@@ -8347,13 +8347,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 targetDir = targetDir.replace("\\", "/")
                 targetDir = rf"{targetDir}"
 
-            if self.ipkernel is not None and self.shell is not None and self.console is not None:
-                # print(''.join(["cd '", targetDir, "'"]))
-                # if sys.platform.startswith("linux"):
-                # self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
-                # else:
-                # self.console.execute(''.join(["os.chdir('", targetDir, "')"]), hidden=False)
+            elif sys.platform.startswith("linux"):
+                targetDir = targetDir.replace("//", "/")
 
+            if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 self.console.execute(
                     ''.join(["os.chdir('", targetDir, "')"]), hidden=True)
 

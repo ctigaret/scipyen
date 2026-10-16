@@ -72,7 +72,7 @@ from core.prog import (safewrapper, scipywarn, unwind_type)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
 from core.marktrain import MarkTrain # noqa
 from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
-from core.datazone import DataZone
+from core.datazone import DataZone  # noqa: F401
 import core.datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice # noqa
@@ -88,7 +88,7 @@ from ephys import (ephys, ephys_pathways, ephys_protocol) # noqa
 
 #### BEGIN pict.gui modules
 # from gui.delegates import PythonItemDelegate
-from gui import guiutils
+from gui import guiutils # noqa: F401
 
 from gui.itemmodels.roles import *
 #### END pict.gui modules
@@ -99,7 +99,7 @@ from gui.itemmodels.roles import *
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-TabularType = typing.Union[pd.DataFrame,
+TabularType = typing.Union[pd.DataFrame, # noqa: UP007
                            pd.Series,
                            neo.core.baseneo.BaseNeo,
                            neo.AnalogSignal,
@@ -127,7 +127,7 @@ TabularType = typing.Union[pd.DataFrame,
 
 TabularTypes = tuple(unwind_type(TabularType))
 
-TabularElementType = typing.Union[
+TabularElementType = typing.Union[  # noqa: UP007
     ephys_pathways.AuxiliaryInput,
     ephys_pathways.AuxiliaryOutput,
     ephys_pathways.RecordingEpisode,
@@ -140,13 +140,6 @@ TabularElementType = typing.Union[
 
 TabularElementTypes = tuple(unwind_type(TabularElementType))
 
-
-# def _extEditableBodyFn_(ns, obj):
-#     ns["obj"] = obj
-#
-#
-# ExternallyEditableType = types.new_class("ExternallyEditableType",
-#                                          exec_body = _extEditableBodyFn_)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
     r"""Table item model for tabular data in Scipyen.
@@ -209,10 +202,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataRowIndexName_: str | None = None
         # self._modelDataRowIndexName_: str = "Index"
         self._modelDataColumns_:int = 0
-        self._modelDataColumnHeaders_: typing.Optional[
-            typing.Union[typing.Mapping, typing.Sequence]
-            ] = None
-        self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
+        self._modelDataColumnHeaders_: typing.Mapping | typing.Sequence | None = None
+        self._immutability_:dict = {"columns": [], "rows": [], "joint": False}
         self._rowBatchSize_:int = 10
         self._columnBatchSize_:int = 10
         self._canAddRemoveRows_:bool = False
@@ -417,7 +408,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return ret
 
-    def appendRow(self, data: typing.Optional[object] = None) -> bool:
+    def appendRow(self, data: object | None = None) -> bool:
         if self._modelData_ is None:
             return
 
@@ -470,7 +461,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             try:
                 if obj is None:
-                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
+                    obj = pd.DataFrame(dict(zip(mdata.columns, (pd.NA, ) * mdata.shape[1])), index = newIndex)
 
                 elif isinstance(obj, typing.Sequence):
                     obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
@@ -491,7 +482,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 newIndex = pd.Index([f"row {row+1}"], name = mdata.index.name)
             try:
                 if obj is None:
-                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex).T
+                    obj = pd.DataFrame(dict(zip(mdata.columns, (pd.NA, ) * mdata.shape[1])), index = newIndex).T
 
                 elif isinstance(obj, typing.Sequence):
                     obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex).T
@@ -529,7 +520,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         TriggerProtocolList
         ],
         row: int,
-        obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
+        obj: ephys_pathways.SynapticPathway | None = None) -> bool:
 
         if obj is None:
             if isinstance(mdata, ephys_pathways.SynapticPathwayList):
@@ -551,10 +542,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 obj = TriggerProtocol()
 
         if len(self._modelData_) and all(hasattr(o, "name") for o in self._modelData_) and hasattr(obj, "name"):
-            names = list(map(lambda o: o.name, self._modelData_))
-
-            seps = list(map(lambda s: strutils.guess_sfx_sep(s), names))
-            seplen = list(map(lambda s: len(s), seps))
+            names = [o.name for o in self._modelData_]
+            seps = [strutils.guess_sfx_sep(s) for s in names]
+            seplen = [len(s) for s in seps]
             longest_sep_ndx = seplen.index(max(seplen))
             sep = seps[longest_sep_ndx]
 
@@ -648,17 +638,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @Slot(object)
     def populateModel(self, data):
-        # from core import datatypes
-        # from imaging import vigrautils
-
-        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__})")
-        # ### BEGIN Define timer to debug
-        # #
-        # timer = QtCore.QElapsedTimer()
-        # timer.start()
-        #
-        # ### END   Define timer debug
-
         self.beginResetModel()
 
         try:
@@ -687,24 +666,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         self.sig_modelPopulated.emit()
 
-
-        # ### BEGIN report timing
-        #
-        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__}) took {timer.elapsed()} milliseconds")
-        #
-        # ### END   report timing
-
     @Slot()
     def _slot_dataEditedExternally(self):
         pass
 
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
-        # ### BEGIN Timing to debug
-        #
-        # timer = QtCore.QElapsedTimer()
-        #
-        # ### END   Timing to debug
         try:
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
                             QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
@@ -729,7 +696,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return qVariant(str(self._modelData_.columns[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
                             if "%s" % self._modelData_.iloc[:,section].dtype == "category":
                                 if len(self._modelData_.iloc[:,section].cat.categories) > 6:
                                     ret = "\n".join(["%s" % v for v in self._modelData_.columns.names] + \
@@ -756,16 +722,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                             if (
                                 isinstance(self._modelDataColumnHeaders_, dict)
-                                # and len(self._modelDataColumnHeaders_)
                                 and section < len(self._modelDataColumnHeaders_)
                                 ):
                                 return qVariant(self._modelDataColumnHeaders_[section])
                             else:
                                 return qVariant(str(self._modelData_.columns[section]))
-                            # return qVariant(str(self._modelData_.columns[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
                             if "%s" % self._modelData_.iloc[:,section].dtype == "category":
                                 if len(self._modelData_.iloc[:,section].cat.categories) > 6:
                                     ret = "\n".join(["%d categories:" % len(self._modelData_.iloc[:,section].cat.categories)] + \
@@ -796,8 +759,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             return qVariant(str(self._modelData_.index[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            # ret = " ".join(["%s" % v for v in self._modelData_.index.names] + ["(%s)" % self._modelData_.iloc[section,:].dtype])
-                            #if isinstance(self._modelData_.iloc[section,:], pd.core.arrays.categorical.CategoricalDtype):
                             if "%s" % self._modelData_.iloc[section,:].dtype == "category":
                                 if len(self._modelData_.iloc[section,:].cat.categories) > 6:
                                     ret = " ".join(["%s" % v for v in self._modelData_.index.names] + \
@@ -827,7 +788,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return qVariant()
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
                             if "%s" % self._modelData_.iloc[section,:].dtype == "category":
                                 if len(self._modelData_.iloc[section,:].cat.category) > 6:
                                     ret = " ".join(["%d categories:" % len(self._modelData_.iloc[section,:].cat.categories)] + \
@@ -860,10 +820,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             return qVariant(self._modelDataColumnHeaders_[section])
                         else:
                             return qVariant(str(self._modelData_.columns[section]))
-                        # return qVariant(str(self._modelData_.name))
 
                     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        #if isinstance(self._modelData_.dtype, pd.core.arrays.categorical.CategoricalDtype):
                         if "%s" % self._modelData_.dtype == "category":
                             if len(self._modelData_.cat.categories) > 6:
                                 ret = "\n".join(["%d categories:" % len(self._modelData_.cat.categories)] + \
@@ -923,7 +881,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return qVariant(str(self._modelData_.index[section]))
 
                             elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                                #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
                                 if "%s" % self._modelData_.iloc[section].dtype == "category":
                                     if len(self._modelData_.iloc[section].cat.categories) > 6:
                                         ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
@@ -1141,7 +1098,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         if attributeName.lower() == "edit":
             return obj
-            # return dataclasses.MISSING
 
         else:
             return getattr(obj, attributeName)
@@ -1151,9 +1107,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         obj = self._modelData_[row] # an Episode
         attributeName = self._modelDataColumnHeaders_[col]
         if attributeName.lower() == "edit":
-            # return ExternallyEditableType(obj = obj)
             return obj
-            # return dataclasses.MISSING
         else:
             return getattr(obj, attributeName)
 
@@ -1216,12 +1170,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         ):
             ret = qVariant(obj)
             obj_name = getattr(obj, "name", None)
-            obj_disp = f"{obj_type_name} object"
+            obj_disp = f"{obj_type_name}"
             if isinstance(obj_name, str) and len(obj_name.strip()):
-                obj_disp = obj_disp + f' "{obj_name}"'
+                obj_disp = f'{obj_disp} "{obj_name}"'
+            else:
+                obj_disp = f'{obj_disp} object'
             obj_disp = qVariant(obj_disp)
-            # obj_disp = qVariant(getattr(obj, "name", obj_type_name))
-            # obj_disp = qVariant(getattr(obj, "name", guiutils.getIcon("view-list-tree")))
 
         elif obj is dataclasses.MISSING:
             ret = qVariant()
@@ -1398,7 +1352,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     )
                 )
 
-        # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
         self._canAddRemoveColumns_ = True
         self._canAddRemoveRows_ = True
         self._modelDataRowIndexName_ = self._modelData_.index.name or "Index"
@@ -1490,7 +1443,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
-        # self._is_vigra_filter_kernel_ = 0
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
@@ -1507,7 +1459,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
-        # self._is_vigra_filter_kernel_ = 0
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
@@ -1521,7 +1472,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
-        # self._is_vigra_filter_kernel_ = 0
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
@@ -1661,8 +1611,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
                 self._modelDataRowIndexName_ = "Index"
 
-                # self._canAddRemoveColumns_ = True
-
             self._modelData_ = data
 
         else: # "plain" numpy arrays and "generic" Quantity arrays
@@ -1730,9 +1678,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
 
                 assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
-
-                # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
-                #     raise ValueError("Only 2D nested sequences are supported")
 
                 self._modelData_ = data
                 self._original_data_ = data
@@ -1923,78 +1868,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             self._original_data_ = vigrautils.kernelfromarray(mdata)
 
         return True
-
-    # @_setValueInModelData_.register(TriggerProtocolList)
-    # def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool: # noqa
-    #     if row >= len(mdata):
-    #         return False
-    #     protocol = mdata[row]
-    #
-    #     attr = self._modelDataColumnHeaders_[col]
-    #
-    #     setattr(protocol, attr, pyvalue)
-    #
-    #     return True
-
-    # @_setValueInModelData_.register(TriggerProtocolList)
-    # @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
-    # @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
-    # @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
-    # @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
-    # @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
-    # @_setValueInModelData_.register(sdc.Schedule)
-    # def __setValueInModelData__(self, mdata: typing.Union[ # noqa
-    #                                             ephys_pathways.SynapticPathwayList,
-    #                                             ephys_pathways.AuxiliaryInputList,
-    #                                             ephys_pathways.AuxiliaryOutputList,
-    #                                             ephys_pathways.RecordingSchedule,
-    #                                             ephys_pathways.SynapticStimulusChannelList,
-    #                                             sdc.Schedule,
-    #                                             ], pyvalue, row, col) -> bool:
-    #     if row >= len(mdata):
-    #         return False
-    #
-    #     obj = mdata[row]
-    #
-    #     attr = self._modelDataColumnHeaders_[col]
-    #
-    #     if attr.lower() != "edit": # noqa
-    #         old_val = getattr(obj, attr)
-    #         if isinstance(old_val, enum.Enum):
-    #             if isinstance(pyvalue, int):
-    #                 new_val = type(old_val)(pyvalue)
-    #
-    #             elif isinstance(pyvalue, str):
-    #                 new_val = type(old_val)[pyvalue]
-    #
-    #         else:
-    #             new_val = pyvalue
-    #
-    #         setattr(obj, attr, new_val)
-    #
-    #     elif hasattr(obj, attr):
-    #         old_val = getattr(obj, attr)
-    #         if isinstance(old_val, enum.Enum):
-    #             if isinstance(pyvalue, int):
-    #                 new_val = type(old_val)(pyvalue)
-    #
-    #             elif isinstance(pyvalue, str):
-    #                 new_val = type(old_val)[pyvalue]
-    #
-    #         else:
-    #             new_val = pyvalue
-    #
-    #         setattr(obj, attr, new_val)
-    #
-    #     mdata[row] = obj
-    #
-    #     if (
-    #         isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
-    #         and attr in ("beginFrame", "nFrames")
-    #         ):
-    #         mdata.update()
-    #
-    #     return True
 
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
