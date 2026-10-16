@@ -125,19 +125,21 @@ TabularType = typing.Union[pd.DataFrame,
                            sdc.Schedule,
                            list, tuple, deque]
 
-TabularElementType = typing.Union[ephys_pathways.RecordingEpisode,
-                                ephys_pathways.RecordingSource,
-                                ephys_pathways.AuxiliaryInput,
-                                ephys_pathways.AuxiliaryOutput,
-                                ephys_pathways.SynapticPathway,
-                                ephys_pathways.SynapticStimulusChannel,
-                                TriggerProtocol,
-                                sdc.Episode
+TabularTypes = tuple(unwind_type(TabularType))
+
+TabularElementType = typing.Union[
+    ephys_pathways.AuxiliaryInput,
+    ephys_pathways.AuxiliaryOutput,
+    ephys_pathways.RecordingEpisode,
+    ephys_pathways.RecordingSource,
+    ephys_pathways.SynapticPathway,
+    ephys_pathways.SynapticStimulusChannel,
+    sdc.Episode,
+    TriggerProtocol,
     ]
 
 TabularElementTypes = tuple(unwind_type(TabularElementType))
 
-TabularTypes = tuple(unwind_type(TabularType))
 
 # def _extEditableBodyFn_(ns, obj):
 #     ns["obj"] = obj
@@ -1115,6 +1117,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_modelDataGetter_.register(TriggerProtocolList)
     def __modelDataGetter__(self, mdata: TriggerProtocolList, row: int, col: int) -> object: # noqa
         obj = mdata[row]
+        attributeName = self._modelDataColumnHeaders_[col]
+        if attributeName.lower() == "edit":
+            return obj
+
         return getattr(obj, self._modelDataColumnHeaders_[col])
 
     @_modelDataGetter_.register(ephys_pathways.SynapticPathwayList)
@@ -1133,11 +1139,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         obj = self._modelData_[row]
         attributeName = self._modelDataColumnHeaders_[col]
 
-        if attributeName.lower() != "edit":
-            return getattr(obj, attributeName)
+        if attributeName.lower() == "edit":
+            return obj
+            # return dataclasses.MISSING
 
         else:
-            return dataclasses.MISSING
+            return getattr(obj, attributeName)
 
     @_modelDataGetter_.register(sdc.Schedule)
     def __modelDataGetter__(self, mdata: sdc.Schedule, row: int, col: int) -> object: # noqa
@@ -1145,7 +1152,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         attributeName = self._modelDataColumnHeaders_[col]
         if attributeName.lower() == "edit":
             # return ExternallyEditableType(obj = obj)
-            return dataclasses.MISSING
+            return obj
+            # return dataclasses.MISSING
         else:
             return getattr(obj, attributeName)
 
@@ -1154,6 +1162,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_modelDataGetter_.register(deque)
     def __modelDataGetter__(self, mdata: (list, tuple, deque), row: int, col: int) -> object: # noqa
         rowObj = self._modelData_[row]
+        attributeName = self._modelDataColumnHeaders_[col]
+        if attributeName.lower() == "edit":
+            return rowObj
+
         if isinstance(rowObj, typing.Sequence):
             val = rowObj[col]
         else:
@@ -1189,11 +1201,26 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def _getVariantForData_(self, obj, role: QtCore.Qt.ItemDataRole) -> QVariantType:
         obj_type_name = qVariant(type(obj).__name__)
 
-        if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
-                            sdc.Procedure,
-                            ephys_pathways.PathwaysStimulationLayout)):
+        if isinstance(obj, (
+            ephys_pathways.AuxiliaryInput,
+            ephys_pathways.AuxiliaryOutput,
+            ephys_protocol.ElectrophysiologyProtocol,
+            ephys_pathways.PathwaysStimulationLayout,
+            ephys_pathways.RecordingEpisode,
+            ephys_pathways.RecordingSource,
+            ephys_pathways.SynapticPathway,
+            ephys_pathways.SynapticStimulusChannel,
+            sdc.Episode,
+            sdc.Procedure,
+            )
+        ):
             ret = qVariant(obj)
-            obj_disp = qVariant(getattr(obj, "name", obj_type_name))
+            obj_name = getattr(obj, "name", None)
+            obj_disp = f"{obj_type_name} object"
+            if isinstance(obj_name, str) and len(obj_name.strip()):
+                obj_disp = obj_disp + f' "{obj_name}"'
+            obj_disp = qVariant(obj_disp)
+            # obj_disp = qVariant(getattr(obj, "name", obj_type_name))
             # obj_disp = qVariant(getattr(obj, "name", guiutils.getIcon("view-list-tree")))
 
         elif obj is dataclasses.MISSING:
@@ -1326,7 +1353,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     map(  # noqa: C417
                         lambda x: (x[0], f"{x[1]}"),
                         enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
-                            "acquisition", "imagingDelay" ,"segments")
+                            "acquisition", "imagingDelay" ,"segments", "Edit")
                         ))
                     )
                 )
@@ -1897,106 +1924,148 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
+    # @_setValueInModelData_.register(TriggerProtocolList)
+    # def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool: # noqa
+    #     if row >= len(mdata):
+    #         return False
+    #     protocol = mdata[row]
+    #
+    #     attr = self._modelDataColumnHeaders_[col]
+    #
+    #     setattr(protocol, attr, pyvalue)
+    #
+    #     return True
+
+    # @_setValueInModelData_.register(TriggerProtocolList)
+    # @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
+    # @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
+    # @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    # @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
+    # @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
+    # @_setValueInModelData_.register(sdc.Schedule)
+    # def __setValueInModelData__(self, mdata: typing.Union[ # noqa
+    #                                             ephys_pathways.SynapticPathwayList,
+    #                                             ephys_pathways.AuxiliaryInputList,
+    #                                             ephys_pathways.AuxiliaryOutputList,
+    #                                             ephys_pathways.RecordingSchedule,
+    #                                             ephys_pathways.SynapticStimulusChannelList,
+    #                                             sdc.Schedule,
+    #                                             ], pyvalue, row, col) -> bool:
+    #     if row >= len(mdata):
+    #         return False
+    #
+    #     obj = mdata[row]
+    #
+    #     attr = self._modelDataColumnHeaders_[col]
+    #
+    #     if attr.lower() != "edit": # noqa
+    #         old_val = getattr(obj, attr)
+    #         if isinstance(old_val, enum.Enum):
+    #             if isinstance(pyvalue, int):
+    #                 new_val = type(old_val)(pyvalue)
+    #
+    #             elif isinstance(pyvalue, str):
+    #                 new_val = type(old_val)[pyvalue]
+    #
+    #         else:
+    #             new_val = pyvalue
+    #
+    #         setattr(obj, attr, new_val)
+    #
+    #     elif hasattr(obj, attr):
+    #         old_val = getattr(obj, attr)
+    #         if isinstance(old_val, enum.Enum):
+    #             if isinstance(pyvalue, int):
+    #                 new_val = type(old_val)(pyvalue)
+    #
+    #             elif isinstance(pyvalue, str):
+    #                 new_val = type(old_val)[pyvalue]
+    #
+    #         else:
+    #             new_val = pyvalue
+    #
+    #         setattr(obj, attr, new_val)
+    #
+    #     mdata[row] = obj
+    #
+    #     if (
+    #         isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
+    #         and attr in ("beginFrame", "nFrames")
+    #         ):
+    #         mdata.update()
+    #
+    #     return True
+
+    @_setValueInModelData_.register(list)
+    @_setValueInModelData_.register(deque)
     @_setValueInModelData_.register(TriggerProtocolList)
-    def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool: # noqa
-        if row >= len(mdata):
-            return False
-        protocol = mdata[row]
-
-        attr = self._modelDataColumnHeaders_[col]
-
-        setattr(protocol, attr, pyvalue)
-
-        return True
-
     @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
     @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
     @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
     @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
     @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
     @_setValueInModelData_.register(sdc.Schedule)
-    def __setValueInModelData__(self, mdata: typing.Union[ # noqa
-                                                ephys_pathways.SynapticPathwayList,
-                                                ephys_pathways.AuxiliaryInputList,
-                                                ephys_pathways.AuxiliaryOutputList,
-                                                ephys_pathways.RecordingSchedule,
-                                                ephys_pathways.SynapticStimulusChannelList,
-                                                sdc.Schedule,
-                                                ], pyvalue, row, col) -> bool:
-        if row >= len(mdata):
-            return False
-
-        obj = mdata[row]
-
+    def __setValueInModelData__(self, mdata, pyvalue, row, col) -> bool: # noqa
+        old_obj = mdata[row]
         attr = self._modelDataColumnHeaders_[col]
+        if attr.lower() == "edit":
+            mdata[row] = pyvalue
+            return True
 
-        if attr.lower() != "edit": # noqa
-            old_val = getattr(obj, attr)
+        if all(isinstance(o, TabularElementTypes) for o in mdata):
+            if (
+                isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
+                and attr in ("beginFrame", "nFrames")
+                ):
+                mdata.update()
+                return True
+
+            # old_obj = mdata[row]
+            # attr = self._modelDataColumnHeaders_[col]
+            attrs = [name for name in self._modelDataColumnHeaders_.values() if name.lower() != "edit"]
+
+            if isinstance(old_obj, ephys_pathways.SynapticPathway):
+                if "electrodeMode" in attrs:
+                    ndx = attrs.index("electrodeMode")
+                    attrs[ndx] = "electrode"
+
+
+                if "pathwayType" in attrs:
+                    ndx = attrs.index("pathwayType")
+                    attrs[ndx] = "pathType"
+
+                if attr == "electrodeMode":
+                    attr = "electrode"
+
+                if attr == "pathwayType":
+                    attr = "pathType"
+
+            params = {name: getattr(old_obj, name) for name in attrs}
+            old_val = getattr(old_obj, attr)
+            # print(f"'{attr}' -> {old_val} ({type(old_val)})")
+
             if isinstance(old_val, enum.Enum):
                 if isinstance(pyvalue, int):
-                    new_val = type(old_val)(pyvalue)
+                    params[attr] = type(old_val)(pyvalue)
 
                 elif isinstance(pyvalue, str):
-                    new_val = type(old_val)[pyvalue]
+                    params[attr] = type(old_val)[pyvalue]
 
             else:
-                new_val = pyvalue
+                params[attr] = pyvalue
 
-            setattr(obj, attr, new_val)
-
-        elif hasattr(obj, attr):
-            old_val = getattr(obj, attr)
-            if isinstance(old_val, enum.Enum):
-                if isinstance(pyvalue, int):
-                    new_val = type(old_val)(pyvalue)
-
-                elif isinstance(pyvalue, str):
-                    new_val = type(old_val)[pyvalue]
-
-            else:
-                new_val = pyvalue
-
-            setattr(obj, attr, new_val)
-
-        mdata[row] = obj
-
-        if (
-            isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
-            and attr in ("beginFrame", "nFrames")
-            ):
-            mdata.update()
-
-        return True
-
-    @_setValueInModelData_.register(list)
-    @_setValueInModelData_.register(deque)
-    def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
-        if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
-            old_obj = mdata[row]
-            attr = self._modelDataColumnHeaders_[col]
-            params = {
-                "name":old_obj.name, "adc":old_obj.adc,
-                "dac":old_obj.dac, "electrodeMode":old_obj.electrodeMode
-                }
-            if attr.lower() != "edit":
-                old_val = getattr(old_obj, attr)
-                # print(f"'{attr}' -> {old_val} ({type(old_val)})")
-                if isinstance(old_val, enum.Enum):
-                    if isinstance(pyvalue, int):
-                        params[attr] = type(old_val)(pyvalue)
-                    elif isinstance(pyvalue, str):
-                        params[attr] = type(old_val)[pyvalue]
-                else:
-                    params[attr] = pyvalue
             new_obj = type(old_obj)(**params)
             mdata[row] = new_obj
+
             return True
+
         else:
             try:
                 mdata[row][col] = pyvalue
             except:
                 traceback.print_exc()
                 return False
+
         return True
 
     @property

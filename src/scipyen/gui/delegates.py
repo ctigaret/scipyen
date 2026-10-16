@@ -1275,7 +1275,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             elif isinstance(data, (
                 ephys_protocol.ElectrophysiologyProtocol,
-                ephys_pathways.PathwaysStimulationLayout
+                ephys_pathways.PathwaysStimulationLayout,
                 sdc.Procedure,
                 )
             ):
