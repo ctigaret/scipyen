@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # NOTE: 2026-02-02 08:32:09
-# DO NOT REMOVE this module: it is used in tableeditorwidget.TableEditorWidget and tableeditor.TableEditor
+# DO NOT REMOVE this module: it is used in tableeditorwidget.TableEditorWidget
+# and tableeditor.TableEditor
 
 #### BEGIN core python modules
 from __future__ import print_function
@@ -53,7 +54,10 @@ else:
     # __has_sip__ = True
 
 class TableDataView(QtWidgets.QTableView):
-    r"""Custom table view, with placeholder text
+    r"""Custom table view, with placeholder text.
+
+CAUTION: Not to be used directly. Use TableEditorWidget instead,
+which incorporates a TableDataView
 
 For code painting the NW corner label see
 // Source - https://stackoverflow.com/a/24163288
