@@ -437,10 +437,10 @@ def lettersToOrdinal(x: str) -> int:
 
 letters2ordinal = lettersToOrdinal
 
-def str2sequence_2(s: str):
-    from core.regexps import BRACKETED_SEQUENCE, DELIMITERS
-
-    DELIMITERS
+# def str2sequence_2(s: str):
+#     from core.regexps import BRACKETED_SEQUENCE, DELIMITERS
+#
+#     DELIMITERS
 
 def detect_nested_sequences(s: str,
                             pairs: typing.Dict[str, str] = None

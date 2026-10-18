@@ -37,7 +37,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-from core import desktoputils
+from core import desktoputils  # noqa: I001
 from core.prog import safewrapper, scipywarn, print_styled # noqa
 from core.sysutils import adapt_ui_path # noqa
 
@@ -192,7 +192,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
 
     @Slot()
     def _slot_editBiologicalSource(self):
-        from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
+        from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget  # noqa: I001
 
         if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and  qtutils.isQObjectAlive(self.biologicalSourceEditor):
             if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):

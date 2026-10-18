@@ -845,13 +845,18 @@ class QuickWidget(QtWidgets.QWidget):
 
 class QuickDialog(QtWidgets.QDialog):
     r"""From vigranumpy.pyqt.quickdialog"""
+    # NOTE: 2026-10-18 15:20:42
+    # Use this signal when the dialog is used to wrap anchoring & collapsible widget
+    #
+    sig_closing = Signal(name="sig_closing")
+
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
                  title:typing.Optional[str]=None,
                  addStretch=True,
                  addSpacing=True):
         QtWidgets.QDialog.__init__(self, parent)
 
-        self._cb_ = list()
+        self._cb_ = []
 
         self.layout = QtWidgets.QVBoxLayout(self)
         if isinstance(addStretch, bool):
@@ -877,6 +882,13 @@ class QuickDialog(QtWidgets.QDialog):
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
+
+    def closeEvent(self, evt):
+        # print(f"{self.__class__.__name__}.closeEvent({evt})")
+        self.sig_closing.emit()
+        if hasattr(super(), "closeEvent"):
+            super().closeEvent(evt)
+        evt.accept()
 
     @property
     def callbacks(self) -> list:

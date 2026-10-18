@@ -139,12 +139,20 @@ data object after loading from file or importing from the workspace.
         self.copyToolButton.clicked.connect(self.sig_requestDataCopy)
         self.exportToolButton.clicked.connect(self.sig_requestDataExport)
         self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
+        if isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()):
+            self.objectSymbolLabel.setText(self._objSymbol_)
 
         self.sig_uiConfigured.connect(self._slot_uiConfigured_)
         self.sig_uiConfigured.emit()
 
     def setObjectSymbol(self, val: str):
-        self.objectSymbolLabel.setText(val)
+        if not isinstance(val, str):
+            val = ""
+        self._objSymbol_ = val
+        if len(self._objSymbol_.strip()) == 0:
+            self.objectSymbolLabel.clear()
+        else:
+            self.objectSymbolLabel.setText(val)
 
     @property
     def varName(self) -> str:
@@ -171,6 +179,7 @@ data object after loading from file or importing from the workspace.
         self.dataType = type(obj)
         if isinstance(objSymbol, str) and len(objSymbol.strip()):
             self._objSymbol_ = objSymbol
+
         else:
             candidateSymbols = self.getDataSymbolInWorkspace(obj)
             if isinstance(candidateSymbols, str):

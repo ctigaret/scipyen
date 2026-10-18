@@ -22,9 +22,7 @@ class InputSpec():
     def __init__(self, mytype=type(dataclasses.MISSING),
                  default = dataclasses.MISSING,
                  value = dataclasses.MISSING,
-                 allowed_values : typing.Optional[
-                                typing.Union[typing.Set, typing.Sequence]
-                                ] = None):
+                 allowed_values : typing.Set | typing.Sequence | None = None):
         r"""Constructor for _InputSpec.
 
     Parameters:

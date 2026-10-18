@@ -220,21 +220,21 @@ Parameters:
 :prompts: A ``dict`` with ``str`` keys (the name of the prompted variable) mapped to |nbsp|
 either: |nbsp|
 
-    * an ``InputSpec`` that enapsulates the default prompt value and type of |nbsp|
-    the value; the latter is used to determine what kind of GUI input |nbsp|
+    * a ``core.inputspec.InputSpec`` object that enapsulates the default prompt  |nbsp|
+    value and type of the value; the latter is used to determine what kind of GUI input |nbsp|
     field will be used in the dialog as a prompt for the variable.
 
     * any object: the object value is the default, and the object type |nbsp|
     determines what kind of gui input field should be used
 
-or a comma-separated list of _NamedInputSpec objects
+or a comma-separated list of core.inputspec.InputSpec objects
 
-:mapping: bool, optional default is False; when True, parameter names are mapped |nbsp|
-to their new values (see below)
+:mapping: bool, optional default is False; when True, returns a dict with |nbsp|
+    parameter names are mapped to their new values (see below)
 
 Kwargs:
 =======
-:dlg_title: ustom dialog title (default is "Input values")
+:dlg_title: custom dialog title (default is "Input values")
 
 Returns:
 --------
@@ -274,8 +274,8 @@ dialog.
 
     prompts = prompts[0]
 
-    prompt_widgets = dict()
-    labels = dict()
+    prompt_widgets = {}
+    labels = {}
 
     nVars = len(prompts)
 
@@ -313,11 +313,6 @@ dialog.
             w.setToolTip("Tri-state checkbox: click to set the desired state: □ (False), ✓ (True) or ⋯ (Undetermined)")
             labels[k] = None
 
-        elif issubclass(v_type, typing.Sequence):
-            if not dt.is_homogeneous_sequence(def_val):
-                raise TypeError("Only sequences homogeneous in their element types are supported")
-            v_type = type(def_val)
-            labels[k] = QtWidgets.QLabel(f"{k}")#, widget_parent)
 
         elif v_type is bool:
             w = qd.CheckBox(widget_parent, f"{k}")
@@ -348,6 +343,15 @@ dialog.
             w.setText(def_val)
             w.setToolTip("Click to edit text")
             labels[k] = None
+
+        elif issubclass(v_type, typing.Sequence):
+            if not dt.is_homogeneous_sequence(def_val):
+                raise TypeError("Only sequences homogeneous in their element types are supported")
+            v_type = type(def_val)
+            labels[k] = QtWidgets.QLabel(f"{k}")#, widget_parent)
+            w = TableEditorWidget(widget_parent)
+            w.readonly=False
+            w.setValue(def_val)
 
         elif issubclass(v_type, np.ndarray):
             if dt.is_scalar(def_val):

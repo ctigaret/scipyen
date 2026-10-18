@@ -6,50 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>427</width>
-    <height>301</height>
+    <width>392</width>
+    <height>390</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_2">
-   <item row="5" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_7">
-     <item>
-      <widget class="QPushButton" name="createObjectPushButton">
-       <property name="toolTip">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="statusTip">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="whatsThis">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="text">
-        <string>New</string>
-       </property>
-       <property name="flat">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-    </layout>
-   </item>
    <item row="4" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
@@ -91,87 +55,172 @@
      </widget>
     </widget>
    </item>
-   <item row="0" column="0">
-    <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
-   </item>
-   <item row="2" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
+   <item row="3" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
      <item>
-      <widget class="QPushButton" name="auxInPushButton">
-       <property name="text">
-        <string>Auxiliary Inputs...</string>
-       </property>
-       <property name="flat">
-        <bool>false</bool>
-       </property>
-      </widget>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>ADC:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="adcSpinBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>DAC:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="dacSpinBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_4">
+           <property name="toolTip">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="statusTip">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="whatsThis">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="text">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Electrode&lt;br/&gt;Mode:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="electrodeModeComboBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="frame">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </item>
      <item>
-      <widget class="QPushButton" name="auxOutPushButton">
-       <property name="text">
-        <string>Auxiliary Outputs...</string>
+      <widget class="QGroupBox" name="groupBox">
+       <property name="title">
+        <string>Auxiliary</string>
        </property>
-       <property name="flat">
-        <bool>false</bool>
-       </property>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QPushButton" name="auxInPushButton">
+          <property name="toolTip">
+           <string>Configure auxiliary inputs</string>
+          </property>
+          <property name="statusTip">
+           <string>Configure auxiliary inputs</string>
+          </property>
+          <property name="whatsThis">
+           <string>Configure auxiliary inputs</string>
+          </property>
+          <property name="text">
+           <string>Inputs...</string>
+          </property>
+          <property name="flat">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="auxOutPushButton">
+          <property name="toolTip">
+           <string>Configure auxiliary outputs</string>
+          </property>
+          <property name="statusTip">
+           <string>Configure auxiliary outputs</string>
+          </property>
+          <property name="whatsThis">
+           <string>Configure auxiliary outputs</string>
+          </property>
+          <property name="text">
+           <string>Outputs...</string>
+          </property>
+          <property name="flat">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </item>
     </layout>
    </item>
    <item row="1" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
+   </item>
+   <item row="5" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_7">
      <item>
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>ADC:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="adcSpinBox"/>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>DAC:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="dacSpinBox"/>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_4">
+      <widget class="QPushButton" name="createObjectPushButton">
        <property name="toolTip">
-        <string>Recording Electrode Mode</string>
+        <string>Create a new RecordingSource from current data</string>
        </property>
        <property name="statusTip">
-        <string>Recording Electrode Mode</string>
+        <string>Create a new RecordingSource from current data</string>
        </property>
        <property name="whatsThis">
-        <string>Recording Electrode Mode</string>
+        <string>Create a new RecordingSource from current data</string>
        </property>
        <property name="text">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Electrode&lt;br/&gt;Mode:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>New</string>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="electrodeModeComboBox">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="frame">
+       <property name="flat">
         <bool>true</bool>
        </property>
       </widget>
      </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
     </layout>
    </item>
-   <item row="3" column="0">
+   <item row="0" column="0">
     <widget class="QPushButton" name="createTwoPathwaysSourcePushButton">
      <property name="toolTip">
       <string>Create a two-pathway source directly</string>
@@ -183,7 +232,7 @@
       <string>Create a two-pathway source directly</string>
      </property>
      <property name="text">
-      <string>Two-Pathways Source</string>
+      <string>New Two-Pathways Source</string>
      </property>
      <property name="icon">
       <iconset theme="document-new-from-template"/>

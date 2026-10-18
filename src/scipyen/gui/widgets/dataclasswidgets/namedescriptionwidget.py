@@ -39,6 +39,7 @@ from core import qtutils
 from iolib import pictio as pio
 
 from gui import textviewer, ObjectInspector
+from gui import quickdialog as qd
 # from gui.workspacegui import WorkspaceGuiMixin
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
@@ -134,8 +135,6 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             self.nameLineEdit.setWhatsThis(f"Name of {self._objectType_.__name__}")
             self.nameLineEdit.setStatusTip(f"Name of {self._objectType_.__name__}")
 
-
-
     @Slot(bool)
     def _slot_toggleDataExchangeWidget(self, val: bool):
         if val is True:
@@ -145,6 +144,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
                 self.dataExchangeWidget.collapse(False)
 
     def _makeDataExchangeWidget(self):
+        print(f"{self.__class__.__name__}<{self.objectName()}>._makeDataExchangeWidget()")
         anchoringWidget = self.provideAnchoringWidget()
         self.dataExchangeWidget = self._setupCollapsibleChild_(
             DataExchangeWidget,
@@ -176,6 +176,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         else:
             self._makeDataExchangeWidget()
 
+        # WARNING 2026-10-18 12:47:45
+        # Subclasses of AnchoringCollapsibleWidget override these two methods so
+        # that, when running in a Wayland compositor, they wrap themselves in a
+        # QuickDialog
         self.dataExchangeWidget.setWindowTitle("Input/Output")
         self.dataExchangeWidget.show()
 
@@ -190,21 +194,27 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     def _slot_dataChanged(self, val: object):
         r"""Captures changes made externally"""
         # print(f"{self.__class__.__name__}._slot_dataChanged")
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
-                              (self.nameLineEdit,
-                               )))
+        # sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        #                       (self.nameLineEdit,
+        #                        )))
+        #
+        # if isinstance(self.descriptionEditor, textviewer.TextViewer):
+        #     sigBlockers.append(QtCore.QSignalBlocker(self.descriptionEditor))
+
+        blockedSignalEmitters = [self.nameLineEdit]
 
         if isinstance(self.descriptionEditor, textviewer.TextViewer):
-            sigBlockers.append(QtCore.QSignalBlocker(self.descriptionEditor))
+            blockedSignalEmitters.append(self.descriptionEditor)
 
-        if hasattr(val, "description") and isinstance(val.description, str):
-            self._dataDescription_ = val.description
-            if isinstance(self.descriptionEditor, textviewer.TextViewer):
-                self.descriptionEditor.setText(self._dataDescription_, show=False)
+        with qtutils.SignalBlocker(tuple(blockedSignalEmitters)):
+            if hasattr(val, "description") and isinstance(val.description, str):
+                self._dataDescription_ = val.description
+                if isinstance(self.descriptionEditor, textviewer.TextViewer):
+                    self.descriptionEditor.setText(self._dataDescription_, show=False)
 
-        if hasattr(val, "name") and isinstance(val.name, str):
-            self._dataName_ = val.name
-            self.nameLineEdit.setText(self._dataName_)
+            if hasattr(val, "name") and isinstance(val.name, str):
+                self._dataName_ = val.name
+                self.nameLineEdit.setText(self._dataName_)
 
         if isinstance(self.detailsViewer, ObjectInspector):# and self.detailsViewer.isVisible():
             # print(f"\n\t-> call self.detailsViewer.view({val},\n{self.symbol})")
@@ -318,6 +328,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
 
     @Slot()
     def _slot_importData(self):
+        print(f"{self.__class__.__name__}<{self.objectName()}>._slot_importData")
         if self._data_ is None:
             ret = self.importFromWorkSpace(
                 title = "Select Object in Workspace",
