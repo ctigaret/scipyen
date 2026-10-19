@@ -150,6 +150,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
 
         self.toggleProcedureEditorToolButton.toggled.connect(self._slot_toggleProcedureEditor)
 
+        self.nameDescriptionWidget.sig_valueChanged.connect(self.sig_valueChanged)
         self.sig_uiConfigured.emit()
 
     def closeEvent(self, evt):

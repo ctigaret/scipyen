@@ -425,17 +425,17 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         evt.accept()
 
     def closeSubWidgets(self):
-        if isinstance(self.descriptionEditor, textviewer.TextViewer):
+        if isinstance(self.descriptionEditor, textviewer.TextViewer) and qtutils.isQObjectAlive(self.descriptionEditor):
             self.descriptionEditor.close()
             self.descriptionEditor.deleteLater()
             self.descriptionEditor = None
 
-        if isinstance(self.detailsViewer, ObjectInspector):
+        if isinstance(self.detailsViewer, ObjectInspector) and qtutils.isQObjectAlive(self.detailsViewer):
             self.detailsViewer.close()
             self.detailsViewer.deleteLater()
             self.detailsViewer = None
 
-        if isinstance(self.dataExchangeWidget, DataExchangeWidget):
+        if isinstance(self.dataExchangeWidget, DataExchangeWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
             self.dataExchangeWidget.close()
             self.dataExchangeWidget.deleteLater()
             self.dataExchangeWidget = None

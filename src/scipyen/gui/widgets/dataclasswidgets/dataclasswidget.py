@@ -313,20 +313,6 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
                 self.parentEditor.collapse(False)
 
-    # def _makeParentEditor(self, editorWidgetType, data):
-    #     anchoringWidget = self.provideAnchoringWidget()
-    #     self.parentEditor = self._setupCollapsibleChild_(
-    #         editorWidgetType,
-    #         "parentEditor",
-    #         self._slot_parentChanged,
-    #         self.nameDescriptionWidget.toggleParentEditorToolButton,
-    #         anchoringWidget,
-    #         not desktoputils.is_wayland(),
-    #         data,
-    #         objSymbol="parent"
-    #         )
-
-
     @Slot()
     def _slot_editParent(self):
         parentData = None
@@ -436,6 +422,8 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             data,
             dataSymbol="organism",
             )
+
+        obj.setWindowTitle(widgetType.__name__.replace("Widget", ""))
 
         return obj
 

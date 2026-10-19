@@ -483,7 +483,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
         #     return
 
         # print(f"{self.__class__.__name__}<{self.objectName()}>.show()")
-        if desktoputils.is_wayland():
+        if desktoputils.is_wayland() and self.isAnchoredWidget:
             windowTitle = self._customWindowTitle_
             if not isinstance(windowTitle, str) or len(windowTitle.strip()) == 0:
                 windowTitle = self.__class__.__name__
