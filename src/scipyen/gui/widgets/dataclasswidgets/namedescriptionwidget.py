@@ -144,7 +144,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
                 self.dataExchangeWidget.collapse(False)
 
     def _makeDataExchangeWidget(self):
-        print(f"{self.__class__.__name__}<{self.objectName()}>._makeDataExchangeWidget()")
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._makeDataExchangeWidget()")
         anchoringWidget = self.provideAnchoringWidget()
         self.dataExchangeWidget = self._setupCollapsibleChild_(
             DataExchangeWidget,
@@ -328,7 +328,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
 
     @Slot()
     def _slot_importData(self):
-        print(f"{self.__class__.__name__}<{self.objectName()}>._slot_importData")
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_importData")
         if self._data_ is None:
             ret = self.importFromWorkSpace(
                 title = "Select Object in Workspace",

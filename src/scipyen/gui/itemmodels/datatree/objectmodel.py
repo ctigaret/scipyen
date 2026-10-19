@@ -317,6 +317,10 @@ class ObjectModel(QtGui.QStandardItemModel):
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
+        for objectItem in self.objectItems():
+            objectNode = objectItem.data(ObjectDataRole)
+            objectNode.objectInfo.readOnly = self._readOnly_
+            self._updateRowForNode_(objectItem, objectNode)
 
     @property
     def readOnlyChildren(self: typing.Self) -> bool:
@@ -325,6 +329,10 @@ class ObjectModel(QtGui.QStandardItemModel):
     @readOnlyChildren.setter
     def readOnlyChildren(self: typing.Self, val: bool):
         self._readOnlyChildren_ = val is True
+        for objectItem in self.objectItems():
+            objectNode = objectItem.data(ObjectDataRole)
+            objectNode.objectInfo.readOnly = self._readOnlyChildren_
+            self._updateRowForNode_(objectItem, objectNode)
 
     def _updateRowForNode_(self, item:QtGui.QStandardItem, objectNode: ObjectNode):
         r"""Updates data representation based on the objectNode"""
@@ -1045,7 +1053,7 @@ class ObjectModel(QtGui.QStandardItemModel):
                               self.objectItems(mode=mode))
 
     def objectItems(self, mode: int = Tree.WIDTH):
-        r"""Iteates through the existing QStandardItem in the first column"""
+        r"""Iterates through the existing QStandardItem in the first column"""
         yield from self.filterObjectItems(mode=mode)
 
     def filterObjectItems(self, item: QtGui.QStandardItem | None = None, /,

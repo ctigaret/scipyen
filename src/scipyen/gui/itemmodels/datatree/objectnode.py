@@ -8,8 +8,8 @@
 import os # noqa
 # import warnings
 import types
-import traceback  # noqa: F401
-# import itertools
+import traceback
+import itertools
 import inspect
 import dataclasses
 import numbers
@@ -2769,6 +2769,7 @@ def introspectObject(obj, /,
             selected = tuple(filter(fcn, childnames))
 
         except: # noqa: E722
+            traceback.print_exc()
             childnames = tuple(fieldnames)
             selected = tuple(filter(fcn, childnames))
 
