@@ -7,7 +7,9 @@
 +            if not result.exists():
 +                result = Path(self.data_dir) / "modules"
 +            if not result.exists():
++                result = Path(self.data_dir) / "mkspecs" / "modules"
++            if not result.exists():
 +                raise ValueError("Cannot find the directory 'modules', containing JSON files for Qt modules")
              return os.fspath(result)
- 
+
          @property

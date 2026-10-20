@@ -1,0 +1,26 @@
+user@host:~> qtpaths6 --qt-query
+QT_SYSROOT:
+QT_INSTALL_PREFIX:/usr
+QT_INSTALL_ARCHDATA:/usr/lib64/qt6
+QT_INSTALL_DATA:/usr/share/qt6
+QT_INSTALL_DOCS:/usr/share/doc/qt6
+QT_INSTALL_HEADERS:/usr/include/qt6
+QT_INSTALL_LIBS:/usr/lib64
+QT_INSTALL_LIBEXECS:/usr/libexec/qt6
+QT_INSTALL_BINS:/usr/lib64/qt6/bin
+QT_INSTALL_TESTS:/usr/lib64/qt6/tests
+QT_INSTALL_PLUGINS:/usr/lib64/qt6/plugins
+QT_INSTALL_QML:/usr/lib64/qt6/qml
+QT_INSTALL_TRANSLATIONS:/usr/share/qt6/translations
+QT_INSTALL_CONFIGURATION:
+QT_INSTALL_EXAMPLES:/usr/lib64/qt6/examples
+QT_INSTALL_DEMOS:/usr/lib64/qt6/examples
+QT_HOST_PREFIX:/usr
+QT_HOST_DATA:/usr/lib64/qt6
+QT_HOST_BINS:/usr/lib64/qt6/bin
+QT_HOST_LIBEXECS:/usr/libexec/qt6
+QT_HOST_LIBS:/usr/lib64
+QMAKE_SPEC:linux-g++
+QMAKE_XSPEC:linux-g++
+QMAKE_VERSION:3.1
+QT_VERSION:6.12.0

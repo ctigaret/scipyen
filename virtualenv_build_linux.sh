@@ -657,6 +657,7 @@ function dopyside6 ()
     if [ ! -r ${VIRTUAL_ENV}/.pyside6done ] || [[ $reinstall_pyside6 -eq 1 ]] ; then
         if [[ $build_pyside6 -eq 1 ]]; then
             get_qtpaths
+            echo "found qtpaths as $full_path_to_qtpaths"
             cd ${VIRTUAL_ENV}
             mkdir -p src && cd src
             # create build directory
@@ -672,7 +673,8 @@ function dopyside6 ()
             base_build_dir=${VIRTUAL_ENV}/src/pyside6-build
             cd ${VIRTUAL_ENV}/src
             git clone https://code.qt.io/pyside/pyside-setup
-            cd pyside-setup && git checkout 6.11
+            cd pyside-setup && git checkout 6.12
+            # cd pyside-setup && git checkout 6.11
             # cd pyside-setup && git checkout 6.9
 #             cd pyside-setup && git checkout 6.8
             if [ -z ${uv_exec} ] ; then
@@ -684,20 +686,23 @@ function dopyside6 ()
                 ${uv_exec} pip install -r requirements-doc.txt
                 ${uv_exec} pip install -r requirements-coin.txt
             fi
-            qtinfopatch=${installscriptdir}/pyside6/qtinfo.diff
+
+            # NOTE: 2026-10-20 23:26:15
+            # skip this for Qt ≥ 6.12
+            qtinfopatch=${installscriptdir}/pyside6/qtinfo_new.diff
             patch build_scripts/qtinfo.py ${qtinfopatch}
 
             if [[ $njobs -gt 0 ]] ; then
                 if [ -z ${uv_exec} ] ; then
-                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
+                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --ignore-git --build-base=${base_build_dir} --parallel=$njobs
                 else
-                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir} --parallel=$njobs
+                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --ignore-git --build-base=${base_build_dir} --parallel=$njobs
                 fi
             else
                 if [ -z ${uv_exec} ] ; then
-                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir}
+                    python setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --ignore-git --build-base=${base_build_dir}
                 else
-                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --build-base=${base_build_dir}
+                    uv run setup.py build --qtpaths=${full_path_to_qtpaths} --build-tests --ignore-git --build-base=${base_build_dir}
                 fi
             fi
             
