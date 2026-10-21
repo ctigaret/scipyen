@@ -181,7 +181,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     # NOTE: 2026-02-01 22:47:01
     # we NEVER store any data in the QModelIndex instances, here...
 
-    sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    # NOTE: 2026-10-21 00:54:59
+    # the next line is invalid in PySide6 for Qt 6.12 -> libpside raises RuntimeWarning
+    # sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    sig_editCompleted = Signal(object, name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
     # NOTE: 2025-11-23 14:03:48 sig_rowsPopulated(startRow, count, total)
     sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")

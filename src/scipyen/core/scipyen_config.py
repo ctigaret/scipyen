@@ -97,6 +97,7 @@ import collections
 import numpy as np
 import pandas as pd
 import quantities as pq
+from tribool import Tribool
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
@@ -656,6 +657,11 @@ def saveQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, va
     key_name = f"{pfx}{key}"
     # print(f"saveQSettingsKey group: {gname}, key: {key}, value: {val} ({type(val).__name__})")
     qsettings.beginGroup(gname)
+    if isinstance(val, bool):
+        val = f"{val}"
+    elif isinstance(val, Tribool):
+        val = f"{val}".lower
+
     qsettings.setValue(key_name, val)
     qsettings.endGroup()
 
@@ -669,6 +675,12 @@ def loadQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, de
     # print(f"loadQSettingsKey group: {gname}, key: {key})")
     try:
         ret = qsettings.value(key_name, default)
+        if isinstance(ret, str):
+            if ret in ("true", "false", "indeterminate"):
+                ret = Tribool() if ret == "indeterminate" else Tribool(True) if ret == "true" else Tribool(False)
+
+            elif ret in ("True", "False"):
+                ret = True if ret == "True" else False
     except:
         scipywarn(f"Cannot load QSettings for key {key_name}")
         traceback.print_exc()

@@ -155,7 +155,10 @@ class ObjectModel(QtGui.QStandardItemModel):
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
-    sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    # NOTE: 2026-10-21 00:54:59
+    # the next line is invalid in PySide6 for Qt 6.12 -> libpside raises RuntimeWarning
+    # sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
+    sig_editCompleted = Signal(object, name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
     sig_standaloneEditorChildExpanded = Signal(QtGui.QStandardItem, name="sig_standaloneEditorChildExpanded")
 
