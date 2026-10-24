@@ -30,9 +30,6 @@ import decimal # noqa
 import fractions # noqa
 # import faulthandler
 import importlib
-# NOTE: 2024-09-26 12:16:28
-# I wrap reload with scipyen_plugin_loader.reload, further below
-# from importlib import reload  # I use this all too often !
 import subprocess
 import platform
 import traceback
@@ -224,7 +221,7 @@ import colorama  # noqa
 from core import qtutils
 from core.qtutils import (qVariant, QVariantType) #, fromQVariant)
 from core import datazone   # noqa: F401
-from core import datatypes
+from core import datatypes  # noqa: F401
 from core import basescipyen # noqa: F401
 from core import neoutils
 from core import prog
@@ -242,15 +239,15 @@ from core.deferredmeasures import *
 from core.basescipyen import BaseScipyenData # noqa: F401
 
 from core.datazone import (DataZone, Interval,  # noqa: F401
-                           intervals2cursors, intervals2epoch, # noqa: F401
-                           epoch2cursors, epoch2intervals) # noqa: F401
+                           intervals2cursors, intervals2epoch,
+                           epoch2cursors, epoch2intervals)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)  # noqa: F401
 # from core.datatypes import *
 # import core.datatypes as datatypes
 
 from core.prog import (safewrapper, deprecation, iter_attribute,  # noqa: F401
-                       filter_type, filterfalse_type, # noqa: F401
+                       filter_type, filterfalse_type,
                        filter_attribute, filterfalse_attribute,
                        timefunc, timemethod, timeblock, processtimefunc,
                        processtimeblock, Timer, scipywarn, warn_with_traceback,
@@ -260,101 +257,101 @@ from core.prog import (safewrapper, deprecation, iter_attribute,  # noqa: F401
 # use our own warning - OK for scipyen console
 warnings.showwarning = prog.showwarning
 
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
-from core.triggerprotocols import TriggerProtocol
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )  # noqa: I001,F401
+from core.triggerprotocols import TriggerProtocol  # noqa: F401
 from core.traitcontainers import DataBag
 
 from core.utilities import (summarize_object_properties, # noqa: F401
-                            augment_obj_prop_dict, # noqa: F401
-                            standard_obj_summary_headers, # noqa: F401
-                            safe_identity_test, unique, index_of, # noqa: F401
-                            gethash, NestedFinder, normalized_index, # noqa: F401
-                            reverse_mapping_lookup) # noqa: F401
+                            augment_obj_prop_dict,
+                            standard_obj_summary_headers,
+                            safe_identity_test, unique, index_of,
+                            gethash, NestedFinder, normalized_index,
+                            reverse_mapping_lookup)
 
-import core.curvefitting as crvf # noqa: F401
+import core.curvefitting as crvf
 import core.data_analysis as anl # noqa: F401
-import core.desktoputils as desktoputils # noqa: F401
+from core import desktoputils
 import core.scipyen_quantities as scq # noqa: F401
-import core.strutils as strutils # noqa: F401
-from core.strutils import counter_suffix # noqa: F401
-import core.signalprocessing as sigp # noqa: F401
-import core.sysutils as sysutils # noqa: F401
-import core.tiwt as tiwt # noqa: F401
-# import core.utilities as utilities
-import core.xmlutils as xmlutils # noqa: F401
+from core import strutils
+from core.strutils import counter_suffix
+import core.signalprocessing as sigp
+from core import sysutils
+from core import tiwt # noqa: F401
+from core import xmlutils # noqa: F401
 
-from core.scipyen_config import (markConfigurable, confuse, # noqa
-                                 saveWindowSettings, loadWindowSettings, ) # noqa: F401
+from core.scipyen_config import (markConfigurable, confuse,  # noqa: F401
+                                 saveWindowSettings, loadWindowSettings, )
 from core.scipyen_config import scipyen_config as scipyen_settings # noqa
-from core.scipyenmagics import ScipyenMagics # noqa: F401
-from core.strutils import InflectEngine # noqa: F401
+from core.scipyenmagics import ScipyenMagics
+from core.strutils import InflectEngine
+# NOTE: 2024-09-26 12:16:28
+# overrised importlib.reload to allow for plugin reloading
 from core.scipyen_plugin_loader import reload # noqa: F401
-from core.vigra_patches import vigra # noqa: F401
-from core.workspacefunctions import * # noqa: F401
-# from core.deferredmeasures import DeferredSignalMeasure # noqa: F401
+from core.vigra_patches import vigra
+from core.workspacefunctions import *
 
-from plots import plots as plots # noqa: F401
+from plots import plots
 
 
 from imaging.axisutils import (axisTypeFromString, # noqa: F401
-                               axisTypeName, # noqa: F401
-                               axisTypeStrings, # noqa: F401
-                               axisTypeSymbol, # noqa: F401
-                               axisTypeUnits, # noqa: F401
-                               dimEnum, # noqa: F401
-                               dimIter, # noqa: F401
-                               evalAxisTypeExpression, # noqa: F401
-                               getAxisTypeFlagsInt, # noqa: F401
-                               getNonChannelDimensions, # noqa: F401
-                               hasChannelAxis, # noqa: F401
-                               ) # noqa: F401
+                               axisTypeName,
+                               axisTypeStrings,
+                               axisTypeSymbol,
+                               axisTypeUnits,
+                               dimEnum,
+                               dimIter,
+                               evalAxisTypeExpression,
+                               getAxisTypeFlagsInt,
+                               getNonChannelDimensions,
+                               hasChannelAxis,
+                               )
 
 from imaging import axisutils, vigrautils # noqa: F401
 from imaging import (imageprocessing as imgp, imgsim,) # noqa: F401
 from imaging.scandata import (AnalysisUnit, ScanData,) # noqa: F401
 from imaging.axiscalibration import (AxesCalibration, # noqa: F401
-                                     AxisCalibrationData, # noqa: F401
-                                     ChannelCalibrationData, # noqa: F401
-                                     CalibrationData) # noqa: F401
-from ephys import (ephys, membrane, ephys_pathways) # noqa: F401
-from systems import * # noqa: F401
+                                     AxisCalibrationData,
+                                     ChannelCalibrationData,
+                                     CalibrationData)
+from ephys import (ephys, membrane, ephys_pathways)  # noqa: F401
+from systems import *
 
-from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems) # noqa: F401
+from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems)
 
 from . import delegates # noqa: F401
 from . import interact # noqa: F401
 from . import scipyen_colormaps as colormaps # noqa: F401
-from . import consoles # noqa: F401
-from . import guiutils # noqa: F401
-from . import scipyenviewer # noqa: F401
-from . import quickdialog as qd # noqa: F401
+from . import consoles
+from . import guiutils
+from . import scipyenviewer
+from . import quickdialog as qd
 # from .resources import resources_rc #as resources_rc
 # from .resources import icons_rc
 if __has_PySide6__:
-    from .resources.pyside6 import breeze_icons_rc # noqa: F401
-    from .resources.pyside6 import breeze_dark_icons_rc # noqa: F401
-    from .resources.pyside6 import extra_icons_rc # noqa: F401
-    from .resources.pyside6 import images_rc # noqa: F401
+    from .resources.pyside6 import breeze_icons_rc
+    from .resources.pyside6 import breeze_dark_icons_rc
+    from .resources.pyside6 import extra_icons_rc
+    from .resources.pyside6 import images_rc
 else:
-    from .resources.pyqt6 import breeze_icons_rc # noqa: F401
-    from .resources.pyqt6 import breeze_dark_icons_rc # noqa: F401
-    from .resources.pyqt6 import extra_icons_rc # noqa: F401
-    from .resources.pyqt6 import images_rc # noqa: F401
+    from .resources.pyqt6 import breeze_icons_rc
+    from .resources.pyqt6 import breeze_dark_icons_rc
+    from .resources.pyqt6 import extra_icons_rc
+    from .resources.pyqt6 import images_rc
 
-from . import pictgui as pgui # noqa: F401
-from . import xmlviewer as xv # noqa: F401
-from . import textviewer as tv # noqa: F401
-from . import tableeditor as te # noqa: F401
-from . import signalviewer as sv # noqa: F401
-from . import matrixviewer as matview # noqa: F401
-from . import imageviewer as iv # noqa: F401
-from . import ObjectInspector as dv # noqa: F401
+from . import pictgui as pgui
+from . import xmlviewer as xv
+from . import textviewer as tv
+from . import tableeditor as te
+from . import signalviewer as sv
+from . import matrixviewer as matview
+from . import imageviewer as iv
+from . import ObjectInspector as dv
 # from gui.pythonhelpwidget import PythonHelpWidget
 
 from .consoles import styles, pstyles # noqa: F401
 from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, # noqa: F401
-                    cursors2epoch, cursors2intervals) # noqa: F401
-from .interact import (getInput, getInputs, packInputs, selectWSData) # noqa: F401
+                    cursors2epoch, cursors2intervals)
+from .interact import (getInput, getInputs, packInputs, selectWSData)
 from .itemslistdialog import ItemsListDialog # noqa: F401
 from .menuproxy import MenuProxy # noqa: F401
 from .triggerdetectgui import guiDetectTriggers # noqa: F401
@@ -2731,12 +2728,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @markConfigurable("RecentDirectories")
     @_recentDirs_.setter
     def _recentDirs(self, val):
-        if not isinstance(val, str) or len(val.strip()):
-            val = collections.deque()
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            dirs = collections.deque()
         else:
-            val = collections.deque(val.split(';;'))
+            dirs = collections.deque(val.split(';;'))
 
-        self.recentDirectories = val
+        self.recentDirectories = dirs
 
     @property
     def fileSystemFilterHistory(self):
@@ -2763,7 +2760,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @markConfigurable("RecentFileSystemFilters")
     @_fsFilterHistory_.setter
     def _fsFilterHistory_(self, val):
-        if not isinstance(val, str) or len(val.strip()):
+        if not isinstance(val, str) or len(val.strip()) == 0:
             val = collections.deque()
         else:
             val = collections.deque(val.split(';;'))
@@ -3301,7 +3298,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def recentScripts(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         # print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            self._recentScripts = collections.deque(s for s in val if os.path.isfile(s))
 
         else:
             self._recentScripts = collections.deque()
@@ -5048,7 +5045,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         if len(selectedItems) == 0:
             ret = self._getFullHistoryAsCode_(magic, lineNumbers = lineNumbers,
                                               withHeader = withHeader,
-                                              skipEmptySessions = skipEmptySessions,#
+                                              skipEmptySessions = skipEmptySessions,
                                               newLineAtEnd = newLineAtEnd)
 
             if suggestTitle:
@@ -6018,7 +6015,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         if len(indexList) > 1:
             varNames = list()
 
-            varSet = set((self.workspaceModel.getVarName(i) for i in indexList))
+            varSet = set(self.workspaceModel.getVarName(i) for i in indexList)
 
             varNames = sorted(varSet)
 

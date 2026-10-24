@@ -84,18 +84,18 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os, inspect, typing, types, math, numbers, json, traceback, warnings  # noqa: I001
+import os, inspect, typing, types, math, numbers, json, traceback, warnings  # noqa: I001,F401
 # import yaml
-import dataclasses
+import dataclasses  # noqa: F401
 # from copy import (copy, deepcopy,)
 import confuse
 # from types import new_class
 from functools import partial
 # from functools import (partial, wraps,)
-from pprint import pprint
+# from pprint import pprint
 import collections
-import numpy as np
-import pandas as pd
+import numpy as np  # noqa: F401
+import pandas as pd  # noqa: F401
 import quantities as pq
 from tribool import Tribool
 
@@ -124,7 +124,7 @@ else:
     elif os.environ["QT_API"] == "pyqt5":
         __has_PyQt5__ = True
 
-    from qtpy import sip
+    from qtpy import sip  # noqa: F401
     # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -146,17 +146,17 @@ organization_name = "Scipyen"
 #     application_name = "Scipyen"
 #     organization_name = "Scipyen"
 
-from IPython.lib.pretty import pprint # noqa: I001
+from IPython.lib.pretty import pprint # noqa: I001,F401
 
 import traitlets
 from traitlets.utils.bunch import Bunch
-import traitlets.config
+import traitlets.config  # noqa: F401
 from .traitcontainers import DataBag
-from core import (traitutils, strutils)
-from core.prog import (safewrapper, print_styled, scipywarn)
+from core import (traitutils, strutils)  # noqa: F401
+from core.prog import (safewrapper, print_styled, scipywarn)  # noqa: F401
 from core.workspacefunctions import user_workspace
 from core.scipyen_quantities import(quantity2str, str2quantity)
-from iolib.jsonio import (object2JSON, json2python)
+from iolib.jsonio import (object2JSON, json2python)  # noqa: F401
 
 def quantity_representer(dumper, data):
     return dumper.represent_scalar("tag:pq.Quantity", quantity2str(data, precision=8))
@@ -212,7 +212,7 @@ confuse.yaml_util.Loader.add_constructor("tag:pq.Quantity", quantity_constructor
 # on environment variables (e.g. pyqtgraph)
 # END NOTE: 2021-01-10 13:17:58
 
-global scipyen_config
+# global scipyen_config
 scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")
 
 if not scipyen_config._materialized:# make sure this is done only once
@@ -220,8 +220,9 @@ if not scipyen_config._materialized:# make sure this is done only once
 
 #print(f"scipyen_config module: global qsettings {qsettings.fileName()}")
 scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
+# scipyen_user_config_source = next(s for s in scipyen_config.sources if not s.default)[0]
 
-def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
+def configsrc2bunch(src:confuse.ConfigSource | Bunch):
     r"""Creates a nested Bunch from this confuse.ConfigSource
 
     Useful for loading configurable values from a source.
@@ -237,8 +238,8 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
 
 def markConfigurable(confname:str, conftype:str="", setter:bool=True,
-                     default:typing.Optional[typing.Any]=None,
-                     trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None,
+                     default:typing.Any | None=None,
+                     trait_notifier:bool | DataBag | None = None,
                      value_type=None):
     r"""Decorator for instance methods & properties.
 
@@ -430,10 +431,10 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
     # FIXME? 2021-11-26 16:47:11
     # cannot check 'f' here !?
     if not isinstance(confname, str) or len(confname.strip()) == 0:
-        return f # fail silently
+        return f # fail silently  # noqa: F821
 
     if not isinstance(conftype, str):
-        return f # fail silently
+        return f # fail silently  # noqa: F821
 
     conftype = conftype.lower()
 
@@ -446,9 +447,9 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
             # NOTE 2021-09-06 10:42:49
             # applies only to read-write properties
             # hence only decorate xxx.setter if defined
-            if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
-                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default, "value_type": value_type}))
-                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default, "value_type": value_type}))
+            if all(inspect.isfunction(func) for func in (f.fget, f.fset)):
+                f.fget.configurable_getter = Bunch({"type": conftype, "name": confname, "getter": f.fget.__name__, "default": default, "value_type": value_type})
+                f.fset.configurable_setter = Bunch({"type": conftype, "name": confname, "setter": f.fset.__name__, "default": default, "value_type": value_type})
 
                 if conftype != "qt": #and isinstance(trait_notifier, DataBag):
                     # NOTE: 2021-09-08 09:14:16
@@ -483,13 +484,13 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
 
                     parset = partial(newfset, _trait_notifier_=trn)
 
-                    setattr(parset, "configurable_setter", conf_setter)
+                    parset.configurable_setter = conf_setter
 
                     return property(fget = f.fget, fset = parset, doc = f.__doc__)
 
         elif inspect.isfunction(f):
             if setter is True:
-                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default, "value_type": value_type}))
+                f.configurable_setter = Bunch({"type": conftype, "name": confname, "setter": f.__name__, "default": default, "value_type": value_type})
 
                 if conftype != "qt":# and isinstance(trait_notifier, DataBag):
                     # see NOTE: 2021-09-08 09:14:16
@@ -503,7 +504,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
                         """
                         f(instance, *args, **kwargs)
 
-                        if trn is true:
+                        if trn is True:
                             trn = getattr(instance, "configurable_traits", None)
 
                         if isinstance(trn, DataBag):
@@ -514,12 +515,12 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
 
                     parset = partial(newf, trn = trn)
 
-                    setattr(parset, "configurable_setter", conf_setter)
+                    parset.configurable_setter = conf_setter
 
                     return parset
 
             else:
-                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default, "value_type": value_type}))
+                f.configurable_getter = Bunch({"type": conftype, "name": confname, "getter": f.__name__, "default": default, "value_type": value_type})
 
         elif inspect.isbuiltin(f): # FIXME 2021-09-09 14:09:04
             # NOTE: 2021-09-08 10:10:07
@@ -549,7 +550,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
 
                 parset = partial(newf, trn=trn)
 
-                setattr(parset, "configurable_setter", conf_setter)
+                parset.configurable_setter = conf_setter
 
                 return parset
 
@@ -559,7 +560,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
                 def newf(instance, *args, **kwargs):
                     return f(instance, *args, **kwargs)
 
-                setattr(newf, "configurable_getter", configurable_getter)
+                newf.configurable_getter = configurable_getter
 
                 return newf
 
@@ -669,7 +670,7 @@ def saveQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, va
 def loadQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, default:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
-    key_name = "%s%s" % (pfx, key)
+    key_name = f"{pfx}{key}"
 
     qsettings.beginGroup(gname)
     # print(f"loadQSettingsKey group: {gname}, key: {key})")
@@ -680,8 +681,8 @@ def loadQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, de
                 ret = Tribool() if ret == "indeterminate" else Tribool(True) if ret == "true" else Tribool(False)
 
             elif ret in ("True", "False"):
-                ret = True if ret == "True" else False
-    except:
+                ret = ret == "True"
+    except:  # noqa: E722
         scipywarn(f"Cannot load QSettings for key {key_name}")
         traceback.print_exc()
         ret = default
@@ -880,7 +881,7 @@ def syncQtSettings(qsettings: QtCore.QSettings,
         pfx = prefix
 
     if isinstance(pfx, str) and len(pfx.strip()):
-        key_prefix = "%s_" % pfx
+        key_prefix = f"{pfx}_"
     else:
         key_prefix=""
 
@@ -1101,14 +1102,14 @@ def collect_configurables(cls):
                 target[confdict.name].update(cfgdict)
 
     # adapt for "old" API
-    ret.qt.update(getattr(cls, "_qtcfg", dict()))
-    ret.qt.update(getattr(cls, "_ownqtcfg", dict()))
-    ret.conf.update(getattr(cls, "_cfg", dict()))
-    ret.conf.update(getattr(cls, "_owncfg", dict()))
+    ret.qt.update(getattr(cls, "_qtcfg", {}))
+    ret.qt.update(getattr(cls, "_ownqtcfg", {}))
+    ret.conf.update(getattr(cls, "_cfg", {}))
+    ret.conf.update(getattr(cls, "_owncfg", {}))
 
     return ret
 
-class ScipyenConfigurable(object):
+class ScipyenConfigurable:
     r"""Base :class: for Scipyen's configurable types.
 
     Implements functionality to deal with non-Qt settings made persistent across
@@ -1313,9 +1314,9 @@ class ScipyenConfigurable(object):
 
         if parent is not None:
             if isinstance(tag, str) and len(tag.strip()):
-                return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({tag:Bunch({change.name:v})})})})
+                return {parent.__class__.__name__: Bunch({self.__class__.__name__: Bunch({tag: Bunch({change.name:v})})})}
 
-            return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({change.name:v})})})
+            return {parent.__class__.__name__: Bunch({self.__class__.__name__: Bunch({change.name:v})})}
 
         return Bunch({self.__class__.__name__:Bunch({change.name:v})})
 
@@ -1573,8 +1574,8 @@ class ScipyenConfigurable(object):
 
                         # val_ = data2confuse(x)
 
-                        if hasattr(user_conf[k], "set"):
-                            user_conf[k].set(val)
+                        if hasattr(v, "set"):
+                            v.set(val)
                         else:
                             user_conf[k] = val
 
@@ -1648,7 +1649,7 @@ class ScipyenConfigurable(object):
 class ScipyenConfiguration(DataBag):
     r"""Superclass of all non-gui configurations
     """
-    leaf_parameters = tuple()
+    leaf_parameters = ()
 
     def __init__(self, *args, **kwargs):
         mutable_types = kwargs.pop("mutable_types", False)
@@ -1658,7 +1659,7 @@ class ScipyenConfiguration(DataBag):
         if len(self.__class__.leaf_parameters):
             for key in kwargs:
                 if key not in self.__class__.leaf_parameters:
-                    raise NameError("Parameter %s is non allowed in %s" % (key, self.__class__))
+                    raise NameError(f"Parameter {key} is not allowed in {self.__class__}")
 
         super().__init__(*args, **kwargs,
                         mutable_types = mutable_types,
@@ -1936,8 +1937,8 @@ def write_config(config: confuse.Configuration = scipyen_config,
     # because of this, we allow here a GUI dialog (QMessageBox) warning the user
     # to the possiblity of wiping out the config_default.yaml file!
     if len(out) == 0:
-        txt = "The configuration file %s is about to be cleared. Do you wish to continue?" % filename
-        ret = QtWidgets.QMessageBox.warning(None,"Scipyen configuration",txt)
+        txt = f"The configuration file {filename} is about to be cleared. Do you wish to continue?"
+        ret = QtWidgets.QMessageBox.warning(None, "Scipyen configuration", txt)
 
         if ret != QtWidgets.QMessageBox.OK:
             return False
@@ -1947,7 +1948,7 @@ def write_config(config: confuse.Configuration = scipyen_config,
 
     return True
 
-def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
+def saveWindowSettings(qsettings:QtCore.QSettings, win:QtWidgets.QMainWindow | Figure, group_name:str | None=None, prefix:str | None=None):
     r"""Saves window settings to the Scipyen's Qt configuration file.
 
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf

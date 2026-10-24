@@ -152,7 +152,7 @@ class ObjectInspector(ScipyenViewer):
         ScipyenDataclass:0
         }
 
-    read_only_types = ( # noqa
+    read_only_types = (
         bgbridge.BrainGlobeAtlas,
         bgbridge.Structure,
         taxonbridge.Taxon,
@@ -604,7 +604,8 @@ class ObjectInspector(ScipyenViewer):
             self, "Automatically resize columns")
         w = quickdialog.StringInput(d, "Comma-separated column indices:",
                                     allowEmptyString = True)
-        w.setValue(", ".join(list(map(lambda v: f"{v}", self._autoResizeColumns_))))
+        # w.setValue(", ".join(list(map(lambda v: f"{v}", self._autoResizeColumns_))))
+        w.setValue(", ".join([f"{v}" for v in self._autoResizeColumns_]))
 
         # d.resize(-1,-1)
         d.adjustSize()
@@ -734,7 +735,8 @@ class ObjectInspector(ScipyenViewer):
         if isinstance(val, str):
             try:
                 if len(val.strip()):
-                    indices = set(list(map(lambda s: eval(s), val)))
+                    # indices = set(list(map(lambda s: eval(s), val)))
+                    indices = set(map(lambda s: eval(s), val))
                     if not all((isinstance(v, int) and v in range(3)) for v in indices):
                         scipywarn("Invalid indices: all must be integers in range 0-2 inclusive")
                         indices = set()
