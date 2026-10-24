@@ -219,10 +219,10 @@ if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read()
 
 #print(f"scipyen_config module: global qsettings {qsettings.fileName()}")
-scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
+scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]  # noqa: RUF015
 # scipyen_user_config_source = next(s for s in scipyen_config.sources if not s.default)[0]
 
-def configsrc2bunch(src:confuse.ConfigSource | Bunch):
+def configsrc2bunch(src: confuse.ConfigSource | Bunch):
     r"""Creates a nested Bunch from this confuse.ConfigSource
 
     Useful for loading configurable values from a source.
@@ -370,6 +370,8 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
     @someQtProp.setter
     :def: someQtProp(self, val):
         self._my_qt_thing_ = val
+
+    CAUTION: in PyQide6 for Qt 6.12 this has issues with restoring data (too complex to detail here)
 
     2) For getter and setter methods, BOTH must be decorated, e.g.:
 

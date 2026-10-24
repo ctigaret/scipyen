@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'scriptmanagerwindow.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.1
+## Created by: Qt User Interface Compiler version 6.12.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -58,7 +58,7 @@ class Ui_ScriptManagerWindow(object):
         ScriptManagerWindow.setStatusBar(self.statusbar)
         self.menuBar = QMenuBar(ScriptManagerWindow)
         self.menuBar.setObjectName(u"menuBar")
-        self.menuBar.setGeometry(QRect(0, 0, 522, 28))
+        self.menuBar.setGeometry(QRect(0, 0, 522, 27))
         self.menuScripts = QMenu(self.menuBar)
         self.menuScripts.setObjectName(u"menuScripts")
         ScriptManagerWindow.setMenuBar(self.menuBar)
@@ -75,7 +75,7 @@ class Ui_ScriptManagerWindow(object):
         ___qtablewidgetitem = self.scriptsTable.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate("ScriptManagerWindow", u"Script", None))
         ___qtablewidgetitem1 = self.scriptsTable.horizontalHeaderItem(1)
-        ___qtablewidgetitem1.setText(QCoreApplication.translate("ScriptManagerWindow", u"Path", None))
+        ___qtablewidgetitem1.setText(QCoreApplication.translate("ScriptManagerWindow", u"Folder", None))
         self.menuScripts.setTitle(QCoreApplication.translate("ScriptManagerWindow", u"Scripts", None))
     # retranslateUi
 

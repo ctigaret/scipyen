@@ -259,7 +259,7 @@ warnings.showwarning = prog.showwarning
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )  # noqa: I001,F401
 from core.triggerprotocols import TriggerProtocol  # noqa: F401
-from core.traitcontainers import DataBag
+from core.traitcontainers import DataBag  # noqa: F401
 
 from core.utilities import (summarize_object_properties, # noqa: F401
                             augment_obj_prop_dict,
@@ -1288,8 +1288,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self._winFlagsCache_ = self.windowFlags()
 
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["RecentScripts"] = self._recentScripts
+        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
+        #     self.configurable_traits["RecentScripts"] = self._recentScripts
 
         self._lockedToolBar:bool = True
         self._guiIconSize_ = self._defaultIconSize_
@@ -1661,7 +1661,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def navigateToRecentFileDirectory(self) -> bool:
         return self._navigateToRecentFileDir_
 
-    # @markConfigurable("ChangeDirUponRecentFileOpen", "Qt")
     @markConfigurable("ChangeDirUponRecentFileOpen")
     @navigateToRecentFileDirectory.setter
     def navigateToRecentFileDirectory(self, val: bool):
@@ -1681,7 +1680,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def navigateToDroppedFileDirectory(self) -> bool:
         return self._navigateToDroppedFileDir_
 
-    # @markConfigurable("ChangeDirUponDropFileOpen", "Qt")
     @markConfigurable("ChangeDirUponDropFileOpen")
     @navigateToDroppedFileDirectory.setter
     def navigateToDroppedFileDirectory(self, val: bool):
@@ -1713,7 +1711,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def hideFilesWhenFiltering(self) -> bool:
         return self._fileNamesFiltersHides_
 
-    # @markConfigurable("HideFilteredFileNames", "Qt")
     @markConfigurable("HideFilteredFileNames")
     @hideFilesWhenFiltering.setter
     def hideFilesWhenFiltering(self, val: bool):
@@ -1733,7 +1730,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useNewNavigatorLook(self) -> bool:
         return self._newNavigatorLook_
 
-    # @markConfigurable("UseNewNavigatorLook", "Qt")
     @markConfigurable("UseNewNavigatorLook")
     @useNewNavigatorLook.setter
     def useNewNavigatorLook(self, val: bool):
@@ -1752,7 +1748,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useNativeMenuBar(self) -> bool:
         return self._useNativeMenuBar
 
-    # @markConfigurable("UseNativeMenuBar", "Qt")
     @markConfigurable("UseNativeMenuBar")
     @useNativeMenuBar.setter
     def useNativeMenuBar(self, val: bool) -> None:
@@ -1932,7 +1927,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def showFullNavigatorPath(self)-> bool:
         return self.navigator.showFullPath()
 
-    # @markConfigurable("ShowFullNavigatorPath", "Qt")
     @markConfigurable("ShowFullNavigatorPath")
     @showFullNavigatorPath.setter
     def showFullNavigatorPath(self, value: bool):
@@ -1942,7 +1936,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def navigatorEditable(self) -> bool:
         return self.navigator.isUrlEditable()
 
-    # @markConfigurable("NavigatorIsEditable", "Qt")
     @markConfigurable("NavigatorIsEditable")
     @navigatorEditable.setter
     def navigatorEditable(self, value: bool):
@@ -1952,7 +1945,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def toolBarLocked(self) -> bool:
         return not self.toolBar.isMovable()
 
-    # @markConfigurable("ToolBarLocked", "Qt")
     @markConfigurable("ToolBarLocked")
     @toolBarLocked.setter
     def toolBarLocked(self, val: bool):
@@ -1987,7 +1979,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def toolBarIconSize(self) -> QtCore.QSize:
         return self.toolBar.iconSize() # QMainWindow API
 
-    # @markConfigurable("ToolbarIconSize", "Qt")
     @toolBarIconSize.setter
     def toolBarIconSize(self, val: QtCore.QSize):
         # print(f"{self.__class__.__name__}.toolBarIconSize.setter(val = {val})")
@@ -2061,7 +2052,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.textOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly)
             self.textUnderIconsToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon)
 
-    # @markConfigurable("ToolBarButtonStyle", "Qt")
     @toolBarButtonStyle.setter
     def toolBarButtonStyle(self, val:QtCore.Qt.ToolButtonStyle|int|str):
         if isinstance(val, str):
@@ -2151,7 +2141,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.workspaceView.setIconSize(iconSize)
 
 
-    # @markConfigurable("WorkSpaceViewIconSize", "Qt")
     @markConfigurable("WorkSpaceViewIconSize")
     @workSpaceIconSize.setter
     def workSpaceIconSize(self, val:int):
@@ -2230,7 +2219,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
                                                              self._fileSystemIconModeIconSize_))
 
-    # @markConfigurable("FileSystemViewerIconSize", "Qt")
     @markConfigurable("FileSystemViewerIconSize")
     @fileSystemIconSize.setter
     def fileSystemIconSize(self, val:int):
@@ -2252,7 +2240,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemIconModeIconSize(self) -> int:
         return self._fileSystemIconModeIconSize_
 
-    # @markConfigurable("FileSystemIconModeIconSize", "Qt")
     @markConfigurable("FileSystemIconModeIconSize")
     @fileSystemIconModeIconSize.setter
     def fileSystemIconModeIconSize(self, val:int):
@@ -2329,10 +2316,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def toolButtonStyle(self) -> int:
         return self._toolButtonStyle_
 
-    # @markConfigurable("ToolButtonStyle", "Qt")
     @toolButtonStyle.setter
     def toolButtonStyle(self, val: int):
-        # print(f"{self.__class__.__name__}.toolButtonStyle.setter({val})")
         self._toolButtonStyle_ = val
         self._set_toolButtonStyle(self._toolButtonStyle_)
 
@@ -2408,7 +2393,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             for b in btns:
                 b.setIconSize(iconSize)
 
-    # @markConfigurable("GUIIconsize", "Qt")
     @markConfigurable("GUIIconsize")
     @guiIconSize.setter
     def guiIconSize(self, val:int):
@@ -2440,7 +2424,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     # def consoleDocked(self):
     #     return self._console_docked_
     #
-    # @markConfigurable("ConsoleDocked", "Qt")
+    # @markConfigurable("ConsoleDocked")
     # @consoleDocked.setter
     # def consoleDocked(self, value):
     #     self._console_docked_ = value is True
@@ -2449,10 +2433,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def autoRemoveViewers(self) -> bool:
         return self._auto_remove_viewers_
 
-    @markConfigurable("AutoRemoveViewers", trait_notifier=True)#, "Qt", default=False, value_type=bool)
+    @markConfigurable("AutoRemoveViewers", trait_notifier=True)
     @autoRemoveViewers.setter
     def autoRemoveViewers(self, value: bool | str) -> None:
-        # print(f"autoRemoveViewers.setter: value = {value}")
         if isinstance(value, str):
             value = value.lower() == "true"
 
@@ -2465,7 +2448,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def maxRecentFiles(self):
         return self._maxRecentFiles
 
-    # @markConfigurable("MaxRecentFiles", "Qt")
     @markConfigurable("MaxRecentFiles")
     @maxRecentFiles.setter
     def maxRecentFiles(self, val: int):
@@ -2491,7 +2473,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def guiStyle(self):
         return self._current_GUI_style_name
 
-    # @markConfigurable("WidgetStyle", "Qt", default="Default")
     @markConfigurable("WidgetStyle", default="Default")
     @guiStyle.setter
     def guiStyle(self, val: str):
@@ -2567,7 +2548,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self._script_manager_autolaunch = self._scriptManager_.isVisible() and not self._scriptManager_.isMinimized()
         return self._script_manager_autolaunch
 
-    # @markConfigurable("ScriptManagerAutoLaunch", "Qt")
     @markConfigurable("ScriptManagerAutoLaunch")
     @scriptManagerAutoLaunch.setter
     def scriptManagerAutoLaunch(self, val: typing.Union[bool, str]):
@@ -2585,7 +2565,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemViewMode(self) -> str:
         return self._fileSystemViewMode_
 
-    # @markConfigurable("FileSystemViewMode", "Qt", default="Tree")
     @markConfigurable("FileSystemViewMode", default="Tree")
     @fileSystemViewMode.setter
     def fileSystemViewMode(self, val:str):
@@ -2664,7 +2643,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def maxRecentDirectories(self):
         return self._maxRecentDirectories
 
-    @markConfigurable("MaxRecentDirectories", trait_notifier=True)#, "Qt", default=10)
+    @markConfigurable("MaxRecentDirectories", trait_notifier=True)
     @maxRecentDirectories.setter
     def maxRecentDirectories(self, val: int):
         # NOTE: _recentDirectories stores them as most recent first !
@@ -2682,7 +2661,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def recentFiles(self):
         return self._recentFiles
 
-    @markConfigurable("RecentFiles", trait_notifier=True)#, "Qt", default=10)
+    @markConfigurable("RecentFiles")
     @recentFiles.setter
     def recentFiles(self, val: collections.OrderedDict | tuple | list | None = None):
         if isinstance(val, collections.OrderedDict):
@@ -2703,7 +2682,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def recentDirectories(self):
         return self._recentDirectories
 
-    # @markConfigurable("RecentDirectories", "Qt")
     @recentDirectories.setter
     def recentDirectories(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
@@ -2739,7 +2717,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemFilterHistory(self):
         return self._fileSystemFilterHistory
 
-    # @markConfigurable("RecentFileSystemFilters", "Qt")
     @fileSystemFilterHistory.setter
     def fileSystemFilterHistory(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
@@ -2771,7 +2748,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def lastFileSystemFilter(self):
         return self._lastFileSystemFilter
 
-    # @markConfigurable("LastFileSystemFilter", "Qt")
     @markConfigurable("LastFileSystemFilter")
     @lastFileSystemFilter.setter
     def lastFileSystemFilter(self, val: str | None = None):
@@ -2792,7 +2768,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def showFileSystemFilter(self) -> bool:
         return self._showFilesFilter
 
-    # @markConfigurable("FilesFilterVisible", "Qt")
     @markConfigurable("FilesFilterVisible")
     @showFileSystemFilter.setter
     def showFileSystemFilter(self, val: typing.Optional[typing.Union[bool, str, int]] = None):
@@ -2812,7 +2787,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemTimeFormat(self) -> str:
         return self._fileSystemTimeDisplayFormat_
 
-    # @markConfigurable("FileSystemTimeDisplay", "Qt")
     @markConfigurable("FileSystemTimeDisplay")
     @fileSystemTimeFormat.setter
     def fileSystemTimeFormat(self, val: str) -> None:
@@ -2852,10 +2826,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontFamily(self) -> str:
         return self._font.family()
 
-    # @markConfigurable("UIFontFamily", "Qt")
     @markConfigurable("UIFontFamily")
     @uiFontFamily.setter
-    def uiFontFamily(self, val:str):
+    def uiFontFamily(self, val: str):
         self._font.setFamily(val)
         self._updateFont()
 
@@ -2863,7 +2836,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontPointSize(self) -> int:
         return int(self._font.pointSize())
 
-    # @markConfigurable("UIFontPointSize", "Qt")
     @markConfigurable("UIFontPointSize")
     @uiFontPointSize.setter
     def uiFontPointSize(self, val: int):
@@ -2876,7 +2848,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._font.style().value)
         return int(self._font.style())
 
-    # @markConfigurable("UIFontStyle", "Qt")
     @markConfigurable("UIFontStyle")
     @uiFontStyle.setter
     def uiFontStyle(self, val: int):
@@ -2887,7 +2858,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontWeight(self) -> int:
         return int(self._font.weight())
 
-    # @markConfigurable("UIFontWeight", "Qt")
     @markConfigurable("UIFontWeight")
     @uiFontWeight.setter
     def uiFontWeight(self, val: int):
@@ -2898,7 +2868,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontFamily(self) -> str:
         return self._workspaceViewerFont.family()
 
-    # @markConfigurable("WorkspaceFontFamily", "Qt")
     @markConfigurable("WorkspaceFontFamily")
     @workspaceFontFamily.setter
     def workspaceFontFamily(self, val: str):
@@ -2909,7 +2878,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontPointSize(self) -> int:
         return int(self._workspaceViewerFont.pointSize())
 
-    # @markConfigurable("WorkspaceFontPointSize", "Qt")
     @markConfigurable("WorkspaceFontPointSize")
     @workspaceFontPointSize.setter
     def workspaceFontPointSize(self, val: int):
@@ -2922,7 +2890,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._workspaceViewerFont.style().value)
         return int(self._workspaceViewerFont.style())
 
-    # @markConfigurable("WorkspaceFontStyle", "Qt")
     @markConfigurable("WorkspaceFontStyle")
     @workspaceFontStyle.setter
     def workspaceFontStyle(self, val: int):
@@ -2933,7 +2900,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontWeight(self) -> int:
         return int(self._workspaceViewerFont.weight())
 
-    # @markConfigurable("WorkspaceFontWeight", "Qt")
     @markConfigurable("WorkspaceFontWeight")
     @workspaceFontWeight.setter
     def workspaceFontWeight(self, val: int):
@@ -2944,7 +2910,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontFamily(self) -> str:
         return self._commandHistoryFont.family()
 
-    # @markConfigurable("HistoryFontFamily", "Qt")
     @markConfigurable("HistoryFontFamily")
     @historyFontFamily.setter
     def historyFontFamily(self, val: str):
@@ -2955,7 +2920,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontPointSize(self) -> int:
         return int(self._commandHistoryFont.pointSize())
 
-    # @markConfigurable("HistoryFontPointSize", "Qt")
     @markConfigurable("HistoryFontPointSize")
     @historyFontPointSize.setter
     def historyFontPointSize(self, val: int):
@@ -2968,7 +2932,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._commandHistoryFont.style().value)
         return int(self._commandHistoryFont.style())
 
-    # @markConfigurable("HistoryFontStyle", "Qt")
     @markConfigurable("HistoryFontStyle")
     @historyFontStyle.setter
     def historyFontStyle(self, val: int):
@@ -2979,7 +2942,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontWeight(self) -> int:
         return int(self._commandHistoryFont.weight())
 
-    # @markConfigurable("HiatoryFontWeight", "Qt")
     @markConfigurable("HiatoryFontWeight")
     @historyFontWeight.setter
     def historyFontWeight(self, val: int):
@@ -2994,7 +2956,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useSystemFont(self) -> bool:
         return self._useSystemDefaultFont
 
-    # @markConfigurable("UseSystemFont", "Qt")
     @markConfigurable("UseSystemFont")
     @useSystemFont.setter
     def useSystemFont(self, val: bool):
@@ -3090,7 +3051,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 #     def maximumWatchedFiles(self):
 #         return self._nMaxWatchedFiles_
 #
-#     @markConfigurable("NMaxWatchedFiles", "Qt")
+#     @markConfigurable("NMaxWatchedFiles")
 #     @maximumWatchedFiles.setter
 #     def maximumWatchedFiles(self, value:int):
 #         if not isinstance(value, int):
@@ -3104,7 +3065,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 #     def maximumWatchedDirectories(self):
 #         return self._nMaxWatchedDirectories_
 #
-#     @markConfigurable("NMaxWatchedDirectories", "Qt")
+#     @markConfigurable("NMaxWatchedDirectories")
 #     @maximumWatchedDirectories.setter
 #     def maximumWatchedDirectories(self, value:int):
 #         if not isinstance(value, int):
@@ -3118,9 +3079,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def variableSearches(self) -> collections.deque:
         return self._recentVariablesList
 
-    # @markConfigurable("VariableSearch", "Qt")
     @variableSearches.setter
-    def variableSearches(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
+    def variableSearches(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentVariablesList = collections.deque(val)
 
@@ -3150,7 +3110,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def lastVariableSearch(self):
         return self._lastVariableFind
 
-    # @markConfigurable("LastVariableSearch", "Qt")
     @markConfigurable("LastVariableSearch")
     @lastVariableSearch.setter
     def lastVariableSearch(self, val: str | None = None):
@@ -3163,7 +3122,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useLastHistoryCommandSearch(self) -> bool:
         return self._useLastHistoryCommandSearch_
 
-    # @markConfigurable("UseLastHistoryCommandSearch", "Qt")
     @markConfigurable("UseLastHistoryCommandSearch")
     @useLastHistoryCommandSearch.setter
     def useLastHistoryCommandSearch(self, val: bool):
@@ -3245,7 +3203,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def scipyenDir(self):
         return self._scipyendir_
 
-    # @markConfigurable("ScipyenEditor", "Qt")
     @markConfigurable("ScipyenEditor")
     @scipyenEditor.setter
     def scipyenEditor(self, val: str | None = None):
@@ -3266,7 +3223,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def overrideSystemEditor(self):
         return self._overrideSystemEditor
 
-    # @markConfigurable("OvererideSystemEditor", "Qt")
     @markConfigurable("OvererideSystemEditor")
     @overrideSystemEditor.setter
     def overrideSystemEditor(self, val: bool = False):
@@ -3280,22 +3236,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     # @markConfigurable("LastCommandSearch", "Qt")
     @markConfigurable("LastCommandSearch")
     @lastCommandSearch.setter
-    def lastCommandSearch(self, val: typing.Optional[str] = None):
+    def lastCommandSearch(self, val: str | None = None):
         if isinstance(val, str):
             self._lastCommandFind = val
         else:
-            self._lastCommandFind = str()
+            self._lastCommandFind = ""
 
     @property
     def recentScripts(self):
         return self._recentScripts
 
-    # NOTE:FIXME/TODO 2022-01-30 00:05:47
-    # Until I figure out a proper contents-observing traitType for Python
-    # collections like list, deque, dict, I stick with Qt configurable here.
-    # @markConfigurable("RecentScripts", "Qt")
     @recentScripts.setter
-    def recentScripts(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
+    def recentScripts(self, val: collections.deque | list | tuple | None = None):
         # print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentScripts = collections.deque(s for s in val if os.path.isfile(s))
@@ -3309,15 +3261,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def _usedScripts_(self):
         return ";;".join(list(self.recentScripts))
 
-    @markConfigurable("RecentScripts", trait_notifier=True)
+    @markConfigurable("RecentScripts")
     @_usedScripts_.setter
-    def _usedScripts(self, val):
+    def _usedScripts_(self, val):
         if not isinstance(val, str) or len(val.strip()) == 0:
-            val = collections.deque()
+            scripts = collections.deque()
         else:
-            val = collections.deque(val.split(";;"))
+            scripts = collections.deque(val.split(";;"))
 
-        self.recentScripts = val
+        # print(f"{self.__class__.__name__}._usedScripts_.setter({val}) -> {scripts}")
+
+        self.recentScripts = scripts
 
     # ### END   Properties and slots connected to properties
 
@@ -7486,8 +7440,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # NOTE: 2017-06-29 21:49:39
         Pictio now uses the mimetypes module
         '''
+        # NOTE: 2026-10-24 13:25:25
+        # adapted in order to be able to store this in config.yaml using the confuse package
         if self._recentFiles is None:
             self._recentFiles = collections.OrderedDict()
+
+        if isinstance(loader, types.FunctionType):
+            loader = {"function": loader.__name__, "module": loader.__module__}
+        else:
+            loader = "None"
 
         if len(self._recentFiles) == 0:
             self._recentFiles[item] = {"loader":loader, "timestamp": datetime.datetime.now()}
@@ -7506,6 +7467,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             items = tuple(filter(lambda v: pathlib.Path(v[0]).exists(), sorted(self._recentFiles.items(), key = lambda x: x[1]["timestamp"], reverse=True)))
             self._recentFiles = self._recentFiles.__class__(items)
+
         # NOTE: 2023-05-27 23:50:19
         # This function may be called from another thread hence it cannot be
         # expected to modify the UI in self (which lives in the current thread)
@@ -7525,8 +7487,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if self._maxRecentFiles > 10:
                 clearAction = self.recentFilesMenu.addAction(guiutils.getIcon("edit-clear-history"),
                     "Clear Recent Files List")
-                # clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
-                #     "Clear Recent Files List")
                 clearAction.triggered.connect(self._clearRecentFiles_)
                 self.recentFilesMenu.addSeparator()
 
@@ -7674,7 +7634,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.recentScriptsMenu.clear()
         self._recent_scripts_dict_.clear()
 
-        if len(self.recentScripts) > 0:
+        if len(self.recentScripts):
             for s in self.recentScripts:
                 s_name = os.path.basename(s)
                 self._recent_scripts_dict_[s] = s_name
@@ -7685,13 +7645,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 action.setStatusTip(s)
                 action.triggered.connect(self._slot_runRecentPythonScript_)
 
-            if any([f not in self._recent_scripts_dict_.keys() for f in self._scriptManager_.scriptFileNames]) \
-                    or any([f not in self._scriptManager_.scriptFileNames for f in self._recent_scripts_dict_.keys()]):
-                self._scriptManager_.setData(self._recent_scripts_dict_)
+        with qtutils.SignalBlocker(self._scriptManager_):
+            if len(self._recent_scripts_dict_):
+                if any(f not in self._recent_scripts_dict_ for f in self._scriptManager_.scriptFileNames) \
+                        or any(f not in self._scriptManager_.scriptFileNames for f in self._recent_scripts_dict_):
+                    self._scriptManager_.setData(self._recent_scripts_dict_)
 
-        else:
-            if len(self._scriptManager_.scriptFileNames):
-                self._scriptManager_.clear()
+            else:
+                if len(self._scriptManager_.scriptFileNames):
+                    self._scriptManager_.clear()
 
     @safewrapper
     def dragEnterEvent(self, event):
@@ -9073,11 +9035,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         inside self.loadDiskFile to select the appropriate file opening code.
         '''
         action = self.sender()
+        fileReader = None
         if isinstance(action, QAction):
             itemText = str(action.text()).replace('&', '')
             pathPart = itemText.split('[')[-1]
             fName = pathPart.split(']')[0]
-            fileReader = self.recentFiles[fName]["loader"]
+            fileReaderSpec = self.recentFiles[fName]["loader"]
+            try:
+                if isinstance(fileReaderSpec, dict):
+                    funcname = fileReaderSpec.get("function", None)
+                    fnmodule = fileReaderSpec.get("module", None)
+                    if isinstance(fnmodule, str) and len(fnmodule.strip()):
+                        module = importlib.import_module(fnmodule)
+                        if funcname in module.__dict__:
+                            fileReader = getattr(module, funcname)
+            except:
+                pass
 
             if self.loadDiskFile(fName, fileReader=fileReader, addToRecent=False):
                 if (
@@ -9121,8 +9094,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.slot_changeDirectory(dirName)
 
     @safewrapper
-    def loadDiskFile(self, fName:str, fileReader:typing.Optional[typing.Callable]=None,
-                     addToRecent:bool=True, updateUi:bool=True) -> bool:
+    def loadDiskFile(self, fName: str, fileReader: typing.Callable | None = None,
+                     addToRecent: bool = True, updateUi: bool = True) -> bool:
         r"""Reads data from a file.
         Common landing point for local data input from the file system.
         Called by various slots connected to File menu actions.

@@ -204,9 +204,9 @@ class TableEditor(ScipyenViewer):
 #     def toolBarLocked(self) -> bool:
 #         return not self.toolBar.isMovable()
 #
-#     @markConfigurable("ToolBarLocked", "Qt")
+#     @markConfigurable("ToolBarLocked")
 #     @toolBarLocked.setter
-#     def toolBarLocked(self, val:bool):
+#     def toolBarLocked(self, val: bool):
 #         self._lockedToolBar = val is True
 #         signalBlocker = QtCore.QSignalBlocker(self.lockToolBarAction)
 #         self.lockToolBarAction.setChecked(self._lockedToolBar)

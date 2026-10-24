@@ -684,7 +684,7 @@ class ObjectInspector(ScipyenViewer):
     # def alwaysSortRows(self) -> bool:
     #     return self._alwaysSortRows_
     #
-    # @markConfigurable("AlwaysSortRows", "qt", trait_notifier = True)
+    # @markConfigurable("AlwaysSortRows", trait_notifier = True)
     # @alwaysSortRows.setter
     # def alwaysSortRows(self, val: bool):
     #     if self._alwaysSortRows_ != val:
@@ -699,7 +699,7 @@ class ObjectInspector(ScipyenViewer):
     def showInlineTables(self) -> bool:
         return self._showInlineTables_
 
-    @markConfigurable("ShowInlineTables", "qt", trait_notifier = True)
+    @markConfigurable("ShowInlineTables", trait_notifier = True)
     @showInlineTables.setter
     def showInlineTables(self, val: bool):
         self._showInlineTables_ = val is True
@@ -714,7 +714,7 @@ class ObjectInspector(ScipyenViewer):
     def initialExpandDepth(self) -> int:
         return self._initialExpandDepth_
 
-    @markConfigurable("InitialExpandDepth", "qt", trait_notifier=True)
+    @markConfigurable("InitialExpandDepth", trait_notifier=True)
     @initialExpandDepth.setter
     def initialExpandDepth(self, val: int):
         if val in range(3):
@@ -727,16 +727,16 @@ class ObjectInspector(ScipyenViewer):
     def autoResizeColumns(self) -> set:
         return self._autoResizeColumns_
 
-    @markConfigurable("AutoResizeColumns", "qt", trait_notifier = True)
+    @markConfigurable("AutoResizeColumns",  trait_notifier = True)
     @autoResizeColumns.setter
-    def autoResizeColumns(self,
-                          val: typing.Union[set[int], str, typing.Sequence[int]]):
+    def autoResizeColumns(self, val: set[int] | str | typing.Sequence[int]):
         indices = set()
         if isinstance(val, str):
             try:
                 if len(val.strip()):
                     # indices = set(list(map(lambda s: eval(s), val)))
-                    indices = set(map(lambda s: eval(s), val))
+                    # indices = set(map(lambda s: eval(s), val))
+                    indices = set(eval(s) for s in val)
                     if not all((isinstance(v, int) and v in range(3)) for v in indices):
                         scipywarn("Invalid indices: all must be integers in range 0-2 inclusive")
                         indices = set()
@@ -773,7 +773,7 @@ class ObjectInspector(ScipyenViewer):
     def showPrivateMembers(self) -> bool:
         return self._showPrivateMembers_
 
-    @markConfigurable("ShowPrivateMembers", "Qt", trait_notifier = True)
+    @markConfigurable("ShowPrivateMembers", trait_notifier = True)
     @showPrivateMembers.setter
     def showPrivateMembers(self, value: bool):
         self._showPrivateMembers_ = value is True
@@ -787,7 +787,7 @@ class ObjectInspector(ScipyenViewer):
     def showIntrospection(self) -> bool:
         return self._showIntrospection_
 
-    @markConfigurable("IntrospectObjects", "Qt", trait_notifier = True)
+    @markConfigurable("IntrospectObjects", trait_notifier = True)
     @showIntrospection.setter
     def showIntrospection(self, value: bool):
         self._showIntrospection_ = value is True
@@ -801,7 +801,7 @@ class ObjectInspector(ScipyenViewer):
     def showValuesOnly(self) -> bool:
         return self._showValuesOnly_
 
-    @markConfigurable("ShowValuesOnly", "Qt", trait_notifier = True)
+    @markConfigurable("ShowValuesOnly", trait_notifier = True)
     @showValuesOnly.setter
     def showValuesOnly(self, val: bool):
         self._showValuesOnly_ = val is True
@@ -816,7 +816,7 @@ class ObjectInspector(ScipyenViewer):
     def showCallables(self) -> bool:
         return self._showCallables_
 
-    @markConfigurable("ShowCallables", "Qt", trait_notifier = True)
+    @markConfigurable("ShowCallables", trait_notifier = True)
     @showCallables.setter
     def showCallables(self, value: bool):
         self._showCallables_ = value is True

@@ -60,7 +60,7 @@
       </column>
       <column>
        <property name="text">
-        <string>Path</string>
+        <string>Folder</string>
        </property>
       </column>
      </widget>
@@ -74,7 +74,7 @@
      <x>0</x>
      <y>0</y>
      <width>522</width>
-     <height>28</height>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuScripts">

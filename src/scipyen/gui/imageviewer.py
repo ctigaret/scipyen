@@ -1237,9 +1237,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def colorBarWidth(self):
         return self._colorbar_width_
     
-    @markConfigurable("ColorBarWidth", "qt")
+    @markConfigurable("ColorBarWidth")
     @colorBarWidth.setter
-    def colorBarWidth(self, value):
+    def colorBarWidth(self, value: str | int):
         if isinstance(value, str):
             value = int(value)
                 

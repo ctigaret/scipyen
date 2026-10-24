@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -521,12 +520,45 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.reset(clear=True)
 
     @property
+    def _scrollBarPosCfg_(self):
+        val = self.scrollBarPosition
+        if isinstance(val, QtCore.Qt.LayoutDirection):
+            return val.value
+
+        elif isinstance(val, str):
+            if val in ("left", "l"):
+                return QtCore.Qt.LayoutDirection.RightToLeft.value
+            else:
+                return QtCore.Qt.LayoutDirection.LeftToRight.value
+
+        elif isinstance(val, int) and val in QtCore.Qt.LayoutDirection:
+            return val
+
+        else:
+            return QtCore.Qt.LayoutDirection.LeftToRight
+
+    @markConfigurable("ScrollBarPosition")
+    @_scrollBarPosCfg_.setter
+    def _scrollBarPosCfg_(self, val):
+        if isinstance(val, int):
+            if val in QtCore.Qt.LayoutDirection:
+                self.scrollBarPosition = QtCore.Qt.LayoutDirection(val)
+            else:
+                self.scrollBarPosition = QtCore.Qt.LayoutDirection.LeftToRight
+
+        elif isinstance(val, str):
+            if val in ("left", "l"):
+                self.scrollBarPosition = QtCore.Qt.LayoutDirection.RightToLeft
+            else:
+                self.scrollBarPosition = QtCore.Qt.LayoutDirection.LeftToRight
+
+
+    @property
     def scrollBarPosition(self):
         return self._control.layoutDirection()
 
-    @markConfigurable("ScrollBarPosition", "qt")
     @scrollBarPosition.setter
-    def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
+    def scrollBarPosition(self, value: int | str | QtCore.Qt.LayoutDirection):
         if isinstance(value, str):
             if value.lower().strip() in ("right", "r"):
                 value = QtCore.Qt.LeftToRight
@@ -561,12 +593,8 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             try:
                 val = QtCore.Qt.LayoutDirection(value.value)
                 self._control.setLayoutDirection(val)
-                # self.custom_page_control.setLayoutDirection(val) # doesn't work !?
             except:
                 traceback.print_exc()
-
-        # finally:
-        #     traceback.print_exc()
 
     def guiSetScrollBack(self):
         if os.environ["QT_API"] == "pyside6":
@@ -582,18 +610,18 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def scrollBackSize(self):
         return self.buffer_size
 
-    @markConfigurable("Scrollback", "qt")
+    @markConfigurable("Scrollback")
     @scrollBackSize.setter
-    def scrollBackSize(self, value:int):
+    def scrollBackSize(self, value: int):
         self.buffer_size = value
 
     @property
     def fontFamily(self):
         return self.font.family()
 
-    @markConfigurable("FontFamily", "qt")
+    @markConfigurable("FontFamily")
     @fontFamily.setter
-    def fontFamily(self, val:str):
+    def fontFamily(self, val: str):
         font = self.font
         font.setFamily(val)
         self.font = font
@@ -602,20 +630,64 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontSize(self):
         return self.font.pointSize()
 
-    @markConfigurable("FontPointSize", "qt")
+    @markConfigurable("FontPointSize")
     @fontSize.setter
-    def fontSize(self, val:int):
+    def fontSize(self, val: int):
         font = self.font
         font.setPointSize(int(val))
         self.font = font
 
     @property
+    def _fontStyleCfg_(self):
+        val = self.fontStyle
+
+        if isinstance(val, QtGui.QFont.Style):
+            return val.value
+
+        elif isinstance(val, int):
+            if val in QtGui.QFont.Style:
+                return val
+            else:
+                return QtGui.QFont.StyleNormal.value
+
+        elif isinstance(val, str):
+            if "italic" in val.lower():
+                return QtGui.QFont.StyleItalic.value
+            elif "obliquel" in val.lower():
+                return QtGui.QFont.StyleOblique.value
+            else:
+                return QtGui.QFont.StyleNormal.value
+
+        else:
+            return QtGui.QFont.StyleNormal.value
+
+    @markConfigurable("FontStyle")
+    @_fontStyleCfg_.setter
+    def _fontStyleCfg_(self, val):
+        if isinstance(val, int):
+            if val in QtGui.QFont.Style:
+                self.fontStyle = QtGui.QFont.Style(val)
+
+            else:
+                self.fontStyle = QtGui.QFont.StyleNormal
+
+        elif isinstance(val, str):
+            if "italic" in val.lower():
+                self.fontStyle = QtGui.QFont.StyleItalic
+            elif "oblique" in val.lower():
+                self.fontStyle = QtGui.QFont.StyleOblique
+            else:
+                self.fontStyle = QtGui.QFont.StyleNormal
+
+        else:
+            self.fontStyle = QtGui.QFont.StyleNormal
+
+    @property
     def fontStyle(self):
         return self.font.style()
 
-    @markConfigurable("FontStyle", "qt")
     @fontStyle.setter
-    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]):
+    def fontStyle(self, val: int | QtGui.QFont.Style | str):
         style = get_font_style(val)
         font  = self.font
         # print(f"{self.__class__.__name__}.fontStyle.setter: current font: {font.family()}; wants style: {style}")
@@ -624,22 +696,83 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         try:
             font.setStyle(QtGui.QFont.Style(style))
         except:
-            # print(f"{self.__class__.__name__}.fontStyle.setter style value {style.value}")
             try:
                 font.setStyle(QtGui.QFont.Style(style.value))
             except:
                 traceback.print_exc()
-        # finally:
-        #     traceback.print_exc()
         self.font = font
+
+    @property
+    def _fontWeightCfg_(self):
+        val = self.fontWeight
+        if isinstance(val, QtGui.QFont.Weight):
+            return val.value
+
+        elif isinstance(val, int):
+            if val in QtGui.QFont.Weight:
+                return val
+            else:
+                return QtGui.QFont.Weight.Normal.value
+
+        elif isinstance(val, str):
+            if "black" in val.lower():
+                return QtGui.QFont.Weight.Black.value
+            elif "demibold" in val.lower():
+                return QtGui.QFont.Weight.DemiBold.value
+            elif "extrabold" in val.lower():
+                return QtGui.QFont.Weight.ExtraBold.value
+            elif "bold" in val.lower():
+                return QtGui.QFont.Weight.Bold.value
+            elif "extralight" in val.lower():
+                return QtGui.QFont.Weight.ExtraLight.value
+            elif "light" in val.lower():
+                return QtGui.QFont.Weight.Light.value
+            elif "medium" in val.lower():
+                return QtGui.QFont.Weight.Medium.value
+            elif "thin" in val.lower():
+                return QtGui.QFont.Weight.Thin.value
+            else:
+                return QtGui.QFont.Weight.Normal.value
+        else:
+            return QtGui.QFont.Weight.Normal.value
+
+    @markConfigurable("FontWeight")
+    @_fontWeightCfg_.setter
+    def _fontWeightCfg_(self, val):
+        if isinstance(val, int):
+            if val in QtGui.QFont.Weight:
+                self.fontWeight = QtGui.QFont.Weight(val)
+            else:
+                self.fontWeight = QtGui.QFont.Weight.Normal
+        elif isinstance(val, str):
+            if "black" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.Black
+            elif "demibold" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.DemiBold
+            elif "extrabold" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.ExtraBold
+            elif "bold" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.Bold
+            elif "extralight" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.ExtraLight
+            elif "light" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.Light
+            elif "medium" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.Medium
+            elif "thin" in val.lower():
+                self.fontWeight = QtGui.QFont.Weight.Thin
+            else:
+                self.fontWeight = QtGui.QFont.Weight.Normal
+
+        else:
+            self.fontWeight = QtGui.QFont.Weight.Normal
 
     @property
     def fontWeight(self):
         return self.font.weight()
 
-    @markConfigurable("FontWeight", "qt")
     @fontWeight.setter
-    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]):
+    def fontWeight(self, val: int | QtGui.QFont.Weight | str):
         weight = get_font_weight(val)
         font = self.font
         font.setWeight(weight)
@@ -649,12 +782,10 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def consoleColors(self): # FIXME 2025-06-29 09:06:35 should return the pygment?
         return self._console_colors
 
-    @markConfigurable("ConsoleColors", "qt")
+    @markConfigurable("ConsoleColors")
     @consoleColors.setter
-    def consoleColors(self, val:str):
-        #print("colors.setter val %s" % val)
+    def consoleColors(self, val: str):
         style = self._console_pygment
-
         self.set_pygment(style, val)
 
     @property
@@ -761,9 +892,9 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # self._console_pygment = self.syntax_style
         return self._console_pygment
 
-    @markConfigurable("SyntaxStyle", "qt")
+    @markConfigurable("SyntaxStyle")
     @syntaxStyle.setter
-    def syntaxStyle(self, style:str):
+    def syntaxStyle(self, style: str):
         colors = self._console_colors
         self.set_pygment(style, colors)
 
@@ -1630,9 +1761,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     def syntaxStyle(self):
         return self._console_pygment
 
-    @markConfigurable("SyntaxStyle", "qt")
+    @markConfigurable("SyntaxStyle")
     @syntaxStyle.setter
-    def syntaxStyle(self, style:str):
+    def syntaxStyle(self, style: str):
         self._console_pygment = style
         if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
             self.active_frontend._set_syntax_style(style)
@@ -1645,9 +1776,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     def consoleColors(self):
         return self._console_colors
 
-    @markConfigurable("ConsoleColors", "qt")
+    @markConfigurable("ConsoleColors")
     @consoleColors.setter
-    def consoleColors(self, val:str):
+    def consoleColors(self, val: str):
         self._console_colors = val
         if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
             self.active_frontend._set_console_colors(val)

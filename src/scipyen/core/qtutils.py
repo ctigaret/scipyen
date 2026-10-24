@@ -177,5 +177,5 @@ def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
 
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
     timeStamp = d.toSecsSinceEpoch()
-    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,  # noqa: DTZ006
+    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
 

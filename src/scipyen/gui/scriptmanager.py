@@ -3,18 +3,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import sys, os, types, typing
+import sys, os, types, typing , pathlib # noqa: I001,F401
 
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,)   # noqa: F401
 __has_PySide6__ = False
 __has_PyQt6__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     # import PySide6
-    # from PySide6 import Shiboken # noqa
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -34,14 +34,14 @@ else:
         __has_qtdbus__ = False
 
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus  # noqa: F401
     __has_qtdbus__ = True
 
 except: # noqa
     __has_qtdbus__ = False
 
-from core.prog import (timefunc, timemethod, safewrapper)
-from core.scipyen_config import (saveWindowSettings, loadWindowSettings, ) # noqa
+from core.prog import (timefunc, timemethod, safewrapper)  # noqa: I001,F401
+from core.scipyen_config import (saveWindowSettings, loadWindowSettings, )
 
 from gui.scriptmanagerwindow_ui import Ui_ScriptManagerWindow
 from gui.workspacegui import WorkspaceGuiMixin
@@ -119,7 +119,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         for k, (key, value) in enumerate(scriptsDict.items()):
             # print(f"ScriptManager.setData {k}: key={key}, value={value}")
-            path_item = QtWidgets.QTableWidgetItem(key)
+            path_item = QtWidgets.QTableWidgetItem(f"{pathlib.Path(key).parent}")
             path_item.setToolTip(key)
 
             script_item = QtWidgets.QTableWidgetItem(value)
@@ -145,7 +145,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
                     # check if this is a python source file
                     mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(url.path()))
                     # print(mimeType.name())
-                    if all([s in mimeType.name() for s in ("text", "python")]):
+                    if all(s in mimeType.name() for s in ("text", "python")):
                         self.signal_pythonFileAdded.emit(url.path())
 
             # if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
@@ -234,25 +234,22 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
     def slot_addScript(self):
         targetDir = os.getcwd()
         fileFilter = "Python script (*.py)"
-        fileName = self.chooseFile(caption=u"Add python script",
-                                   fileFilter="Python script (*.py)",
+        fileName = self.chooseFile(caption="Add python script",
+                                   fileFilter=fileFilter,
                                    targetDir=targetDir)
 
         # print(f"ScriptManager.slot_addScript fileName: { fileName}" )
 
         if isinstance(fileName, tuple):
             # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
-            fileName, fileFilter = fileName
+            fileName, _ = fileName
 
         if pio.checkFileReadAccess(fileName):
             mime_file_type = pio.getMimeAndFileType(fileName)
-            # print(f"ScriptManager.slot_addScript {mime_file_type}")
-            # for s in mime_file_type:
-            # print(f"ScriptManager.slot_addScript s: {s}, type: {type(s).__name__}")
-            if any("python" in s for s in mime_file_type if isinstance(s, str)):
+            if any((isinstance(s, str) and "python" in s) for s in mime_file_type):  # noqa: SIM114
                 self.signal_pythonFileAdded.emit(fileName)
 
-            elif any("text" in s for s in mime_file_type if isinstance(s, str)) and os.path.splitext(fileName)[-1] == ".py":
+            elif any((isinstance(s, str) and "text" in s) for s in mime_file_type) and os.path.splitext(fileName)[-1] == ".py":
                 self.signal_pythonFileAdded.emit(fileName)
 
     @Slot()
@@ -263,7 +260,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         # NOTE: returns a tuple (path list, filter)
         # fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
 
-        fn, fl = self.chooseFile(caption=u"Add python scripts",
+        fn, _ = self.chooseFile(caption="Add python scripts",
                                  filter="Python script (*.py)",
                                  targetDir=targetDir,
                                  single=False)
@@ -280,7 +277,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) == 0:
             return
 
-        rows = list(set([i.row() for i in self.scriptsTable.selectedItems()]))
+        rows = list(set([i.row() for i in self.scriptsTable.selectedItems()]))  # noqa: C403
 
         items = [self.scriptsTable.item(r, 1).text() for r in rows]
 
@@ -306,7 +303,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) != 1:
             return
 
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
+        row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
         item = self.scriptsTable.item(row, 1).text()
 
@@ -318,7 +315,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) != 1:
             return
 
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
+        row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
         item = self.scriptsTable.item(row, 1).text()
 
@@ -330,7 +327,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) != 1:
             return
 
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
+        row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
         fileName = self.scriptsTable.item(row, 1).text()
 
@@ -344,7 +341,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) != 1:
             return
 
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
+        row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
         item = self.scriptsTable.item(row, 1).text()
 
@@ -356,7 +353,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
         if len(self.scriptsTable.selectedItems()) != 1:
             return
 
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
+        row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
         item = self.scriptsTable.item(row, 1).text()
 

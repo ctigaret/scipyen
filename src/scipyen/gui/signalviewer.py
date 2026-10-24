@@ -1294,9 +1294,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def editCursorUponCreation(self):
         return self._editCursorOnCreation_
 
-    @markConfigurable("EditCursorWhenCreated", "qt")
+    @markConfigurable("EditCursorWhenCreated")
     @editCursorUponCreation.setter
-    def editCursorUponCreation(self, value:bool):
+    def editCursorUponCreation(self, value: bool):
         self._editCursorOnCreation_ = value == True
         sigBlocker = QtCore.QSignalBlocker(self.actionShow_Cursor_Edit_Dialog_When_Created)
         self.actionShow_Cursor_Edit_Dialog_When_Created.setChecked(self._editCursorOnCreation_)
@@ -1305,7 +1305,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def visibleDocks(self):
         return dict(((name, w.isVisible()) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
 
-    @markConfigurable("VisibleDocks", "qt")
+    @markConfigurable("VisibleDocks")
     @visibleDocks.setter
     def visibleDocks(self, val):
         if isinstance(val, dict):
@@ -1352,9 +1352,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def leftLabelWrapMode(self) -> str:
         return self._leftLabelWrapMode_
 
-    @markConfigurable("LeftAxisLabelWrapMode", "qt")
+    @markConfigurable("LeftAxisLabelWrapMode")
     @leftLabelWrapMode.setter
-    def leftLabelWrapMode(self, val:str):
+    def leftLabelWrapMode(self, val: str):
         fallback = "WordWrap"
         if not isinstance(val, str):
             val=fallback
@@ -1376,9 +1376,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def leftLabelSpace(self) -> int:
         return self._leftLabelSpace_
 
-    @markConfigurable("LeftAxisLabelSpace", "qt")
+    @markConfigurable("LeftAxisLabelSpace")
     @leftLabelSpace.setter
-    def leftLabelSpace(self, val:int):
+    def leftLabelSpace(self, val: int):
         self._leftLabelSpace_ = int(val)
         for ax in self.axes:
             ax.axes["left"]["item"].setWidth(self._leftLabelSpace_)
@@ -1528,9 +1528,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def lockedToolbars(self) -> bool:
         return self._toolbarsLocked_
 
-    @markConfigurable("LockedToolbars", "Qt")
+    @markConfigurable("LockedToolbars")
     @lockedToolbars.setter
-    def lockedToolbars(self, value:bool):
+    def lockedToolbars(self, value: bool):
         self._toolbarsLocked_ = value
         for w in list(filter(lambda w: isinstance(w, QtWidgets.QToolBar), self.children())):
             w.setMovable(not self._toolbarsLocked_)
@@ -1541,9 +1541,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def cursorsToolBarVisible(self) -> bool:
         return self._cursorsToolBarVisible_
 
-    @markConfigurable("CursorsToolBarVisible", "Qt")
+    @markConfigurable("CursorsToolBarVisible")
     @cursorsToolBarVisible.setter
-    def cursorsToolBarVisible(self, value:bool):
+    def cursorsToolBarVisible(self, value: bool):
         self._cursorsToolBarVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewCursors_Toolbar, self.cursorsToolBar)]
         self.cursorsToolBar.setVisible(self._cursorsToolBarVisible_)
@@ -1553,9 +1553,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def epochsToolBarVisible(self) -> bool:
         return self._epochsToolBarVisible_
 
-    @markConfigurable("EpochsToolBarVisible", "Qt")
+    @markConfigurable("EpochsToolBarVisible")
     @epochsToolBarVisible.setter
-    def epochsToolBarVisible(self, value:bool):
+    def epochsToolBarVisible(self, value: bool):
         self._epochsToolBarVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewEpochs_Toolbar, self.epochsToolBar)]
         self.epochsToolBar.setVisible(self._epochsToolBarVisible_)
@@ -1565,9 +1565,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def triggersToolBarVisible(self) -> bool:
         return self._triggersToolBarVisible_
 
-    @markConfigurable("TriggersToolBarVisible", "Qt")
+    @markConfigurable("TriggersToolBarVisible")
     @triggersToolBarVisible.setter
-    def triggersToolBarVisible(self, value:bool):
+    def triggersToolBarVisible(self, value: bool):
         self._triggersToolBarVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewTriggers_Toolbar, self.triggersToolBar)]
         self.triggersToolBar.setVisible(self._triggersToolBarVisible_)
@@ -1577,9 +1577,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def mainToolBarVisible(self) -> bool:
         return self._mainToolBarVisible_
 
-    @markConfigurable("MainToolbarVisible", "qt")
+    @markConfigurable("MainToolbarVisible")
     @mainToolBarVisible.setter
-    def mainToolBarVisible(self, value:bool):
+    def mainToolBarVisible(self, value: bool):
         self._mainToolBarVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewMain_Toolbar, self.mainToolBar)]
         self.mainToolBar.setVisible(self._mainToolBarVisible_)
@@ -1589,9 +1589,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def navigatorVisible(self) -> bool:
         return self._navigatorVisible_
 
-    @markConfigurable("NavigatorVisible", "qt")
+    @markConfigurable("NavigatorVisible")
     @navigatorVisible.setter
-    def navigatorVisible(self, value:bool):
+    def navigatorVisible(self, value: bool):
         self._navigatorVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewFrame_Navigator, self._frames_spinBoxSlider_)]
         self._frames_spinBoxSlider_.setVisible(self._navigatorVisible_)
@@ -1601,9 +1601,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def selectorsVisible(self) -> bool:
         return self._selectorsVisible_
 
-    @markConfigurable("SelectorsVisible", "qt")
+    @markConfigurable("SelectorsVisible")
     @selectorsVisible.setter
-    def selectorsVisible(self, value:bool):
+    def selectorsVisible(self, value: bool):
         self._selectorsVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewSignal_Selectors, self.selectorsWidget)]
         self.selectorsWidget.setVisible(self._selectorsVisible_)
