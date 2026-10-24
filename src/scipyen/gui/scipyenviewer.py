@@ -832,7 +832,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         r"""All viewers in Scipyen should behave consistently.
         However, this may by reimplemented in derived classes.
         """
-        # print(f"ScipyenViewer<{self.__class__.__name__}>.closeEvent {self.winTitle}: isTopLevel {self.isTopLevel}")
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.closeEvent {self.winTitle}: isTopLevelWindow {self.isTopLevelWindow}")
 
         self.saveSettings()
         # NOTE: 2021-07-08 12:07:35
@@ -846,7 +846,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._deregister_menuBar_()
 
 
-            if self.isTopLevel:
+            if self.isTopLevelWindow:
                 if self._delete_on_close_ or getattr(self.scipyenWindow, "autoRemoveViewers", False):
                     if any([v is self for v in self.scipyenWindow.workspace.values()]):
                         self.scipyenWindow.deRegisterWindow(self)

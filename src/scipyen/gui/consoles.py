@@ -768,7 +768,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.set_pygment(style, colors)
 
     @property
-    def isTopLevel(self):
+    def isTopLevelWindow(self):
         r"""Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole this is None.
@@ -1179,7 +1179,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.active_frontend.font = val
 
     @property
-    def isTopLevel(self):
+    def isTopLevelWindow(self):
         r"""Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.

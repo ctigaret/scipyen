@@ -46,6 +46,7 @@ setuptools-scm
 qasync
 aiohttp
 pyqtdarktheme
+pyside-settings-manager
 PyWavelets
 # QtPy # already insatlled by jupyter
 SecretStorage

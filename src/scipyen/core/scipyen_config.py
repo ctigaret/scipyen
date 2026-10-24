@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -85,13 +84,14 @@ are configuration settings for various Scipyen functionalities:
 
 """
 #import base64
-import os, inspect, typing, types, math, numbers, json, traceback, warnings
-import yaml
+import os, inspect, typing, types, math, numbers, json, traceback, warnings  # noqa: I001
+# import yaml
 import dataclasses
-from copy import (copy, deepcopy,)
+# from copy import (copy, deepcopy,)
 import confuse
-from types import new_class
-from functools import (partial, wraps,)
+# from types import new_class
+from functools import partial
+# from functools import (partial, wraps,)
 from pprint import pprint
 import collections
 import numpy as np
@@ -102,17 +102,17 @@ from tribool import Tribool
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets)#, QtXml, QtSvg, QtNetwork, )
+# from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_PyQt5__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -146,7 +146,7 @@ organization_name = "Scipyen"
 #     application_name = "Scipyen"
 #     organization_name = "Scipyen"
 
-from IPython.lib.pretty import pprint
+from IPython.lib.pretty import pprint # noqa: I001
 
 import traitlets
 from traitlets.utils.bunch import Bunch
@@ -568,7 +568,7 @@ def markConfigurable(confname:str, conftype:str="", setter:bool=True,
     return partial(wrapper, trn = trait_notifier)
 
 @safewrapper
-def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, Figure]):
+def qSettingsGroupPfx(win: QtWidgets.QMainWindow | QtWidgets.QWidget | Figure):
     r"""Generates a QSettings group name and, optionally, a prefix for a window.
 
     Parameters:
@@ -631,7 +631,7 @@ def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget,
         #if isinstance(win, WorkspaceGuiMixin):
         # cannot have here this as importing gui.workspacegui would trigger
         # recursive import cycles
-        if hasattr(win, "isTopLevel") and win.isTopLevel: # (this is a WorkspaceGuiMixin)
+        if hasattr(win, "isTopLevelWindow") and win.isTopLevelWindow: # (this is a WorkspaceGuiMixin)
             gname = win.__class__.__name__
         else:
             gname = win.parent().__class__.__name__
@@ -684,15 +684,16 @@ def loadQSettingsKey(qsettings:QtCore.QSettings, gname:str, pfx:str, key:str, de
     except:
         scipywarn(f"Cannot load QSettings for key {key_name}")
         traceback.print_exc()
-        ret = None
+        ret = default
     qsettings.endGroup()
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret
 
-def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, Figure],
-                   group_name:typing.Optional[str]=None,
-                   prefix:typing.Optional[str]=None,
-                   save:bool=True):
+def syncQtSettings(qsettings: QtCore.QSettings,
+                   win: QtWidgets.QMainWindow | QtWidgets.QWidget | Figure,
+                   group_name: str | None = None,
+                   prefix: str | None = None,
+                   save: bool = True):
     r"""Synchronize user-specifc settings with the Scipyen's Qt configuration file.
 
     The Scipyen's configuration file is in native format, and on Linux it usually
@@ -865,10 +866,10 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
 
     """
 
-    gname = ""
-    pfx = ""
+    # gname = ""
+    # pfx = ""
 
-    #gname, pfx = qSettingsGroupPfx(win)
+    gname, pfx = qSettingsGroupPfx(win)
 
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
@@ -883,9 +884,10 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
     else:
         key_prefix=""
 
-    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
-    #print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
-    #print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
+    # # # print("\n***\n\nsyncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
+
+    # print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
+    # print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
 
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables
@@ -937,13 +939,10 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
 
         if isinstance(getter, property):
             val = getattr(win, gettername)
-            #val = getter.fget(win)
-            #print("\t\tgetter win.%s -> %s" % (gettername, val))
 
         elif getter is not None: # in case gettername does not exist as a win's attribute name
             # getter may by a function/method, or a sip.wrapper (for Qt objects)
             val = getattr(win, gettername)()
-            #print("\t\tgetter win.%s() -> %s" % (gettername, val))
 
         else:
             continue
@@ -1007,7 +1006,12 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
                     newval = QtCore.QRect(newX, newY, newW, newH)
 
             if isinstance(setter, property):
-                config_setter = getattr(setter.fset, "configurable_setter")
+                # NOTE: 2026-10-23 22:12:13
+                # "configurable_setter" attribute is injected into the setter by
+                # the markConfigurable decorator
+                #
+                # config_setter = getattr(setter.fset, "configurable_setter")
+                config_setter = setter.fset.configurable_setter
                 value_type = config_setter.get("value_type", None)
                 if not isinstance(value_type, type):
                     value_type = type(default)
@@ -1135,7 +1139,7 @@ class ScipyenConfigurable(object):
 
     NOTE: For developers:
     1) If the derived class defines a UI component, is better to call`loadSettings`
-        called AFTER the initialization of its widgets.
+        called AFTER the initialization of its widgets (via _configureUI_ or setupUi).
 
         This is MANDATORY whenever the derived class uses the `loadSettings`
         method to assign default values (read from the config file) to various
@@ -1219,7 +1223,7 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
-        isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+        isTop = hasattr(self, "isTopLevelWindow") and self.isTopLevelWindow
         parent = self._get_parent_()
         tag = self.configTag
 
@@ -1462,7 +1466,7 @@ class ScipyenConfigurable(object):
         # NOTE 2021-09-06 17:37:14
         # keep Qt settings segregated
         if len(cfg):
-            isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+            isTop = hasattr(self, "isTopLevelWindow") and self.isTopLevelWindow
             if isTop:
                 parent = getattr(self, "scipyenWindow", None)
 
@@ -1520,7 +1524,7 @@ class ScipyenConfigurable(object):
         # or (for windows) when they are closed (i.e. called from their closeEvent)
 
         if len(cfg):
-            isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+            isTop = hasattr(self, "isTopLevelWindow") and self.isTopLevelWindow
             parent = None
             if isTop:
                 parent = getattr(self, "scipyenWindow", None)
@@ -1532,6 +1536,9 @@ class ScipyenConfigurable(object):
 
             # print(f"{self.__class__.__name__}.saveSettings: parent -> {parent}")
             tag = self.configTag if hasattr(self, "configTag") and isinstance(self.configTag, str) and len(self.configTag.strip()) else None
+            if tag is None:
+                tag = self.__class__.__name__
+
             user_conf = self._get_config_view_(isTop, parent, tag)
 
             #### BEGIN debug - comment out when done
@@ -1545,7 +1552,7 @@ class ScipyenConfigurable(object):
 
             changed = False
 
-            if isinstance(user_conf, dict):
+            if isinstance(user_conf, (dict, confuse.ConfigView)):
                 for k, v in user_conf.items():
                     try:
                         val = self.get_configurable_attribute(k, cfg)
@@ -1573,6 +1580,20 @@ class ScipyenConfigurable(object):
 
                         changed = True
 
+                # NOTE: 2026-10-23 22:58:25
+                # now, deal with NEW clsconfigurable attributes
+
+                newCfg = [k for k in cfg if k not in user_conf]
+
+                if len(newCfg):
+                    changed = True
+                    for k in newCfg:
+                        val = self.get_configurable_attribute(k, cfg)
+                        if hasattr(user_conf[k], "set"):
+                            user_conf[k].set(val)
+                        else:
+                            user_conf[k] = val
+
             if changed:
                 #### BEGIN debug - comment out when done
                 # if self.__class__.__name__ == "EventAnalysis":
@@ -1589,7 +1610,7 @@ class ScipyenConfigurable(object):
 
     def get_configurable_attribute(self, name, config_dict):
         r"""Helper to get the actual attribute value correspondong to a config entry.
-        Called in order to WRITE a the value of a configurable attribute to the
+        Called in order to WRITE the value of a configurable attribute to the
         config file.
         """
         getset = config_dict.get(name, {})
@@ -1742,8 +1763,8 @@ class FunctionConfiguration(ScipyenConfiguration):
 
         """
         fname=""
-        fargs = tuple()
-        fkwargs = dict()
+        fargs = ()
+        fkwargs = {}
 
         if len(args):
             if isinstance(args[0], str):
@@ -1754,7 +1775,7 @@ class FunctionConfiguration(ScipyenConfiguration):
                     raise ValueError("Function name cannot be an empty string")
 
             else:
-                raise TypeError("First argument must be a str; got %s instead" % type(args[0]).__name__)
+                raise TypeError(f"First argument must be a str; got {type(args[0]).__name__} instead")
 
             if len(args) > 1: # store the rest of the arguments in the fargs
                 fargs = args[1:]
@@ -1767,7 +1788,7 @@ class FunctionConfiguration(ScipyenConfiguration):
             fkwargs.update(kwargs)
 
         if not isinstance(fname, str):
-            raise TypeError("'name' must be a str; got %s instead" % type(fname).__name__)
+            raise TypeError(f"'name' must be a str; got {type(fname).__name__} instead")
 
         if len(fname.strip()) == 0:
             raise ValueError("'name' cannot be empty")
@@ -1816,7 +1837,10 @@ def get_QtSettings_file():
     return ScipyenConfigurable.qsettings.fileName()
 
 @safewrapper
-def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, filename:typing.Optional[str]=None, full:bool=True, redact:bool=False, as_default:bool=False, default_only:bool=False):
+def write_config(config: confuse.Configuration = scipyen_config,
+                 filename: str | None = None, full: bool = True,
+                 redact: bool = False, as_default: bool = False,
+                 default_only: bool = False):
     r"""Saves Scipyen non-gui configuration options to an yaml file.
     Settings are saved implicitly to the config.yaml file located in the
     application configuration directory and stored in the 'filename' attribute
@@ -1890,7 +1914,8 @@ def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, f
     else:
         (fn, ext) = os.path.splitext(filename)
         if ext != ".yaml":
-            filename = ".".join([fn, "yaml"])
+            filename = f"{fn}.yaml"
+            # filename = ".".join([fn, "yaml"])
 
     #print(f"scipyen_config.write_config: filename {filename}")
 
@@ -2013,9 +2038,9 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     return syncQtSettings(qsettings, win, group_name, prefix, True)
 
 def loadWindowSettings(qsettings:QtCore.QSettings,
-                       win:typing.Union[QtWidgets.QMainWindow, Figure],
-                       group_name:typing.Optional[str]=None,
-                       prefix:typing.Optional[str]=None):
+                       win: QtWidgets.QMainWindow | Figure,
+                       group_name: str | None = None,
+                       prefix: str | None = None):
     r"""Loads window settings from the Scipyen's Qt configuration file.
 
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf
@@ -2113,7 +2138,7 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
 
 def data2confuse(x):
     r"""Filter to convert some special data to str for yaml representation.
-    Uses iolib.jonsio to enable storage of more specialized /complex data types
+    Uses iolib.jonsio to enable storage of more specialized / complex data types
     with the confuse framework.
     A bit expensive, though... Therefore not sure I will use it...
     """

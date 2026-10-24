@@ -349,10 +349,24 @@ def main():
         # BEGIN 
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
+        app.setDesktopFileName(scipyen_config.application_name)
+
+        app.setApplicationName(scipyen_config.application_name)
+
+        app.setOrganizationName(scipyen_config.organization_name)
         if __QT_USE_NATIVE_MENUBAR__ == 0:# or (desktoputils.is_x11() and not desktoputils.is_kde() and not desktoputils.is_gnome()):
             app.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar, True)
             app.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, True)
+
         translator = QtCore.QTranslator(app)
+
+        if os.environ["QT_API"] == "pyside6":
+            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
+
+        else:
+            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
+
+        app.installTranslator(translator)
 
         # NOTE: 2025-07-01 14:45:39
         # This MUST be imported AFTER, and NOT BEFORE creating the app in the
@@ -363,20 +377,20 @@ def main():
         #
         from gui import mainwindow
 
-        if os.environ["QT_API"] == "pyside6":
-            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
+        # if os.environ["QT_API"] == "pyside6":
+        #     translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
+        #
+        # else:
+        #     translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
+        #
+        # app.installTranslator(translator)
+        #
+        # app.setDesktopFileName(scipyen_config.application_name)
+        #
+        # app.setApplicationName(scipyen_config.application_name)
+        #
+        # app.setOrganizationName(scipyen_config.organization_name)
 
-        else:
-            translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
-
-        app.installTranslator(translator)
-
-        app.setDesktopFileName(scipyen_config.application_name)
-
-        app.setApplicationName(scipyen_config.application_name)
-
-        app.setOrganizationName(scipyen_config.organization_name)
-        
         gc.enable()
         
         mainwindow.ScipyenWindow()

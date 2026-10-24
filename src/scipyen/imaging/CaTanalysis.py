@@ -12138,7 +12138,7 @@ class LSCaTWindow(ScipyenFrameViewer, Ui_LSCaTWindow):
         r"""Overrides ScipyenFrameViewer.closeEvent() for clean up.
         """
         #print("%s.closeEvent %s:" % (self.__class__.__name__, self.winTitle))
-        #print("LSCaTWindow.closeEvent: isTopLevel", self.isTopLevel)
+        #print("LSCaTWindow.closeEvent: isTopLevelWindow", self.isTopLevelWindow)
         
         #print("%s.closeEvent %s save settings" % (self.__class__.__name__, self.winTitle))
         self.saveSettings()
@@ -12199,7 +12199,7 @@ class LSCaTWindow(ScipyenFrameViewer, Ui_LSCaTWindow):
             
         self._data_ = None
         
-        if self.isTopLevel:
+        if self.isTopLevelWindow:
             if any([v is self for v in self.scipyenWindow.workspace.values()]):
                 self.scipyenWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
                 self.scipyenWindow.removeFromWorkspace(self, by_name=False)

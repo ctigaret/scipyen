@@ -16,7 +16,7 @@ r"""Main window for the Scipyen application
 
 # BEGIN import modules
 # BEGIN core python modules
-import sys
+import sys  # noqa: I001
 import os
 import types
 # import atexit
@@ -55,7 +55,7 @@ import collections
 import cmath # noqa
 from tribool import Tribool # noqa
 import datetime
-import math
+import math # noqa: F401
 
 # END core python modules
 
@@ -69,7 +69,7 @@ __has_PySide6__ = False
 __has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa: I001
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -113,7 +113,7 @@ except: # noqa
 # BEGIN jupyter, ipython, qtconsole et al
 # from jupyter_client.session import Message
 # from IPython.display import set_matplotlib_formats
-from IPython.core.history import HistoryAccessor
+from IPython.core.history import HistoryAccessor  # noqa: I001
 from jupyter_core.paths import jupyter_runtime_dir
 from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image # noqa
 # from IPython.lib.deepreload import reload as dreload
@@ -221,147 +221,147 @@ import colorama  # noqa
 # END 3rd party modules
 
 # BEGIN scipyen modules
-from core import qtutils # noqa
+from core import qtutils
 from core.qtutils import (qVariant, QVariantType) #, fromQVariant)
-from core import datazone # noqa
-from core import datatypes # noqa
-from core import basescipyen # noqa
-from core import neoutils # noqa
-from core import prog # noqa
-from core import pyabfbridge as pab # noqa
-from core import scipyen_plugin_loader # noqa
-from core import scipyen_config as scipyenconf # noqa
-from core import scipyendataclasses as sdc # noqa
-from core import utilities # noqa
-from core import svgutils # noqa
-from core import models # noqa
-from core import (bgbridge, taxonbridge) # noqa
-from core import deferredmeasures as dms # noqa
-from core.deferredmeasures import * # noqa
+from core import datazone   # noqa: F401
+from core import datatypes
+from core import basescipyen # noqa: F401
+from core import neoutils
+from core import prog
+from core import pyabfbridge as pab  # noqa: F401
+from core import scipyen_plugin_loader
+from core import scipyen_config as scipyenconf  # noqa: F401
+from core import scipyendataclasses as sdc  # noqa: F401
+from core import utilities
+from core import svgutils  # noqa: F401
+from core import models  # noqa: F401
+from core import (bgbridge, taxonbridge)  # noqa: F401
+from core import deferredmeasures as dms  # noqa: F401
+from core.deferredmeasures import *
 
-from core.basescipyen import BaseScipyenData # noqa
+from core.basescipyen import BaseScipyenData # noqa: F401
 
-from core.datazone import (DataZone, Interval, # noqa
-                           intervals2cursors, intervals2epoch, # noqa
-                           epoch2cursors, epoch2intervals) # noqa
+from core.datazone import (DataZone, Interval,  # noqa: F401
+                           intervals2cursors, intervals2epoch, # noqa: F401
+                           epoch2cursors, epoch2intervals) # noqa: F401
 
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal,) # noqa
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)  # noqa: F401
 # from core.datatypes import *
-import core.datatypes as datatypes # noqa
+# import core.datatypes as datatypes
 
-from core.prog import (safewrapper, deprecation, iter_attribute, # noqa
-                       filter_type, filterfalse_type, # noqa
-                       filter_attribute, filterfalse_attribute, # noqa
-                       timefunc, timemethod, timeblock, processtimefunc, # noqa
-                       processtimeblock, Timer, scipywarn, warn_with_traceback, # noqa
-                       get_properties, print_styled) # noqa
+from core.prog import (safewrapper, deprecation, iter_attribute,  # noqa: F401
+                       filter_type, filterfalse_type, # noqa: F401
+                       filter_attribute, filterfalse_attribute,
+                       timefunc, timemethod, timeblock, processtimefunc,
+                       processtimeblock, Timer, scipywarn, warn_with_traceback,
+                       get_properties, print_styled)
 
 # NOTE: 2024-01-30 22:00:13
 # use our own warning - OK for scipyen console
 warnings.showwarning = prog.showwarning
 
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, ) # noqa
-from core.triggerprotocols import TriggerProtocol # noqa
-from core.traitcontainers import DataBag # noqa
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
+from core.triggerprotocols import TriggerProtocol
+from core.traitcontainers import DataBag
 
-from core.utilities import (summarize_object_properties, # noqa
-                            augment_obj_prop_dict, # noqa
-                            standard_obj_summary_headers, # noqa
-                            safe_identity_test, unique, index_of, # noqa
-                            gethash, NestedFinder, normalized_index, # noqa
-                            reverse_mapping_lookup) # noqa
+from core.utilities import (summarize_object_properties, # noqa: F401
+                            augment_obj_prop_dict, # noqa: F401
+                            standard_obj_summary_headers, # noqa: F401
+                            safe_identity_test, unique, index_of, # noqa: F401
+                            gethash, NestedFinder, normalized_index, # noqa: F401
+                            reverse_mapping_lookup) # noqa: F401
 
-import core.curvefitting as crvf # noqa
-import core.data_analysis as anl # noqa
-import core.desktoputils as desktoputils # noqa
-import core.scipyen_quantities as scq # noqa
-import core.strutils as strutils # noqa
-from core.strutils import counter_suffix # noqa
-import core.signalprocessing as sigp # noqa
-import core.sysutils as sysutils # noqa
-import core.tiwt as tiwt # noqa
-import core.utilities as utilities # noqa
-import core.xmlutils as xmlutils # noqa
+import core.curvefitting as crvf # noqa: F401
+import core.data_analysis as anl # noqa: F401
+import core.desktoputils as desktoputils # noqa: F401
+import core.scipyen_quantities as scq # noqa: F401
+import core.strutils as strutils # noqa: F401
+from core.strutils import counter_suffix # noqa: F401
+import core.signalprocessing as sigp # noqa: F401
+import core.sysutils as sysutils # noqa: F401
+import core.tiwt as tiwt # noqa: F401
+# import core.utilities as utilities
+import core.xmlutils as xmlutils # noqa: F401
 
 from core.scipyen_config import (markConfigurable, confuse, # noqa
-                                 saveWindowSettings, loadWindowSettings, ) # noqa
+                                 saveWindowSettings, loadWindowSettings, ) # noqa: F401
 from core.scipyen_config import scipyen_config as scipyen_settings # noqa
-from core.scipyenmagics import ScipyenMagics # noqa
-from core.strutils import InflectEngine # noqa
-from core.scipyen_plugin_loader import reload # noqa
-from core.vigra_patches import vigra # noqa
-from core.workspacefunctions import * # noqa
-from core.deferredmeasures import DeferredSignalMeasure # noqa
+from core.scipyenmagics import ScipyenMagics # noqa: F401
+from core.strutils import InflectEngine # noqa: F401
+from core.scipyen_plugin_loader import reload # noqa: F401
+from core.vigra_patches import vigra # noqa: F401
+from core.workspacefunctions import * # noqa: F401
+# from core.deferredmeasures import DeferredSignalMeasure # noqa: F401
 
-from plots import plots as plots # noqa
+from plots import plots as plots # noqa: F401
 
 
-from imaging.axisutils import (axisTypeFromString, # noqa
-                               axisTypeName, # noqa
-                               axisTypeStrings, # noqa
-                               axisTypeSymbol, # noqa
-                               axisTypeUnits, # noqa
-                               dimEnum, # noqa
-                               dimIter, # noqa
-                               evalAxisTypeExpression, # noqa
-                               getAxisTypeFlagsInt, # noqa
-                               getNonChannelDimensions, # noqa
-                               hasChannelAxis, # noqa
-                               ) # noqa
+from imaging.axisutils import (axisTypeFromString, # noqa: F401
+                               axisTypeName, # noqa: F401
+                               axisTypeStrings, # noqa: F401
+                               axisTypeSymbol, # noqa: F401
+                               axisTypeUnits, # noqa: F401
+                               dimEnum, # noqa: F401
+                               dimIter, # noqa: F401
+                               evalAxisTypeExpression, # noqa: F401
+                               getAxisTypeFlagsInt, # noqa: F401
+                               getNonChannelDimensions, # noqa: F401
+                               hasChannelAxis, # noqa: F401
+                               ) # noqa: F401
 
-from imaging import axisutils, vigrautils # noqa
-from imaging import (imageprocessing as imgp, imgsim,) # noqa
-from imaging.scandata import (AnalysisUnit, ScanData,) # noqa
-from imaging.axiscalibration import (AxesCalibration, # noqa
-                                     AxisCalibrationData, # noqa
-                                     ChannelCalibrationData, # noqa
-                                     CalibrationData) # noqa
-from ephys import (ephys, membrane, ephys_pathways) # noqa
-from systems import * # noqa
+from imaging import axisutils, vigrautils # noqa: F401
+from imaging import (imageprocessing as imgp, imgsim,) # noqa: F401
+from imaging.scandata import (AnalysisUnit, ScanData,) # noqa: F401
+from imaging.axiscalibration import (AxesCalibration, # noqa: F401
+                                     AxisCalibrationData, # noqa: F401
+                                     ChannelCalibrationData, # noqa: F401
+                                     CalibrationData) # noqa: F401
+from ephys import (ephys, membrane, ephys_pathways) # noqa: F401
+from systems import * # noqa: F401
 
-from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems) # noqa
+from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems) # noqa: F401
 
-from . import delegates # noqa
-from . import interact # noqa
-from . import scipyen_colormaps as colormaps # noqa
-from . import consoles # noqa
-from . import guiutils # noqa
-from . import scipyenviewer # noqa
-from . import quickdialog as qd # noqa
+from . import delegates # noqa: F401
+from . import interact # noqa: F401
+from . import scipyen_colormaps as colormaps # noqa: F401
+from . import consoles # noqa: F401
+from . import guiutils # noqa: F401
+from . import scipyenviewer # noqa: F401
+from . import quickdialog as qd # noqa: F401
 # from .resources import resources_rc #as resources_rc
 # from .resources import icons_rc
 if __has_PySide6__:
-    from .resources.pyside6 import breeze_icons_rc # noqa
-    from .resources.pyside6 import breeze_dark_icons_rc # noqa
-    from .resources.pyside6 import extra_icons_rc # noqa
-    from .resources.pyside6 import images_rc # noqa
+    from .resources.pyside6 import breeze_icons_rc # noqa: F401
+    from .resources.pyside6 import breeze_dark_icons_rc # noqa: F401
+    from .resources.pyside6 import extra_icons_rc # noqa: F401
+    from .resources.pyside6 import images_rc # noqa: F401
 else:
-    from .resources.pyqt6 import breeze_icons_rc # noqa
-    from .resources.pyqt6 import breeze_dark_icons_rc # noqa
-    from .resources.pyqt6 import extra_icons_rc # noqa
-    from .resources.pyqt6 import images_rc # noqa
+    from .resources.pyqt6 import breeze_icons_rc # noqa: F401
+    from .resources.pyqt6 import breeze_dark_icons_rc # noqa: F401
+    from .resources.pyqt6 import extra_icons_rc # noqa: F401
+    from .resources.pyqt6 import images_rc # noqa: F401
 
-from . import pictgui as pgui # noqa
-from . import xmlviewer as xv # noqa
-from . import textviewer as tv # noqa
-from . import tableeditor as te # noqa
-from . import signalviewer as sv # noqa
-from . import matrixviewer as matview # noqa
-from . import imageviewer as iv # noqa
-from . import ObjectInspector as dv # noqa
+from . import pictgui as pgui # noqa: F401
+from . import xmlviewer as xv # noqa: F401
+from . import textviewer as tv # noqa: F401
+from . import tableeditor as te # noqa: F401
+from . import signalviewer as sv # noqa: F401
+from . import matrixviewer as matview # noqa: F401
+from . import imageviewer as iv # noqa: F401
+from . import ObjectInspector as dv # noqa: F401
 # from gui.pythonhelpwidget import PythonHelpWidget
 
-from .consoles import styles, pstyles # noqa
-from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, # noqa
-                    cursors2epoch, cursors2intervals) # noqa
-from .interact import (getInput, getInputs, packInputs, selectWSData) # noqa
-from .itemslistdialog import ItemsListDialog # noqa
-from .menuproxy import MenuProxy # noqa
-from .triggerdetectgui import guiDetectTriggers # noqa
-from .widgets import gradientwidgets # noqa
-from .widgets import stylewidgets # noqa
-from .widgets import colorwidgets # noqa
-from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver) # noqa
+from .consoles import styles, pstyles # noqa: F401
+from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, # noqa: F401
+                    cursors2epoch, cursors2intervals) # noqa: F401
+from .interact import (getInput, getInputs, packInputs, selectWSData) # noqa: F401
+from .itemslistdialog import ItemsListDialog # noqa: F401
+from .menuproxy import MenuProxy # noqa: F401
+from .triggerdetectgui import guiDetectTriggers # noqa: F401
+from .widgets import gradientwidgets # noqa: F401
+from .widgets import stylewidgets # noqa: F401
+from .widgets import colorwidgets # noqa: F401
+from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver) # noqa: F401
 
 from gui.itemmodels.workspacemodel import WorkspaceModel
 from gui.itemmodels.filesystemmodel import FileSystemModel
@@ -373,13 +373,13 @@ from gui.scriptmanager import ScriptManager
 # from gui.workspaceviewer import WorkspaceViewer
 
 
-from iolib import h5io, jsonio, network, navigation # noqa
-from iolib.navigation import filesystems # noqa
-from iolib import pictio as pio # noqa
-from iolib.navigation import navigator # noqa
+from iolib import h5io, jsonio, network, navigation # noqa: F401
+from iolib.navigation import filesystems # noqa: F401
+from iolib import pictio as pio # noqa: F401
+from iolib.navigation import navigator # noqa: F401
 
 
-from core.pyqtgraph_patch import pyqtgraph as pg # noqa
+from core.pyqtgraph_patch import pyqtgraph as pg # noqa: F401
 
 # from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 # END scipyen modules
@@ -554,7 +554,7 @@ def console_info():
 try:
     from gui.mainwindow_ui import Ui_MainWindow
 
-except:
+except: # noqa: E722
     _mainwindow_ui_file = "mainwindow.ui"
     if __has_PyQt6__ or __has_PySide6__:
         Ui_MainWindow, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
@@ -577,7 +577,7 @@ class VTH:
     #       NOTE: when a tuple with a single element 'x', make sure it is passed as (x,)
     #       otherwise it will resolve to x itself !
 
-    default_handlers = {mpl.figure.Figure: {"action": "Plot (matplotlib)",
+    default_handlers = {mpl.figure.Figure: {"action": "Plot (matplotlib)", # noqa: RUF012
                                             "types": {np.ndarray: 99, tuple: 99, list: 99}}}
 
     gui_handlers = deepcopy(default_handlers)
@@ -616,8 +616,8 @@ class VTH:
         # NOTE: 2026-01-16 11:02:34
         # skip types and Qt widgets as there is no need to handle these:
         # types are described at the console, and widgets — well, they just show themselves ⌣
-        if objtype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(objtype):
-            return list()
+        if objtype in VTH.gui_handlers or QtWidgets.QWidget in inspect.getmro(objtype):
+            return []
 
         objtypemro = inspect.getmro(objtype)
         act_np = set()
@@ -625,14 +625,9 @@ class VTH:
         for k, v in VTH.gui_handlers.items():
             v_types = list(filter(lambda x: isinstance(x, type), v["types"].keys()))
             v_predicates = list(filter(lambda x: prog.is_predicate(x), v["types"].keys()))
-            # print(f"VTH.get_handler_spec: v_types = {v_types}, v_predicates = {v_predicates}")
-            # if len(v_predicates):
-                # print(f"\tv_predicates for {k} = {v_predicates}")
 
             for vpred in v_predicates:
-                # print(f"\t\t{vpred}() -> {vpred(obj)}")
                 if vpred(obj):
-                    # print(f"\t\t\tadding{(k, v['action'],  v['types'][vpred])}")
                     #           viewer type,   action name   priority
                     act_np.add((k,             v["action"],  v["types"][vpred]))
 
@@ -640,26 +635,19 @@ class VTH:
                 if vtype in v_types:
                     if len(v_predicates):
                         for vpred in v_predicates:
-                            # print(f"\t\tvtype: {vtype} -> {vpred}() -> {vpred(obj)}")
                             if vpred(obj):
-                                # print(f"\t\t\tadding{(k, v['action'],  v['types'][vpred])}")
                                 #           viewer type,   action name   priority
                                 act_np.add((k,             v["action"],  v["types"][vtype]))
-                    # else:
-                    #     #           viewer type,   action name   priority
-                    #     # print(f"\t\t\tvtype: {vtype} -> adding{(k, v['action'],  v['types'][vtype])}")
-                    #     act_np.add((k,             v["action"],  v["types"][vtype]))
                     if v["action"] not in list(map(lambda act: act[1], list(act_np))):
                         act_np.add((k,             v["action"],  v["types"][vtype]))
 
         if len(act_np):
-            # print(f"act_np = {act_np}")
             # sort in ascending order by action name, and in descending order by
             # priority
             actions = sorted(sorted(list(act_np), key=lambda x: x[1]), key=lambda x: x[2], reverse=True)
             return actions
 
-        return list()
+        return []
 
     def reset_all():
         r"""Resets all gui handlers to the default.
@@ -734,8 +722,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if (
                 issubclass(cls, subclass)
                 and issubclass(subclass, typing.Self)
-                # and issubclass(subclass, SMW)
-                # and subclass != SMW
                 and subclass != typing.Self
             ):
                 yield subclass
@@ -747,8 +733,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @classmethod
     def instance(cls:typing.Self, *args, **kwargs) -> typing.Self:
-        # if __has_PyQt6__:
-        #     return
         # NOTE: Singleton design pattern
         if cls._instance is None:
             inst = cls(*args, **kwargs)
@@ -771,7 +755,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         See Python Wiki / PythonDecoratorLibrary / Creating well behaved decorators
         '''
 
-        # print(n_outputs)
         def fs(a, b):
             return ''.join((a, b))
 
@@ -1175,7 +1158,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self._lastFileSystemFilter = ""
         self._recentVariablesList = collections.deque()
         self._lastVariableFind = ""
-        self._commandHistoryFinderList = collections.deque()
+        self._commandHistorySearches = collections.deque()
         self._lastCommandFind = ""
         # self._recentScripts = list()
         self._recentScripts = collections.deque()
@@ -1472,6 +1455,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # now apply stored settings, including the 'state' of the ScipyenWindow
         # object (which is an instance of QMainWindow)
         #
+        self.configTag = self.__class__.__name__
         self.loadSettings()
 
         self.sig_splashMessage.emit("Loading User Plugins...")
@@ -1680,9 +1664,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def navigateToRecentFileDirectory(self) -> bool:
         return self._navigateToRecentFileDir_
 
-    @markConfigurable("ChangeDirUponRecentFileOpen", "Qt")
+    # @markConfigurable("ChangeDirUponRecentFileOpen", "Qt")
+    @markConfigurable("ChangeDirUponRecentFileOpen")
     @navigateToRecentFileDirectory.setter
-    def navigateToRecentFileDirectory(self, val:bool):
+    def navigateToRecentFileDirectory(self, val: bool):
         self._navigateToRecentFileDir_ = val is True
 
         with qtutils.SignalBlocker(self.actionOpeningARecentFileNavigatesToItsDirectory):
@@ -1699,9 +1684,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def navigateToDroppedFileDirectory(self) -> bool:
         return self._navigateToDroppedFileDir_
 
-    @markConfigurable("ChangeDirUponDropFileOpen", "Qt")
+    # @markConfigurable("ChangeDirUponDropFileOpen", "Qt")
+    @markConfigurable("ChangeDirUponDropFileOpen")
     @navigateToDroppedFileDirectory.setter
-    def navigateToDroppedFileDirectory(self, val:bool):
+    def navigateToDroppedFileDirectory(self, val: bool):
         self._navigateToDroppedFileDir_ = val is True
         with qtutils.SignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file):
             # sigBlock = QtCore.QSignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file)
@@ -1713,7 +1699,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @markConfigurable("ShellAutomagic")
     @shellAutomagic.setter
-    def shellAutomagic(self, val:bool):
+    def shellAutomagic(self, val: bool):
         self._shell_automagics = val is True
         if self.console:
             self.console.shellAutomagic = self._shell_automagics
@@ -1730,9 +1716,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def hideFilesWhenFiltering(self) -> bool:
         return self._fileNamesFiltersHides_
 
-    @markConfigurable("HideFilteredFileNames", "Qt")
+    # @markConfigurable("HideFilteredFileNames", "Qt")
+    @markConfigurable("HideFilteredFileNames")
     @hideFilesWhenFiltering.setter
-    def hideFilesWhenFiltering(self, val:bool):
+    def hideFilesWhenFiltering(self, val: bool):
         self._fileNamesFiltersHides_ = val is True
         self.fileSystemModel.setNameFilterDisables(not self._fileNamesFiltersHides_)
 
@@ -1749,9 +1736,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useNewNavigatorLook(self) -> bool:
         return self._newNavigatorLook_
 
-    @markConfigurable("UseNewNavigatorLook", "Qt")
+    # @markConfigurable("UseNewNavigatorLook", "Qt")
+    @markConfigurable("UseNewNavigatorLook")
     @useNewNavigatorLook.setter
-    def useNewNavigatorLook(self, val:bool):
+    def useNewNavigatorLook(self, val: bool):
         self._newNavigatorLook_ = val is True
         self.navigator.newLook = self._newNavigatorLook_
 
@@ -1767,9 +1755,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useNativeMenuBar(self) -> bool:
         return self._useNativeMenuBar
 
-    @markConfigurable("UseNativeMenuBar", "Qt")
+    # @markConfigurable("UseNativeMenuBar", "Qt")
+    @markConfigurable("UseNativeMenuBar")
     @useNativeMenuBar.setter
-    def useNativeMenuBar(self, val:bool) -> None:
+    def useNativeMenuBar(self, val: bool) -> None:
         self._useNativeMenuBar = val is True
 
         with qtutils.SignalBlocker(self.actionUse_Native_Menu_Bar):
@@ -1933,7 +1922,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @markConfigurable("UserPluginsDirectory", trait_notifier=True)
     @userPluginsDirectory.setter
-    def userPluginsDirectory(self, val:typing.Union[str, pathlib.Path]):
+    def userPluginsDirectory(self, val: str | pathlib.Path):
         if isinstance(val, pathlib.Path):
             val = str(val)
 
@@ -1946,44 +1935,64 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def showFullNavigatorPath(self)-> bool:
         return self.navigator.showFullPath()
 
-    @markConfigurable("ShowFullNavigatorPath", "Qt")
+    # @markConfigurable("ShowFullNavigatorPath", "Qt")
+    @markConfigurable("ShowFullNavigatorPath")
     @showFullNavigatorPath.setter
-    def showFullNavigatorPath(self, value:bool):
+    def showFullNavigatorPath(self, value: bool):
         self.navigator.setShowFullPath(value is True)
 
     @property
-    def navigatorEditable(self)->bool:
+    def navigatorEditable(self) -> bool:
         return self.navigator.isUrlEditable()
 
-    @markConfigurable("NavigatorIsEditable", "Qt")
+    # @markConfigurable("NavigatorIsEditable", "Qt")
+    @markConfigurable("NavigatorIsEditable")
     @navigatorEditable.setter
-    def navigatorEditable(self, value:bool):
+    def navigatorEditable(self, value: bool):
         self.navigator.setUrlEditable(value is True)
 
     @property
     def toolBarLocked(self) -> bool:
         return not self.toolBar.isMovable()
 
-    @markConfigurable("ToolBarLocked", "Qt")
+    # @markConfigurable("ToolBarLocked", "Qt")
+    @markConfigurable("ToolBarLocked")
     @toolBarLocked.setter
-    def toolBarLocked(self, val:bool):
+    def toolBarLocked(self, val: bool):
         self._lockedToolBar = val is True
         with qtutils.SignalBlocker(self.lockToolBarAction):
             self.lockToolBarAction.setChecked(self._lockedToolBar)
         self.toolBar.setMovable(not self._lockedToolBar)
 
     @Slot(bool)
-    def _slot_changeToolBarLockedState(self, val:bool):
+    def _slot_changeToolBarLockedState(self, val: bool):
         # print(f"{self.__class__.__name__}._slot_changeToolBarLockedState(val={val})")
         self.toolBarLocked = val is True
+
+    @property
+    def _toolBarIconSize_(self) -> str:
+        return f"{self.toolBarIconSize.width()}x{self.toolBarIconSize.height()}"
+
+    @markConfigurable("ToolbarIconSize")
+    @_toolBarIconSize_.setter
+    def _toolBarIconSize_(self, val:str):
+        w,h = [16, 16]
+        try:
+            wh = val.split("x")
+            if len(wh) == 2:
+                w, h = [int(v) for v in wh]
+        except: # noqa
+            pass
+
+        self.toolBarIconSize = QtCore.QSize(w,h)
 
     @property
     def toolBarIconSize(self) -> QtCore.QSize:
         return self.toolBar.iconSize() # QMainWindow API
 
-    @markConfigurable("ToolbarIconSize", "Qt")
+    # @markConfigurable("ToolbarIconSize", "Qt")
     @toolBarIconSize.setter
-    def toolBarIconSize(self, val:QtCore.QSize):
+    def toolBarIconSize(self, val: QtCore.QSize):
         # print(f"{self.__class__.__name__}.toolBarIconSize.setter(val = {val})")
         self._tbIconSize = val
         self.toolBar.setIconSize(val)
@@ -2026,6 +2035,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.toolBarIconSize = QtCore.QSize(48,48)
 
     @property
+    def _toolBarButtonStyleCfg_(self) -> int:
+        if isinstance(self.toolBarButtonStyle, int):
+            return self.toolBarButtonStyle
+        elif isinstance(self.toolBarButtonStyle, QtCore.Qt.ToolButtonStyle):
+            return self.toolBarButtonStyle.value
+        else:
+            return QtCore.Qt.ToolButtonStyle.ToolButtonFollowStyle.value
+
+    @markConfigurable("ToolBarButtonStyle")
+    @_toolBarButtonStyleCfg_.setter
+    def _toolBarButtonStyleCfg_(self, val: int):
+        if val in QtCore.Qt.ToolButtonStyle:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonStyle(val)
+        else:
+            self.toolBarButtonStyle = QtCore.Qt.ToolButtonStyle.ToolButtonFollowStyle
+
+
+    @property
     def toolBarButtonStyle(self) -> QtCore.Qt.ToolButtonStyle:
         r"""MainWindow's tool bar button style"""
         return self.toolBar.toolButtonStyle()
@@ -2037,7 +2064,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.textOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly)
             self.textUnderIconsToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon)
 
-    @markConfigurable("ToolBarButtonStyle", "Qt")
+    # @markConfigurable("ToolBarButtonStyle", "Qt")
     @toolBarButtonStyle.setter
     def toolBarButtonStyle(self, val:QtCore.Qt.ToolButtonStyle|int|str):
         if isinstance(val, str):
@@ -2126,7 +2153,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         iconSize = QtCore.QSize(val, val)
         self.workspaceView.setIconSize(iconSize)
 
-    @markConfigurable("WorkSpaceViewIconSize", "Qt")
+
+    # @markConfigurable("WorkSpaceViewIconSize", "Qt")
+    @markConfigurable("WorkSpaceViewIconSize")
     @workSpaceIconSize.setter
     def workSpaceIconSize(self, val:int):
         val = int(val)
@@ -2204,7 +2233,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
                                                              self._fileSystemIconModeIconSize_))
 
-    @markConfigurable("FileSystemViewerIconSize", "Qt")
+    # @markConfigurable("FileSystemViewerIconSize", "Qt")
+    @markConfigurable("FileSystemViewerIconSize")
     @fileSystemIconSize.setter
     def fileSystemIconSize(self, val:int):
         val = int(val)
@@ -2225,7 +2255,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemIconModeIconSize(self) -> int:
         return self._fileSystemIconModeIconSize_
 
-    @markConfigurable("FileSystemIconModeIconSize", "Qt")
+    # @markConfigurable("FileSystemIconModeIconSize", "Qt")
+    @markConfigurable("FileSystemIconModeIconSize")
     @fileSystemIconModeIconSize.setter
     def fileSystemIconModeIconSize(self, val:int):
         val = int(val)
@@ -2281,12 +2312,29 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.guiIconSize = newVal
 
     @property
+    def _toolButtonStyleCfg_(self) -> int:
+        if isinstance(self.toolButtonStyle, QtCore.Qt.ToolButtonStyle):
+            return self.toolButtonStyle.value
+        elif isinstance(self.toolButtonStyle, int):
+            return self.toolButtonStyle
+        else:
+            return QtCore.Qt.ToolButtonStyle.ToolButtonFollowStyle.value
+
+    @markConfigurable("ToolButtonStyle")
+    @_toolButtonStyleCfg_.setter
+    def _toolButtonStyleCfg_(self, val: int):
+        if val in QtCore.Qt.ToolButtonStyle:
+            self.toolButtonStyle = QtCore.Qt.ToolButtonStyle(val)
+        else:
+            self.toolButtonStyle = QtCore.Qt.ToolButtonStyle.ToolButtonFollowStyle
+
+    @property
     def toolButtonStyle(self) -> int:
         return self._toolButtonStyle_
 
-    @markConfigurable("ToolButtonStyle", "Qt")
+    # @markConfigurable("ToolButtonStyle", "Qt")
     @toolButtonStyle.setter
-    def toolButtonStyle(self, val:int):
+    def toolButtonStyle(self, val: int):
         # print(f"{self.__class__.__name__}.toolButtonStyle.setter({val})")
         self._toolButtonStyle_ = val
         self._set_toolButtonStyle(self._toolButtonStyle_)
@@ -2363,7 +2411,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             for b in btns:
                 b.setIconSize(iconSize)
 
-    @markConfigurable("GUIIconsize", "Qt")
+    # @markConfigurable("GUIIconsize", "Qt")
+    @markConfigurable("GUIIconsize")
     @guiIconSize.setter
     def guiIconSize(self, val:int):
         # print(f"{self.__class__.__name__}.guiIconSize = {val}")
@@ -2390,22 +2439,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def scriptsManager(self) -> ScriptManager | None:
         return self.scriptManager
 
-    @property
-    def consoleDocked(self):
-        return self._console_docked_
-
-    @markConfigurable("ConsoleDocked", "Qt")
-    @consoleDocked.setter
-    def consoleDocked(self, value):
-        self._console_docked_ = value is True
+    # @property
+    # def consoleDocked(self):
+    #     return self._console_docked_
+    #
+    # @markConfigurable("ConsoleDocked", "Qt")
+    # @consoleDocked.setter
+    # def consoleDocked(self, value):
+    #     self._console_docked_ = value is True
 
     @property
     def autoRemoveViewers(self) -> bool:
         return self._auto_remove_viewers_
 
-    @markConfigurable("AutoRemoveViewers", "Qt")#, default=False, value_type=bool)
+    @markConfigurable("AutoRemoveViewers", trait_notifier=True)#, "Qt", default=False, value_type=bool)
     @autoRemoveViewers.setter
-    def autoRemoveViewers(self, value: typing.Union[bool, str]) -> None:
+    def autoRemoveViewers(self, value: bool | str) -> None:
         # print(f"autoRemoveViewers.setter: value = {value}")
         if isinstance(value, str):
             value = value.lower() == "true"
@@ -2419,7 +2468,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def maxRecentFiles(self):
         return self._maxRecentFiles
 
-    @markConfigurable("MaxRecentFiles", "Qt")
+    # @markConfigurable("MaxRecentFiles", "Qt")
+    @markConfigurable("MaxRecentFiles")
     @maxRecentFiles.setter
     def maxRecentFiles(self, val: int):
         if isinstance(val, int) and val >= 0:
@@ -2444,7 +2494,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def guiStyle(self):
         return self._current_GUI_style_name
 
-    @markConfigurable("WidgetStyle", "qt", default="Default")
+    # @markConfigurable("WidgetStyle", "Qt", default="Default")
+    @markConfigurable("WidgetStyle", default="Default")
     @guiStyle.setter
     def guiStyle(self, val: str):
         if not isinstance(val, str) or val not in self._available_Qt_style_names_:
@@ -2519,7 +2570,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self._script_manager_autolaunch = self._scriptManager_.isVisible() and not self._scriptManager_.isMinimized()
         return self._script_manager_autolaunch
 
-    @markConfigurable("ScriptManagerAutoLaunch", "qt")
+    # @markConfigurable("ScriptManagerAutoLaunch", "Qt")
+    @markConfigurable("ScriptManagerAutoLaunch")
     @scriptManagerAutoLaunch.setter
     def scriptManagerAutoLaunch(self, val: typing.Union[bool, str]):
         if isinstance(val, str):
@@ -2536,7 +2588,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemViewMode(self) -> str:
         return self._fileSystemViewMode_
 
-    @markConfigurable("FileSystemViewMode", "Qt", default="Tree")
+    # @markConfigurable("FileSystemViewMode", "Qt", default="Tree")
+    @markConfigurable("FileSystemViewMode", default="Tree")
     @fileSystemViewMode.setter
     def fileSystemViewMode(self, val:str):
         if val not in ("Tree", "Icon", "List", "Column"):
@@ -2614,7 +2667,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def maxRecentDirectories(self):
         return self._maxRecentDirectories
 
-    @markConfigurable("MaxRecentDirectories", "Qt", default=10)
+    @markConfigurable("MaxRecentDirectories", trait_notifier=True)#, "Qt", default=10)
     @maxRecentDirectories.setter
     def maxRecentDirectories(self, val: int):
         # NOTE: _recentDirectories stores them as most recent first !
@@ -2632,9 +2685,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def recentFiles(self):
         return self._recentFiles
 
-    @markConfigurable("RecentFiles", "Qt", default=10)
+    @markConfigurable("RecentFiles", trait_notifier=True)#, "Qt", default=10)
     @recentFiles.setter
-    def recentFiles(self, val: typing.Optional[typing.Union[collections.OrderedDict, tuple, list]] = None):
+    def recentFiles(self, val: collections.OrderedDict | tuple | list | None = None):
         if isinstance(val, collections.OrderedDict):
             if not all(isinstance(v, dict) and "loader" in v and "timestamp" in v for v in val.values()):
                 return
@@ -2647,13 +2700,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self._slot_refreshRecentFilesMenu_()
 
+
+
     @property
     def recentDirectories(self):
         return self._recentDirectories
 
-    @markConfigurable("RecentDirectories", "Qt")
+    # @markConfigurable("RecentDirectories", "Qt")
     @recentDirectories.setter
-    def recentDirectories(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
+    def recentDirectories(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentDirectories = collections.deque(val)
         else:
@@ -2670,15 +2725,28 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.navigator.urlChanged.emit(url)
 
     @property
+    def _recentDirs_(self):
+        return ";;".join(list(self.recentDirectories))
+
+    @markConfigurable("RecentDirectories")
+    @_recentDirs_.setter
+    def _recentDirs(self, val):
+        if not isinstance(val, str) or len(val.strip()):
+            val = collections.deque()
+        else:
+            val = collections.deque(val.split(';;'))
+
+        self.recentDirectories = val
+
+    @property
     def fileSystemFilterHistory(self):
         return self._fileSystemFilterHistory
 
-    @markConfigurable("RecentFileSystemFilters", "Qt")
+    # @markConfigurable("RecentFileSystemFilters", "Qt")
     @fileSystemFilterHistory.setter
-    def fileSystemFilterHistory(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
+    def fileSystemFilterHistory(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._fileSystemFilterHistory = collections.deque(val)
-
         else:
             self._fileSystemFilterHistory = collections.deque()
 
@@ -2689,32 +2757,46 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     self.fileSystemFilter.addItem(item)
 
     @property
+    def _fsFilterHistory_(self):
+        return ";;".join(list(self.fileSystemFilterHistory))
+
+    @markConfigurable("RecentFileSystemFilters")
+    @_fsFilterHistory_.setter
+    def _fsFilterHistory_(self, val):
+        if not isinstance(val, str) or len(val.strip()):
+            val = collections.deque()
+        else:
+            val = collections.deque(val.split(';;'))
+
+        self.fileSystemFilterHistory = val
+
+    @property
     def lastFileSystemFilter(self):
         return self._lastFileSystemFilter
 
-    @markConfigurable("LastFileSystemFilter", "Qt")
+    # @markConfigurable("LastFileSystemFilter", "Qt")
+    @markConfigurable("LastFileSystemFilter")
     @lastFileSystemFilter.setter
-    def lastFileSystemFilter(self, val: typing.Optional[str] = None):
-        if isinstance(val, str):
-            self._lastFileSystemFilter = val
+    def lastFileSystemFilter(self, val: str | None = None):
+        if not isinstance(val, str):
+            self._lastFileSystemFilter = ""
         else:
-            self._lastFileSystemFilter = str()
-
-        if len(self._lastFileSystemFilter) > 0 and len(self._lastFileSystemFilter.strip()) == 0:
-            self._lastFileSystemFilter = str()
+            self._lastFileSystemFilter = val
 
         self.fileSystemFilter.setCurrentText(self._lastFileSystemFilter)
 
         if len(self._lastFileSystemFilter) > 0:
             self.fileSystemModel.setNameFilters(self._lastFileSystemFilter.split())
+
         else:
-            self.fileSystemModel.setNameFilters(list())
+            self.fileSystemModel.setNameFilters([])
 
     @property
-    def showFileSystemFilter(self):
+    def showFileSystemFilter(self) -> bool:
         return self._showFilesFilter
 
-    @markConfigurable("FilesFilterVisible", "Qt")
+    # @markConfigurable("FilesFilterVisible", "Qt")
+    @markConfigurable("FilesFilterVisible")
     @showFileSystemFilter.setter
     def showFileSystemFilter(self, val: typing.Optional[typing.Union[bool, str, int]] = None):
         if isinstance(val, str) and val.strip().lower() == "true":
@@ -2733,7 +2815,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def fileSystemTimeFormat(self) -> str:
         return self._fileSystemTimeDisplayFormat_
 
-    @markConfigurable("FileSystemTimeDisplay", "Qt")
+    # @markConfigurable("FileSystemTimeDisplay", "Qt")
+    @markConfigurable("FileSystemTimeDisplay")
     @fileSystemTimeFormat.setter
     def fileSystemTimeFormat(self, val: str) -> None:
         if isinstance(val, str) and val in ("LongFormat", "ShortFormat", "NarrowFormat", "Fancy Short", "Fancy Narrow"):
@@ -2772,7 +2855,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontFamily(self) -> str:
         return self._font.family()
 
-    @markConfigurable("UIFontFamily", "Qt")
+    # @markConfigurable("UIFontFamily", "Qt")
+    @markConfigurable("UIFontFamily")
     @uiFontFamily.setter
     def uiFontFamily(self, val:str):
         self._font.setFamily(val)
@@ -2782,9 +2866,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontPointSize(self) -> int:
         return int(self._font.pointSize())
 
-    @markConfigurable("UIFontPointSize", "Qt")
+    # @markConfigurable("UIFontPointSize", "Qt")
+    @markConfigurable("UIFontPointSize")
     @uiFontPointSize.setter
-    def uiFontPointSize(self, val:int):
+    def uiFontPointSize(self, val: int):
         self._font.setPointSize(val)
         self._updateFont()
 
@@ -2794,9 +2879,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._font.style().value)
         return int(self._font.style())
 
-    @markConfigurable("UIFontStyle", "Qt")
+    # @markConfigurable("UIFontStyle", "Qt")
+    @markConfigurable("UIFontStyle")
     @uiFontStyle.setter
-    def uiFontStyle(self, val:int):
+    def uiFontStyle(self, val: int):
         self._font.setStyle(get_font_style(val))
         self._updateFont()
 
@@ -2804,9 +2890,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def uiFontWeight(self) -> int:
         return int(self._font.weight())
 
-    @markConfigurable("UIFontWeight", "Qt")
+    # @markConfigurable("UIFontWeight", "Qt")
+    @markConfigurable("UIFontWeight")
     @uiFontWeight.setter
-    def uiFontWeight(self, val:int):
+    def uiFontWeight(self, val: int):
         self._font.setWeight(get_font_weight(val))
         self._updateFont()
 
@@ -2814,9 +2901,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontFamily(self) -> str:
         return self._workspaceViewerFont.family()
 
-    @markConfigurable("WorkspaceFontFamily", "Qt")
+    # @markConfigurable("WorkspaceFontFamily", "Qt")
+    @markConfigurable("WorkspaceFontFamily")
     @workspaceFontFamily.setter
-    def workspaceFontFamily(self, val:str):
+    def workspaceFontFamily(self, val: str):
         self._workspaceViewerFont.setFamily(val)
         self._updateWorkspaceItemsFont()
 
@@ -2824,9 +2912,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontPointSize(self) -> int:
         return int(self._workspaceViewerFont.pointSize())
 
-    @markConfigurable("WorkspaceFontPointSize", "Qt")
+    # @markConfigurable("WorkspaceFontPointSize", "Qt")
+    @markConfigurable("WorkspaceFontPointSize")
     @workspaceFontPointSize.setter
-    def workspaceFontPointSize(self, val:int):
+    def workspaceFontPointSize(self, val: int):
         self._workspaceViewerFont.setPointSize(int(val))
         self._updateWorkspaceItemsFont()
 
@@ -2836,9 +2925,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._workspaceViewerFont.style().value)
         return int(self._workspaceViewerFont.style())
 
-    @markConfigurable("WorkspaceFontStyle", "Qt")
+    # @markConfigurable("WorkspaceFontStyle", "Qt")
+    @markConfigurable("WorkspaceFontStyle")
     @workspaceFontStyle.setter
-    def workspaceFontStyle(self, val:int):
+    def workspaceFontStyle(self, val: int):
         self._workspaceViewerFont.setStyle(get_font_style(val))
         self._updateWorkspaceItemsFont()
 
@@ -2846,9 +2936,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def workspaceFontWeight(self) -> int:
         return int(self._workspaceViewerFont.weight())
 
-    @markConfigurable("WorkspaceFontWeight", "Qt")
+    # @markConfigurable("WorkspaceFontWeight", "Qt")
+    @markConfigurable("WorkspaceFontWeight")
     @workspaceFontWeight.setter
-    def workspaceFontWeight(self, val:int):
+    def workspaceFontWeight(self, val: int):
         self._workspaceViewerFont.setWeight(get_font_weight(val))
         self._updateWorkspaceItemsFont()
 
@@ -2856,9 +2947,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontFamily(self) -> str:
         return self._commandHistoryFont.family()
 
-    @markConfigurable("HistoryFontFamily", "Qt")
+    # @markConfigurable("HistoryFontFamily", "Qt")
+    @markConfigurable("HistoryFontFamily")
     @historyFontFamily.setter
-    def historyFontFamily(self, val:str):
+    def historyFontFamily(self, val: str):
         self._commandHistoryFont.setFamily(val)
         self._updateHistoryViewFont()
 
@@ -2866,9 +2958,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontPointSize(self) -> int:
         return int(self._commandHistoryFont.pointSize())
 
-    @markConfigurable("HistoryFontPointSize", "Qt")
+    # @markConfigurable("HistoryFontPointSize", "Qt")
+    @markConfigurable("HistoryFontPointSize")
     @historyFontPointSize.setter
-    def historyFontPointSize(self, val:int):
+    def historyFontPointSize(self, val: int):
         self._commandHistoryFont.setPointSize(val)
         self._updateHistoryViewFont()
 
@@ -2878,9 +2971,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             return int(self._commandHistoryFont.style().value)
         return int(self._commandHistoryFont.style())
 
-    @markConfigurable("HistoryFontStyle", "Qt")
+    # @markConfigurable("HistoryFontStyle", "Qt")
+    @markConfigurable("HistoryFontStyle")
     @historyFontStyle.setter
-    def historyFontStyle(self, val:int):
+    def historyFontStyle(self, val: int):
         self._commandHistoryFont.setStyle(get_font_style(val))
         self._updateHistoryViewFont()
 
@@ -2888,9 +2982,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def historyFontWeight(self) -> int:
         return int(self._commandHistoryFont.weight())
 
-    @markConfigurable("HiatoryFontWeight", "Qt")
+    # @markConfigurable("HiatoryFontWeight", "Qt")
+    @markConfigurable("HiatoryFontWeight")
     @historyFontWeight.setter
-    def historyFontWeight(self, val:int):
+    def historyFontWeight(self, val: int):
         self._commandHistoryFont.setWeight(get_font_weight(val))
         self._updateHistoryViewFont()
 
@@ -2902,9 +2997,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useSystemFont(self) -> bool:
         return self._useSystemDefaultFont
 
-    @markConfigurable("UseSystemFont", "Qt")
+    # @markConfigurable("UseSystemFont", "Qt")
+    @markConfigurable("UseSystemFont")
     @useSystemFont.setter
-    def useSystemFont(self, val:bool):
+    def useSystemFont(self, val: bool):
         self._useSystemDefaultFont = val is True
         self._updateWorkspaceItemsFont()
         self._updateHistoryViewFont()
@@ -3025,7 +3121,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def variableSearches(self) -> collections.deque:
         return self._recentVariablesList
 
-    @markConfigurable("VariableSearch", "Qt")
+    # @markConfigurable("VariableSearch", "Qt")
     @variableSearches.setter
     def variableSearches(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
@@ -3042,12 +3138,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.setCurrentText("")
 
     @property
+    def _varSearches_(self):
+        return ";;".join(self.variableSearches)
+
+    @markConfigurable("VariableSearch")
+    @_varSearches_.setter
+    def _varSearches_(self, val):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            self.variableSearches = collections.deque()
+        else:
+            self.variableSearches = collections.deque(val.split(';;'))
+
+    @property
     def lastVariableSearch(self):
         return self._lastVariableFind
 
-    @markConfigurable("LastVariableSearch", "Qt")
+    # @markConfigurable("LastVariableSearch", "Qt")
+    @markConfigurable("LastVariableSearch")
     @lastVariableSearch.setter
-    def lastVariableSearch(self, val: typing.Optional[str] = None):
+    def lastVariableSearch(self, val: str | None = None):
         if isinstance(val, str):
             self._lastVariableFind = val
         else:
@@ -3057,9 +3166,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def useLastHistoryCommandSearch(self) -> bool:
         return self._useLastHistoryCommandSearch_
 
-    @markConfigurable("UseLastHistoryCommandSearch", "Qt")
+    # @markConfigurable("UseLastHistoryCommandSearch", "Qt")
+    @markConfigurable("UseLastHistoryCommandSearch")
     @useLastHistoryCommandSearch.setter
-    def useLastHistoryCommandSearch(self, val:bool):
+    def useLastHistoryCommandSearch(self, val: bool):
         self._useLastHistoryCommandSearch_ = val is True
         with qtutils.SignalBlocker(self.useLastHistoryCommandSearchAction):
             self.useLastHistoryCommandSearchAction.setChecked(self._useLastHistoryCommandSearch_)
@@ -3086,20 +3196,19 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @property
     def commandSearches(self):
-        return self._commandHistoryFinderList
+        return self._commandHistorySearches
 
-    @markConfigurable("CommandSearch", "Qt")
     @commandSearches.setter
-    def commandSearches(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
+    def commandSearches(self, val: collections.deque | list | tuple | None = None):
         if isinstance(val, (collections.deque, list, tuple)):
-            self._commandHistoryFinderList = collections.deque(val)
+            self._commandHistorySearches = collections.deque(val)
 
         else:
-            self._commandHistoryFinderList = collections.deque()
+            self._commandHistorySearches = collections.deque()
 
-        if len(self._commandHistoryFinderList):
+        if len(self._commandHistorySearches):
             self.commandHistoryFinderComboBox.clear()
-            for item in self._commandHistoryFinderList:
+            for item in self._commandHistorySearches:
                 self.commandHistoryFinderComboBox.addItem(item)
 
             if self.useLastHistoryCommandSearch:
@@ -3112,6 +3221,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 self.historyTreeWidget.setSelectionMode(original_selection_mode)
                 self.historyTreeWidget.scrollToItem(topLevelItem)
 
+    @property
+    def _commandSearch_(self):
+        return ';;'.join(list(self._commandHistorySearches))
+        # return qVariant(val)
+
+    @markConfigurable("CommandSearch")
+    @_commandSearch_.setter
+    def _commandSearch_(self, val: str):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            val = collections.deque()
+        else:
+            val = collections.deque(val.split(";;"))
+
+        self.commandSearches = val
 
     @property
     def lastCommandSearch(self):
@@ -3125,9 +3248,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def scipyenDir(self):
         return self._scipyendir_
 
-    @markConfigurable("ScipyenEditor", "Qt")
+    # @markConfigurable("ScipyenEditor", "Qt")
+    @markConfigurable("ScipyenEditor")
     @scipyenEditor.setter
-    def scipyenEditor(self, val: typing.Optional[str] = None):
+    def scipyenEditor(self, val: str | None = None):
         import shutil
         if isinstance(val, str) and len(val.strip()):
             editorExecPath = shutil.which(val)
@@ -3145,7 +3269,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def overrideSystemEditor(self):
         return self._overrideSystemEditor
 
-    @markConfigurable("OvererideSystemEditor", "Qt")
+    # @markConfigurable("OvererideSystemEditor", "Qt")
+    @markConfigurable("OvererideSystemEditor")
     @overrideSystemEditor.setter
     def overrideSystemEditor(self, val: bool = False):
         self._overrideSystemEditor = val is True
@@ -3155,7 +3280,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self._updateConsolesEditor()
 
-    @markConfigurable("LastCommandSearch", "Qt")
+    # @markConfigurable("LastCommandSearch", "Qt")
+    @markConfigurable("LastCommandSearch")
     @lastCommandSearch.setter
     def lastCommandSearch(self, val: typing.Optional[str] = None):
         if isinstance(val, str):
@@ -3169,9 +3295,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     # NOTE:FIXME/TODO 2022-01-30 00:05:47
     # Until I figure out a proper contents-observing traitType for Python
-    # collections like list, deque, dict, I stick with Qt configable here.
-    # @markConfigurable("RecentScripts", trait_notifier=True)
-    @markConfigurable("RecentScripts", "Qt")
+    # collections like list, deque, dict, I stick with Qt configurable here.
+    # @markConfigurable("RecentScripts", "Qt")
     @recentScripts.setter
     def recentScripts(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         # print(f"ScipyenWindow.recentScripts.setter {val}")
@@ -3182,6 +3307,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self._recentScripts = collections.deque()
 
         self._refreshRecentScriptsMenu_()
+
+    @property
+    def _usedScripts_(self):
+        return ";;".join(list(self.recentScripts))
+
+    @markConfigurable("RecentScripts", trait_notifier=True)
+    @_usedScripts_.setter
+    def _usedScripts(self, val):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            val = collections.deque()
+        else:
+            val = collections.deque(val.split(";;"))
+
+        self.recentScripts = val
 
     # ### END   Properties and slots connected to properties
 
@@ -3908,7 +4047,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # 1. start remote kernel
         # 2. once started, automatically import useful libraries such as bokeh etc
         # 3. make this in two flavours, one of them with NEURON environment
-        from core.extipyutils_client import (nrn_ipython_initialization_cmd,
+        from core.extipyutils_client import (nrn_ipython_initialization_cmd,  # noqa: I001
                                              cmd_foreign_shell_ns_hidden_listing)
         from functools import partial
         # print("_init_ExternalIPython_ new", new)
@@ -6389,10 +6528,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(guiutils.getIcon("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        self.consolesAction = self.toolBar.addAction(guiutils.getIcon("akonadiconsole"), "Consoles")
+        # self.consolesAction = self.toolBar.addAction(guiutils.getIcon("akonadiconsole"), "Consoles")
+        self.consolesAction = self.toolBar.addAction(guiutils.getIcon("dialog-scripts"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
-        self.scriptsAction = self.toolBar.addAction(guiutils.getIcon("dialog-scripts"), "Scripts")
+        # self.scriptsAction = self.toolBar.addAction(guiutils.getIcon("dialog-scripts"), "Scripts")
+        self.scriptsAction = self.toolBar.addAction(guiutils.getIcon("run-build"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(guiutils.getIcon("homerun", "window-list"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
@@ -8010,8 +8151,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def slot_addCommandFindToHistory(self):
         cmdTxt = self.commandHistoryFinderComboBox.lineEdit().text()
         if len(cmdTxt.strip()) > 0:
-            if cmdTxt not in self._commandHistoryFinderList:
-                self._commandHistoryFinderList.appendleft(cmdTxt)
+            if cmdTxt not in self._commandHistorySearches:
+                self._commandHistorySearches.appendleft(cmdTxt)
             self.lastCommandFind = cmdTxt
             self.slot_findCommand(cmdTxt)
 
@@ -8020,8 +8161,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def slot_removeItemFromCommandFinderHistory(self):
         currentNdx = self.commandHistoryFinderComboBox.currentIndex()
         cmdTxt = self.commandHistoryFinderComboBox.itemText(currentNdx)
-        if cmdTxt in self._commandHistoryFinderList:
-            self._commandHistoryFinderList.remove(cmdTxt)
+        if cmdTxt in self._commandHistorySearches:
+            self._commandHistorySearches.remove(cmdTxt)
 
         self.commandHistoryFinderComboBox.removeItem(currentNdx)
         self.commandHistoryFinderComboBox.lineEdit().setClearButtonEnabled(True)

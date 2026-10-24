@@ -1251,7 +1251,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         return self._scipyenWindow_
 
     @property
-    def isTopLevel(self):
+    def isTopLevelWindow(self):
         """Returns True when this window is a top level window in Scipyen.
         In Scipyen, a window is "top level" when it is a direct child of the
         Scipyen's main window.
@@ -1262,14 +1262,14 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         In contrast, viewers created from within a Scipyen "application" are
         members of the application and thus are not "top level". The application
-        is responsible for managng these viewers.
+        is responsible for managing these viewers.
 
         A Scipyen "application" is any facility that runs its own GUI inside
         Scipyen (e.g., LSCaT) - this is NOT a stand-alone Qt application with
         which Scipyen communicates.
 
         """
-        return self.appWindow is None
+        return self.appWindow is None or self.appWindow is self
 
     @property
     def appWindow(self):

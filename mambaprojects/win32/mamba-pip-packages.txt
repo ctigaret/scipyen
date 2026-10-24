@@ -2,6 +2,7 @@ confuse
 isodate
 drawsvg
 python-magic
+pyside-settings-manager
 winshell
 tribool
 pyabf
