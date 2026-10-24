@@ -620,8 +620,8 @@ class VTH:
         act_np = set()
 
         for k, v in VTH.gui_handlers.items():
-            v_types = list(filter(lambda x: isinstance(x, type), v["types"].keys()))
-            v_predicates = list(filter(lambda x: prog.is_predicate(x), v["types"].keys()))
+            v_types = list(filter(lambda x: isinstance(x, type), v["types"]))
+            v_predicates = list(filter(lambda x: prog.is_predicate(x), v["types"]))
 
             for vpred in v_predicates:
                 if vpred(obj):
@@ -1879,7 +1879,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return tuple(x.__name__ for x in self._ui_plugins_.keys())
+        return tuple(x.__name__ for x in self._ui_plugins_)
 
     @property
     def UIPluginMenus(self) -> dict:
@@ -3771,7 +3771,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         viewer_type = type(win)
 
-        if viewer_type in self.viewers.keys():
+        if viewer_type in self.viewers:
             if win in self.viewers[viewer_type]:
                 self.viewers[viewer_type].remove(win)
 
@@ -3837,7 +3837,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
             return
 
-        if type(obj) not in self.viewers.keys():
+        if type(obj) not in self.viewers:
             self.viewers[type(obj)] = list()
 
         if obj not in self.viewers[type(obj)]:
@@ -4721,7 +4721,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                     return
 
-                if varname not in self.workspace:#.keys():
+                if varname not in self.workspace:
                     return
 
         return varname
@@ -4776,7 +4776,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         workspace at the time the `dir()` command is run.
 
     """
-        if name in self.workspaceModel.user_ns_hidden.keys():
+        if name in self.workspaceModel.user_ns_hidden:
             t = type(self.workspaceModel.user_ns_hidden[name])
             self.criticalMessage("Assign in workspace", f"The name {name} would overwrite a system {t.__name__} variable.\n Please choose a different name!")
             return False
@@ -5309,9 +5309,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     cmd_lines = cmd.split("\n")
                     for k, cmd_line in enumerate(cmd_lines):
                         words = cmd_line.split(" ")
-                        if words[0] in self.shell.magics_manager.magics["line"].keys():
+                        if words[0] in self.shell.magics_manager.magics["line"]:
                             words[0] = "%"+words[0]
-                        elif words[0] in self.shell.magics_manager.magics["cell"].keys():
+                        elif words[0] in self.shell.magics_manager.magics["cell"]:
                             words[0] = "%%"+words[0]
 
                         new_cmd_line = " ".join(words)
@@ -7491,7 +7491,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 self.recentFilesMenu.addSeparator()
 
             try:
-                for item in self._recentFiles.keys():
+                for item in self._recentFiles:
                     itemPath  = pathlib.Path(item)
                     itemName = itemPath.name
 
@@ -9780,34 +9780,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         if msg["msg_type"] == "execute_reply":
             vardict = unpack_shell_channel_data(msg)
-            # print(f"\t\tvardict: {len(vardict)}")
 
             if len(vardict):
-                # print(f"\t\tgot vardict with ({len(vardict)}) key ↦ value mappings:")
                 # dict with properties of variables in external kernel namespace
                 prop_dicts = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
-                # print(f"\t\tproperty mappings: {list(prop_dicts.keys())}")
 
                 ns_hidden_listing = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
-                # print(f"\t\t{len(ns_hidden_listing)} hidden listing")
-                # print(f"\t\thidden_ns_listing: {list(ns_hidden_listing.keys())}")
 
                 if len(ns_hidden_listing):
-                    # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tns_hidden_listing:\n\t{ns_hidden_listing}")
                     user_ns_hidden_vars = ns_hidden_listing[f"hidden_ns_listing_of_{ns_name}"]
                     self.workspaceModel.updateForeignNamespace(ns_name, connection_file, user_ns_hidden_vars, hidden=True)
+
                 else:
                     self.workspaceModel.updateForeignNamespace(ns_name, connection_file, {'user_ns':dict()}, hidden=True)
 
                 # dict with listing of contents of the external kernel namespace
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
-
-                # print(f"\t\tns_listings: {list(ns_listings.keys())}")
-
-                # print(f"\t\t{len(ns_listings)} var listing")
 
                 if len(ns_listings):
                     for key, val in ns_listings.items():
@@ -9816,7 +9807,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                             if isinstance(val, dict):
                                 self.workspaceModel.updateForeignNamespace(ns_name, msg["connection_file"], val, hidden=False)
                                 for varname in self.workspaceModel.getForeignNamespaceSymbols(ns_name, "current"):
-                                    # print(f"\t\t\tquerying properties for {varname}")
                                     self.external_console.execute(cmds_get_foreign_data_props(varname,
                                                                                                 namespace=msg["workspace_name"]),
                                                                     where=msg["parent_header"]["session"])
@@ -9834,7 +9824,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                         # (on the client side we removed the Icon property)
                         value = augment_obj_prop_dict(value)
 
-                        for propname in value.keys():
+                        for propname in value:
                             if propname != "Icon":
                                 value[propname]["tooltip"] = value[propname]["tooltip"].replace(
                                     "Internal", ns_name)
@@ -10463,13 +10453,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                 return
 
-            if varname not in self.workspace.keys():
+            if varname not in self.workspace:
                 return
 
         variable = self.workspace[varname]
         vartype = type(variable)
 
-        viewers = [v for v in self.viewers.keys() if v.__name__ ==
+        viewers = [v for v in self.viewers if v.__name__ ==
                    "ObjectInspector"]
 
         if len(viewers):
@@ -10503,7 +10493,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                 return
 
-            if varname not in self.workspace.keys():
+            if varname not in self.workspace:
                 return
 
             self.currentVarItem = item
@@ -10537,7 +10527,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                 return
 
-            if varname not in self.workspace.keys():
+            if varname not in self.workspace:
                 return
 
             self.currentVarItem = item
@@ -10823,7 +10813,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         for d in directories:
             if d in self._monitoredDirsCache_:
                 currentItems = set(d.glob('*'))
-                cachedItems = set(self._monitoredDirsCache_[d].keys())
+                cachedItems = set(self._monitoredDirsCache_[d])
                 removedItems = cachedItems - currentItems
                 newItems = currentItems - cachedItems
                 changedItems = tuple(i[0] for i in self._monitoredDirsCache_[d].items() if i[0] in currentItems and i[0].stat() != i[1])
@@ -10936,15 +10926,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         #     except:
         #         return False
 
-        if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
-            if winType not in self.viewers.keys():
-                raise ValueError("Unknown viewer type %s" % winType)
+        if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers]:
+            if winType not in self.viewers:
+                raise ValueError(f"Unknown viewer type {winType}")
 
-            winType = [v for v in self.viewers.keys()
+            winType = [v for v in self.viewers
                        if v.__name__ is winType][0]
 
-        elif inspect.isclass(winType) and winType in self.viewers.keys():
-            if winType not in self.viewers.keys():
+        elif inspect.isclass(winType) and winType in self.viewers:
+            if winType not in self.viewers:
                 raise ValueError("Unknown viewer type %s" % winType.__name__)
 
         elif winType is None:
@@ -11375,8 +11365,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 sig = inspect.signature(f)
 
                 if inArgTypes is None:
-                    # arg_param_names = sig.parameters.keys() #not very useful to get the parameter types !!!
-
                     # NOTE: 2016-04-17 16:32:00
                     # this will raise KeyError if annotations is incomplete;
                     # however if an annotation is badly formed (e.g. it has a
