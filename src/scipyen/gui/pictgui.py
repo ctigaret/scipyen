@@ -304,24 +304,20 @@ def checkboxDialogPrompt(parent, title, slist):
     
 class MouseEventSink(QtCore.QObject):
     def __init__(self, *args, **kwargs):
-        super(MouseEventSink, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         
     def eventFilter(self, obj, evt):
-        if evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick, 
+        return evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick,
                           QtCore.QEvent.GraphicsSceneMousePress, 
                           QtCore.QEvent.GraphicsSceneMouseRelease,
                           QtCore.QEvent.GraphicsSceneHoverEnter, 
                           QtCore.QEvent.GraphicsSceneHoverLeave, 
                           QtCore.QEvent.GraphicsSceneHoverMove,
-                          QtCore.QEvent.GraphicsSceneMouseMove):
-            return True
+                          QtCore.QEvent.GraphicsSceneMouseMove)
         
-        else:
-            return False
-    
     # don't use validate as this overrides a QWidget method and breaks the dialog code below
     def validateItems(self, itemsList):
-        if itemsList is None or not all([isinstance(x,(str,unicode)) for x in itemsList]):
+        if itemsList is None or not all(isinstance(x,(str,unicode)) for x in itemsList):
             QtWidgets.QMessageBox.critical(None, "Error", QtCore.QString("Argument must be a list of string or unicode items."))
             return False
         return True
