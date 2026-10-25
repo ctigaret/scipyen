@@ -3641,6 +3641,14 @@ class ScipyenConsoleWidget(ConsoleWidget):
                     # TODO: allow for running the code without writing it in console
                     # but store in history nevertheless (maybe?)
 
+                    overlaps, cursorOutsideBuffer, startpos, endpos = self._checkTextCursorInCommandBuffer_()
+
+                    if any(overlaps, cursorOutsideBuffer):
+                        self._keep_cursor_in_buffer()
+
+                    if self._control.readOnly():
+                        self._control.setReadOnly(False)
+
                     if echoing:
                         # NOTE: 2019-08-13 11:03:52
                         # displays the text in the console to be edited
@@ -3672,6 +3680,26 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         evt.accept()
 
+    def _checkTextCursorInCommandBuffer_(self) -> tuple[bool]:
+        overlaps = False
+        cursorOutsideBuffer = False
+        try:
+            cursor = self._control.textCursor()
+            endpos = cursor.selectionEnd()
+            startpos = cursor.selectionStart()
+            if any(v < self._prompt_pos for v in (startpos, endpos)):
+                overlaps = True
+                if ( startpos == endpos
+                    and not self._in_buffer(endpos)):
+                    cursorOutsideBuffer = True
+                else:
+                    cursorOutsideBuffer = False
+        except:
+            pass
+
+        return (overlaps, cursorOutsideBuffer, startpos, endpos)
+
+
     def eventFilter(self, obj, event) -> bool:
         # # NOTE: 2026-08-17 22:06:08
         # # disallow typing in text above prompt line after clicking in the window
@@ -3700,22 +3728,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         #         self._control.setReadOnly(False)
 
         if isinstance(event, QtGui.QMouseEvent) or event.type() == QtCore.QEvent.KeyPress:
-
-            cursor = self._control.textCursor()
-            endpos = cursor.selectionEnd()
-            startpos = cursor.selectionStart()
-
-            if any(v < self._prompt_pos for v in (startpos, endpos)):
-                overlaps = True
-                if ( startpos == endpos
-                    and not self._in_buffer(endpos)):
-                    cursorOutsideBuffer = True
-                else:
-                    cursorOutsideBuffer = False
-
-            else:
-                overlaps = False
-                cursorOutsideBuffer = False
+            overlaps, cursorOutsideBuffer, startpos, endpos = self._checkTextCursorInCommandBuffer_()
 
             if (__has_PyQt6__ or __has_PySide6__):
                 if (isinstance(event, QtGui.QMouseEvent)
@@ -3727,18 +3740,13 @@ class ScipyenConsoleWidget(ConsoleWidget):
                     return super().eventFilter(obj, event)
 
                 elif event.type() == QtCore.QEvent.KeyPress:
-                    # cursor = self._control.textCursor()
-                    # endpos = cursor.selectionEnd()
-                    # startpos = cursor.selectionStart()
                     key = event.key()
-                    # print(f"{self.__class__.__name__}.eventFilter")
-                    # print(f"\n\t_control_key_down: {self._control_key_down(event.modifiers())}")
-                    # print(f"\n\tkey in _ctrl_down_remap: {key in self._ctrl_down_remap}")
-                    # print(f"\n\tkey -> {key}")
                     if not (self._control_key_down(event.modifiers())
                             or key in self._ctrl_down_remap):
+
                         if cursorOutsideBuffer or not all(self._in_buffer(pos) for pos in (startpos, endpos)):
                             self._keep_cursor_in_buffer()
+
                         self._control.setReadOnly(False)
 
         return super().eventFilter(obj, event)

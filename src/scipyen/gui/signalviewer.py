@@ -218,7 +218,7 @@ from core.neoutils import (get_domain_name,
 # from core.neoutils import normalized_index as normalized_index_neo
 
 from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn,
-                       timefunc, timemethod)
+                       timefunc, timemethod, unwind_type)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index,
@@ -267,12 +267,30 @@ from gui.itemslistdialog import ItemsListDialog
 
 #### END gui modules
 
-SIGNAL_OBJECT_TYPES = (neo.AnalogSignal, neo.IrregularlySampledSignal,
-                       DataSignal, IrregularlySampledDataSignal)
+SIGNAL_OBJECT_TYPE = typing.Union[neo.core.baseneo.BaseNeo,
+                                  DataSignal,
+                                  IrregularlySampledDataSignal,
+                                  TriggerEvent,
+                                  TriggerProtocol,
+                                  vigra.filters.Kernel1D,
+                                  np.ndarray,
+                                  tuple,
+                                  list
+                                  ]
+
+SIGNAL_OBJECT_TYPES = tuple(unwind_type(SIGNAL_OBJECT_TYPE))
+
+EVENT_OBJECT_TYPE = typing.Union[neo.Event, DataMark, TriggerEvent]
 
 EVENT_OBJECT_TYPES = (neo.Event, DataMark, TriggerEvent)
 
-EPOCH_OBJECT_TYPES = (neo.Epoch, DataZone) # NOTE: pyabf Epoch must be converted
+EPOCH_OBJECT_TYPE = typing.Union[neo.Epoch, DataZone]
+
+EPOCH_OBJECT_TYPES = (neo.Epoch, DataZone) # NOTE: pyabf Epoch must be converted to neo.Epoch
+
+INDEXING_TYPE = typing.Union[int, tuple, list, range, slice]
+
+INDEXING_TYPES = (int, tuple, list, range, slice)
 
 r"""
 canvas events in matplotlib:
@@ -471,6 +489,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         tuple: 99,
                         list: 99}
 
+
     defaultCursorWindowSizeX = 0.001
     defaultCursorWindowSizeY = 0.001
 
@@ -516,24 +535,30 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultLeftAxisLabelSpace = 40
 
     # defaultLeftAxisLabelWrapMode = "WrapAtWordBoundaryOrAnywhere"
-    defaultLeftAxisLabelWrapMode = "WrapAtWordBoundary"
+    # defaultLeftAxisLabelWrapMode = "WrapAtWordBoundary"
+    defaultLeftAxisLabelWrapMode = QtGui.QTextOption.WordWrap
 
-    def __init__(self, x: typing.Optional[typing.Union[neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list]] = None,
-                       y: typing.Optional[typing.Union[neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list]] = None,
-                       parent: typing.Optional[QtWidgets.QMainWindow] = None,
-                       ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None,
-                       doc_title: typing.Optional[str] = None,
-                       frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
-                       frameAxis: typing.Optional[int] = None,
-                       signalIndex: typing.Optional[typing.Union[str, int, tuple, list, range, slice]] = None,
-                       signalChannelAxis: typing.Optional[int] = None,
-                       signalChannelIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
-                       irregularSignalIndex:typing.Optional[typing.Union[str, int, tuple, list, range, slice]] = None,
-                       irregularSignalChannelAxis: typing.Optional[int] = None,
-                       irregularSignalChannelIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
-                       separateSignalChannels:bool = False, singleFrame:bool=False, interval: typing.Optional[typing.Sequence] = None,
-                       channelIndex:typing.Optional[typing.Any] = None,
-                       currentFrame: typing.Optional[int] = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,
+    def __init__(self, x: SIGNAL_OBJECT_TYPES + ( None, ) = None,
+                       y: SIGNAL_OBJECT_TYPES + ( None, ) = None,
+                       parent: QtWidgets.QMainWindow | None = None,
+                       ID: int | None = None,
+                       win_title: str | None = None,
+                       doc_title: str | None = None,
+                       frameIndex: INDEXING_TYPES + (None, ) = None,
+                       frameAxis: int | None = None,
+                       signalIndex: INDEXING_TYPES + (None, ) = None,
+                       signalChannelAxis: int | None = None,
+                       signalChannelIndex: INDEXING_TYPES + (None, ) = None,
+                       irregularSignalIndex: INDEXING_TYPES + (None, ) = None,
+                       irregularSignalChannelAxis: int | None = None,
+                       irregularSignalChannelIndex: INDEXING_TYPES + (None, ) = None,
+                       separateSignalChannels: bool = False,
+                       singleFrame: bool = False,
+                       interval: typing.Sequence | None = None,
+                       channelIndex: typing.Any = None,
+                       currentFrame: int | None = None,
+                       plotStyle: str = "plot",
+                       nAxes: int | None = None,
                        *args, **kwargs):
         r"""SignalViewer constructor.
         TODO: Write docstring!
@@ -559,12 +584,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # • offset is the difference between the view range leftmost point and
         #   the leftmost domain value
         # • factor is the ratio between the vew range and data domain range
-        self._axes_X_view_offsets_scales_ = list()
+        self._axes_X_view_offsets_scales_ = []
 
         # a cache of x data bounds for all axes
-        self._x_data_bounds_ = list()
+        self._x_data_bounds_ = []
 
-        self._axes_X_view_ranges_ = list()
+        self._axes_X_view_ranges_ = []
+
+        self._autoUpdateAnnotationsPane_ = False
 
         # define these early
         self._xData_ = None
@@ -740,7 +767,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.frameAxis = None
         #self._frameIndex_ = None
 
-        # data axis for numpy arrays - ionly used to plot numpy arrays
+        # data axis for numpy arrays - only used when plotting "stock" numpy arrays
         self.dataAxis = None
 
         self.signalIndex = None
@@ -1201,22 +1228,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # self.annotationsViewer.setSupportedDataTypes(tuple(ObjectInspector.viewer_for_types))
         #### END set up annotations dock widget
 
-        #### BEGIN set up coordinates dock widget - defined in the UI file
-        # self.cursorsDockWidget s now defined in the ui file
-        #### END set up coordinates dock widget
 
         #print("_configureUI_ sets up dock widget actions menu")
         self.docksMenu = QtWidgets.QMenu("Panels", self)
 
         self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
         self.showAnnotationsDockWidgetAction.setCheckable(True)
-        self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
+        self.showAnnotationsDockWidgetAction.setObjectName(f"action_{self.annotationsDockWidget.objectName()}")
         self.showAnnotationsDockWidgetAction.toggled.connect(self.slot_showAnnotationsDock)
         # self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
 
         self.showCursorsDockWidgetAction = self.docksMenu.addAction("Cursors")
         self.showCursorsDockWidgetAction.setCheckable(True)
-        self.showCursorsDockWidgetAction.setObjectName("action_%s" % self.cursorsDockWidget.objectName())
+        self.showCursorsDockWidgetAction.setObjectName(f"action_{self.cursorsDockWidget.objectName()}")
         self.showCursorsDockWidgetAction.toggled.connect(self.slot_showCursorsDock)
         # self.showCursorsDockWidgetAction.triggered.connect(self.slot_showCursorsDock)
 
@@ -1232,8 +1256,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
 
-        self.actionData_to_workspace.setIcon(QtGui.QIcon.fromTheme("document-export"))
+        self.actionData_to_workspace.setIcon(QtGui.QIcon(guiutils.getIcon("document-export")))
         self.actionData_to_workspace.triggered.connect(self.slot_exportDataToWorkspace)
+
+        self.actionAlways_Update_Annotations_Panel.toggled.connect(self._slot_setAutoUpdateAnnotationsPanel)
+
+        self.actionRefresh_Annotations_Pane.triggered.connect(self._slot_refreshAnnotationsPane)
 
         self.actionShow_Legends.triggered.connect(self._slot_showLegends)
 
@@ -1279,6 +1307,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @property
     def spikeTrainsAxis(self):
         return self._spiketrains_axis_
+
+    @property
+    def autoUpdateAnnotationsPane(self) -> bool:
+        return self._autoUpdateAnnotationsPane_
+
+    @autoUpdateAnnotationsPane.setter
+    def autoUpdateAnnotationsPane(self, val: bool):
+        self._autoUpdateAnnotationsPane_ = val is True
+        with qtutils.SignalBlocker((self.actionAlways_Update_Annotations_Panel, )):
+            self.actionAlways_Update_Annotations_Panel.setChecked(val is True)
 
     @property
     def commonAxesXPadding(self):
@@ -1349,28 +1387,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionIgnore_empty_spike_trains.setChecked(self._ignore_empty_spiketrains_)
 
     @property
-    def leftLabelWrapMode(self) -> str:
-        return self._leftLabelWrapMode_
+    def _leftAxisLabelWrapCfg_(self) -> str:
+        return self.leftLabelWrapMode.name
 
     @markConfigurable("LeftAxisLabelWrapMode")
+    @_leftAxisLabelWrapCfg_.setter
+    def _leftAxisLabelWrapCfg_(self, val: str):
+        # print(f"{self.__class__.__name__}._leftAxisLabelWrapCfg_.setter({val})")
+        self.leftLabelWrapMode = getattr(QtGui.QTextOption.WrapMode, val, QtGui.QTextOption.WrapMode.WordWrap)
+
+    @property
+    def leftLabelWrapMode(self) -> QtGui.QTextOption.WrapMode:
+        return self._leftLabelWrapMode_
+
     @leftLabelWrapMode.setter
-    def leftLabelWrapMode(self, val: str):
-        fallback = "WordWrap"
-        if not isinstance(val, str):
-            val=fallback
-            # raise TypeError(f"Expecting a str; instead got {type(val).__name__}")
-        if not hasattr(QtGui.QTextOption.WrapMode, val):
-            try:
-                wrModes = dict((k,v) for k,v in vars(QtGui.QTextOption).items() if isinstance(v, QtGui.QTextOption.WrapMode))
-                if val not in wrModes:
-                    val = fallback
-
-            except:
-                val = fallback
-
-            # raise ValueError(f"Invalid wrap mode {val}")
-
-        self._leftLabelWrapMode_ = val
+    def leftLabelWrapMode(self, val: QtGui.QTextOption.WrapMode):
+        if not isinstance(val, QtGui.QTextOption.WrapMode):
+            self._leftLabelWrapMode_ = QtGui.QTextOption.WordWrap
+        else:
+            self._leftLabelWrapMode_ = val
 
     @property
     def leftLabelSpace(self) -> int:
@@ -2546,7 +2581,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(data, dict):
             self.dataAnnotations.update(data)
 
-        if self.annotationsViewer.isVisible():
+        if self._autoUpdateAnnotationsPane_ and self.annotationsViewer.isVisible():
             self.annotationsViewer.setData(self.dataAnnotations, "Annotations")
 
             # if self.annotationsViewer.topLevelItemCount() == 1:
@@ -3257,9 +3292,15 @@ anything else       anything else       ❌
         # TODO/FIXME 2022-11-16 21:37:13
         # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
 
-        if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
+        # if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
+        if (
+            getattr(self, "_delete_on_close_", False)
+            or isinstance(self.appWindow, QtWidgets.QWidget)
+            or getattr(self.scipyenWindow, "autoRemoveViewers", False)
+            ):
             if len(self._signal_axes_):
                 self._signal_axes_.clear()
+
 
             self._legends_.clear()
             self._frame_analog_map_.clear()
@@ -3273,26 +3314,27 @@ anything else       anything else       ❌
 
             self._plot_names_.clear()
             for plotItem in self.axes:
+                self.signalsLayout.removeItem(plotItem)
                 # print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
-                try:
+                if qtutils.isQObjectAlive(plotItem):
                     try:
-                        plotItem.vb.sigStateChanged.disconnect()
+                        try:
+                            plotItem.vb.sigStateChanged.disconnect()
+                        except:
+                            pass
+
+                        try:
+                            plotItem.vb.sigResized.disconnect()
+                        except:
+                            pass
+
+                        plotItem.vb.close()
+                        plotItem.close()
+                        del plotItem
+
                     except:
-                        pass
+                        continue
 
-                    try:
-                        plotItem.vb.sigResized.disconnect()
-                    except:
-                        pass
-
-                    plotItem.vb.close()
-                    plotItem.close()
-                    del plotItem
-
-                except:
-                    continue
-
-            # self.signalsLayout.clear()
 
         super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
         evt.accept()
@@ -3892,6 +3934,14 @@ Var-keyword parameters ("name=value" pairs):
     def _slot_plotEpochsCheckStateChanged_(self, state: bool):
         self._plot_epochs_ = state is True
         self.displayFrame()
+
+    @Slot(bool)
+    def _slot_setAutoUpdateAnnotationsPanel(self, val):
+        self._autoUpdateAnnotationsPane_ = val is True
+
+    @Slot()
+    def _slot_refreshAnnotationsPane(self):
+        self._update_annotations_()
 
     @safewrapper
     @Slot(bool)
@@ -7043,7 +7093,6 @@ Var-keyword parameters ("name=value" pairs):
             self._number_of_frames_ = len(self.frameIndex)
 
             _n_signal_axes_ = 0 if len(y.segments) == 0 else max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y.segments)
-            # self._n_signal_axes_ = 0 if len(y.segments) == 0 else max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y.segments)
 
             self._meta_index = np.recarray((self._number_of_frames_, 1),
                                            dtype = [('block', int), ('segment', int)])
@@ -7083,7 +7132,6 @@ Var-keyword parameters ("name=value" pairs):
             self.separateSignalChannels = False
 
             _n_signal_axes_ = len(y.analogsignals) + len(y.irregularlysampledsignals)
-            # self._n_signal_axes_ = len(y.analogsignals) + len(y.irregularlysampledsignals)
 
             self._meta_index = np.recarray((self._number_of_frames_,1),
                                            dtype=[("frame", int)])
@@ -7139,7 +7187,6 @@ Var-keyword parameters ("name=value" pairs):
                         self._number_of_frames_ = 1
                         self.frameIndex = range(self._number_of_frames_)
                         _n_signal_axes_ = y.shape[self.signalChannelAxis]
-                        # self._n_signal_axes_ = y.shape[self.signalChannelAxis]
 
                         self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                         self._meta_index.frame[:,0] = self.frameIndex
@@ -7149,7 +7196,6 @@ Var-keyword parameters ("name=value" pairs):
                         self._number_of_frames_ = y.shape[1]
                         self.frameIndex = range(self._number_of_frames_)
                         _n_signal_axes_ = 1
-                        # self._n_signal_axes_ = 1
 
                         self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                         self._meta_index.frame[:,0] = self.frameIndex
@@ -7158,7 +7204,6 @@ Var-keyword parameters ("name=value" pairs):
                 else:
                     # all channels in one axis, single frame
                     _n_signal_axes_ = 1
-                    # self._n_signal_axes_ = 1
                     self._number_of_frames_ = 1
                     self.frameIndex = range(self._number_of_frames_)
 
@@ -7181,7 +7226,6 @@ Var-keyword parameters ("name=value" pairs):
 
                 self.separateSignalChannels = False
                 _n_signal_axes_ = 1
-                # self._n_signal_axes_ = 1
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7210,7 +7254,6 @@ Var-keyword parameters ("name=value" pairs):
                         self._number_of_frames_ = 1
                         self.frameIndex = range(self._number_of_frames_)
                         _n_signal_axes_ = y.shape[self.signalChannelAxis]
-                        # self._n_signal_axes_ = y.shape[self.signalChannelAxis]
                         self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                         self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7219,7 +7262,6 @@ Var-keyword parameters ("name=value" pairs):
                         self._number_of_frames_ = y.shape[1]
                         self.frameIndex = range(self._number_of_frames_)
                         _n_signal_axes_ = 1
-                        # self._n_signal_axes_ = 1
                         self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                         self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7227,7 +7269,6 @@ Var-keyword parameters ("name=value" pairs):
                     self._number_of_frames_ = 1
                     self.frameIndex = range(self._number_of_frames_)
                     _n_signal_axes_ = 1
-                    # self._n_signal_axes_ = 1
                     self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                     self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7243,7 +7284,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._number_of_frames_ = len(self.frameIndex)
                 self.separateSignalChannels  = False
                 _n_signal_axes_ = 1
-                # self._n_signal_axes_ = 1
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7251,7 +7291,6 @@ Var-keyword parameters ("name=value" pairs):
             # NOTE: 2023-01-01 18:17:26
             # use a single spike_train_axis
             _n_signal_axes_ = 0
-            # self._n_signal_axes_ = 0
             x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
@@ -7269,7 +7308,6 @@ Var-keyword parameters ("name=value" pairs):
             self._number_of_frames_ = 1
             self.frameIndex = range(self._number_of_frames_)
             _n_signal_axes_ = 0
-            # self._n_signal_axes_ = 0
             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
             self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7281,7 +7319,6 @@ Var-keyword parameters ("name=value" pairs):
             self._number_of_frames_ = 1
             self.frameIndex = range(self._number_of_frames_)
             _n_signal_axes_ = 0
-            # self._n_signal_axes_ = 0
             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
             self._meta_index.frame[:,0] = self.frameIndex
 
@@ -7303,12 +7340,11 @@ Var-keyword parameters ("name=value" pairs):
             self.frameIndex = range(self._number_of_frames_)
             self.signalIndex = range(1)
             _n_signal_axes_ = 1
-            # self._n_signal_axes_ = 1
             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
             self._meta_index.frame[:,0] = self.frameIndex
 
         elif isinstance(y, np.ndarray): # NOTE: this includes vigra.VigraArray, quantities.Quantity
-            # NOTE 2021-11-14 12:39:57
+            # ### BEGIN NOTE 2021-11-14 12:39:57
             # a 'channel' is a data vector (usually, & not necesarily,
             # a column vector); even when plotted on the same axis
             # system, a large number of channels cann bring a huge
@@ -7345,6 +7381,7 @@ Var-keyword parameters ("name=value" pairs):
             # the same for all channels in the array (for arrays with 2 or 3
             # dimensions) - things may change in the future
             #
+            # ### END   NOTE 2021-11-14 12:39:57
             if not issubclass(y.dtype.type, np.number):
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot arrays with dtype {y.dtype.type.__name__}")
                 return False, None, None, 0
@@ -7357,8 +7394,6 @@ Var-keyword parameters ("name=value" pairs):
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", "Cannot plot a scalar")
                 return False, None, None, 0
 
-            # self._xData_ = None
-            # self._yData_ = y
             self._cached_title = "Numpy array"
 
             if y.ndim == 1: # one frame, one channel
@@ -7370,7 +7405,6 @@ Var-keyword parameters ("name=value" pairs):
                 self.signalChannelIndex = range(1)
                 self.separateSignalChannels = False
                 _n_signal_axes_ = 1
-                # self._n_signal_axes_ = 1
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7423,7 +7457,6 @@ Var-keyword parameters ("name=value" pairs):
                             self._number_of_frames_ = y.shape[self.frameAxis]
                             self.frameIndex = range(self._number_of_frames_)
                             _n_signal_axes_ = 1
-                            # self._n_signal_axes_ = 1
                             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                             self._meta_index.frame[:,0] = self.frameIndex
                         else:
@@ -7431,7 +7464,6 @@ Var-keyword parameters ("name=value" pairs):
                             self._data_frames_ = 1
                             self._number_of_frames_ = 1
                             _n_signal_axes_ = y.shape[self.signalChannelAxis]
-                            # self._n_signal_axes_ = y.shape[self.signalChannelAxis]
 
 
                         self.frameIndex = range(self._number_of_frames_)
@@ -7443,7 +7475,6 @@ Var-keyword parameters ("name=value" pairs):
                         self._data_frames_ = 1
                         self._number_of_frames_ = 1
                         _n_signal_axes_ = 1
-                        # self._n_signal_axes_ = 1
 
                         self.frameIndex = range(self._number_of_frames_)
 
@@ -7470,7 +7501,6 @@ Var-keyword parameters ("name=value" pairs):
                     self._number_of_frames_ = len(self.frameIndex)
 
                     _n_signal_axes_ = 1
-                    # self._n_signal_axes_ = 1
 
                     self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                     self._meta_index.frame[:,0] = self.frameIndex
@@ -7563,7 +7593,6 @@ Var-keyword parameters ("name=value" pairs):
                 self.separateSignalChannels = separateSignalChannels
 
                 _n_signal_axes_ = y.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
-                # self._n_signal_axes_ = y.shape[self.signalChannelAxis] if self.separateSignalChannels else 1
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7615,19 +7644,16 @@ Var-keyword parameters ("name=value" pairs):
                 if frameAxis is None:
                     if self.separateSignalChannels:
                         _n_signal_axes_ = len(y)
-                        # self._n_signal_axes_ = len(y)
                         self._number_of_frames_ = 1
                         self.frameIndex = range(self._number_of_frames_)
                     else:
                         self._number_of_frames_ = len(y)
                         self.frameIndex = range(self._number_of_frames_)
                         _n_signal_axes_ = 1
-                        # self._n_signal_axes_ = 1
                 else:
                     self._number_of_frames_ = len(y)
                     self.frameIndex = range(self._number_of_frames_)
                     _n_signal_axes_ = 1
-                    # self._n_signal_axes_ = 1
                     self.separateSignalChannels = False
 
                 xx, yy = zip(*list(map(kernel2array, y)))
@@ -7656,7 +7682,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._cached_title = "Vigra Kernel1D objects"
 
                 _n_signal_axes_ = 1
-                # self._n_signal_axes_ = 1
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7686,7 +7711,6 @@ Var-keyword parameters ("name=value" pairs):
                 self.irregularSignalIndex           = irregularSignalIndex
 
                 _n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y)
-                # self._n_signal_axes_ = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in y)
 
                 self._meta_index = np.recarray((self._number_of_frames_,1),
                                                dtype = [('frame', int)])
@@ -7712,7 +7736,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._cached_title = "Neo blocks"
 
                 _n_signal_axes_ = max(max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in b.segments) for b in y if len(b.segments))
-                # self._n_signal_axes_ = max(max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in b.segments) for b in y if len(b.segments))
 
                 mIndex = np.array(list(chain.from_iterable([[(bk,sk) for sk in range(len(b.segments))] for bk,b in enumerate(y) if len(b.segments)])))
 
@@ -7770,7 +7793,6 @@ Var-keyword parameters ("name=value" pairs):
                     self.frameIndex = range(1)
                     self._number_of_frames_ = 1
                     _n_signal_axes_ = len(y)
-                    # self._n_signal_axes_ = len(y)
                     # NOTE: 2023-01-17 21:28:34
                     # When all signals in the collection are plotted in the same
                     # frame, using separateSignalChannels is cumbersome (albeit
@@ -7787,11 +7809,9 @@ Var-keyword parameters ("name=value" pairs):
 
                     if self.separateSignalChannels:
                         _n_signal_axes_ = max(sig.shape[1] for sig in y)
-                        # self._n_signal_axes_ = max(sig.shape[1] for sig in y)
 
                     else:
                         _n_signal_axes_ = 1
-                        # self._n_signal_axes_ = 1
 
                 self._meta_index = np.recarray((self._number_of_frames_, 1),
                                                 dtype=[('frame', int)])
@@ -7811,7 +7831,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._number_of_frames_ = 1
 
                 _n_signal_axes_ = 0
-                # self._n_signal_axes_ = 0
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7824,7 +7843,6 @@ Var-keyword parameters ("name=value" pairs):
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
                 _n_signal_axes_ = 1
-                # self._n_signal_axes_ = 1
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7838,7 +7856,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._number_of_frames_ = 1
                 self._cached_title = "Spike trains"
                 _n_signal_axes_ = 0
-                # self._n_signal_axes_ = 0
 
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
@@ -7884,7 +7901,6 @@ Var-keyword parameters ("name=value" pairs):
                 self._cached_title = "Numpy arrays"
                 # FIXME - in progress 2023-01-19 08:17:25
                 _n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 or not self.separateSignalChannels else x.shape[self.signalChannelAxis], y)))
-                # self._n_signal_axes_ = max(list(map(lambda x: 1 if x.ndim == 1 or not self.separateSignalChannels else x.shape[self.signalChannelAxis], y)))
 
             else:
                 self.criticalMessage(f"Set data ({y.__class__.__name__})",
@@ -7941,7 +7957,7 @@ Var-keyword parameters ("name=value" pairs):
             self.plot_stop = interval[1]
 
         try:
-            dataOK, x, y, n_axes = self._parse_data_( x = x, y = y,
+            dataOK, x, y, n_signal_axes = self._parse_data_( x = x, y = y,
                                         frameIndex = frameIndex,
                                         frameAxis = frameAxis,
                                         signalIndex = signalIndex,
@@ -7956,7 +7972,7 @@ Var-keyword parameters ("name=value" pairs):
 
             # print(f"self._set_data_ dataOK = {dataOK}")
 
-            # self._n_signal_axes_ = len(self.signalAxes)
+            # self._n_signal_axes_ = n_signal_axes_
 
             if dataOK:
                 # NOTE: 2026-08-15 16:05:45
@@ -7986,8 +8002,8 @@ Var-keyword parameters ("name=value" pairs):
                 # NOTE: 2023-06-02 13:09:25
                 # to avoid flicker, set up axes ONLY if data demands a different
                 # number of axes
-                if n_axes != self._n_signal_axes_:
-                    self._setup_axes_(n_axes) # also assigns n_axes to self._n_signal_axes_
+                if n_signal_axes != len(self.signalAxes):
+                    self._setup_axes_(n_signal_axes) # also assigns n_axes to self._n_signal_axes_
 
                 if isinstance(plotStyle, str):
                     self.plotStyle = plotStyle
@@ -8030,16 +8046,9 @@ Var-keyword parameters ("name=value" pairs):
                 self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
                 self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
 
-                # self._new_data_ = True
-
-                # print(f"{self.__class__.__name__}._set_data_:")
-                # print(f"\t_xData_ = {self._xData_}")
-                # print(f"\t_yData_ = {self._yData_}")
-                # print("\n###\n")
-
-                # BUG: 2026-04-03 11:01:44 FIXME
-                # this will call displayFrame twice!
-                # Fixed by avoiding registration of non-data with self.observed_vars
+                # ATTENTION: 2026-04-03 11:01:44
+                # To avoid calling call displayFrame twice, non-plottable data
+                # is registered with self.observed_vars
                 if self._xData_ is not None and self._xData_ is not MISSING:
                     self.observed_vars["xData"] = self._xData_
 
@@ -8350,9 +8359,9 @@ Var-keyword parameters ("name=value" pairs):
                         showFrame = showFrame,
                         **kwargs)
 
-        # NOTE: 2026-08-15 16:11:38
-        # self._slot_set_data_finished is inherited from ScipyenViewer; does nothing
-        # to the data plots or axes, just does some housekeeping common to all
+        # NOTE: 2026-08-15 16:11:38 ATTENTION
+        # inherited from ScipyenViewer; does nothing to the data plots or axes,
+        # just does some housekeeping common to all
         # ScipyenViewer objects
         # TODO: use it in other viewers, too!
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
@@ -11215,8 +11224,10 @@ Var-keyword parameters ("name=value" pairs):
         --------
         ¹ PyQtGraph's PlotItem
         """
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._setup_axes_({_n_signal_axes_})")
         self._plot_names_.clear()
         nAxes = _n_signal_axes_ + 2 # how many axes the data requires?
+        # print(f"\n\trequiring {nAxes} axes")
 
         # set these up at earliest occasion
         self._axes_X_view_ranges_ = [[math.nan, math.nan] for k in range(nAxes)]
@@ -11232,10 +11243,13 @@ Var-keyword parameters ("name=value" pairs):
             # last two to the events axis and spiketrains axis
             self._events_axis_, self._spiketrains_axis_ = self.plotItems[-2:]
 
+            # print(f"\n\t stored events axis {self._events_axis_} and spiketrain axis {self._spiketrains_axis_}")
+
         elif len(self.plotItems) - len(self.signalAxes) == 1:
             # if there is only only one plotitem more than existing signal axes
             # then assign it to the events axis
             self._events_axis_ = self.plotItems[-1]
+            # print(f"\n\t stored events axis {self._events_axis_}")
 
         # WARNING 2023-01-17 10:46:04
         # the last two slots in the layout are the events axis and
@@ -11273,19 +11287,10 @@ Var-keyword parameters ("name=value" pairs):
                 # add ALL plotitems to column 0! (or at least ot the same column)
                 self.signalsLayout.addItem(plotItem, row = k, col = self._axesColumn_)
 
-                # plotItem.sigRangeChanged.connect(self._slot_plotItemRangeChanged)
-                # plotItem.sigXRangeChanged.connect(self._slot_plotItemXRangeChanged)
-                # plotItem.sigYRangeChanged.connect(self._slot_plotItemYRangeChanged)
-                # plotItem.sigRangeChangedManually.connect(self._slot_plotItemRangeChangedManually)
-
-                # plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-                # plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
-
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 plotItem.setVisible(False)
                 self._signal_axes_.append(plotItem)
-                # # # plotItem.deleteLater()
 
         elif len(self.signalAxes) > _n_signal_axes_:
             # more signal axes than necessary
@@ -11313,28 +11318,22 @@ Var-keyword parameters ("name=value" pairs):
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37
         if not isinstance(self._events_axis_, pg.PlotItem):
             self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
-            # self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-            # self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
-            if self._events_axis_.scene() is not None:
-                self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
         if self._events_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._events_axis_, row = _n_signal_axes_, col = self._axesColumn_) # see NOTE: 2024-11-13 20:31:54 CAUTION
-            self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+            if self._events_axis_.scene() is not None:
+                self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
         # NOTE: 2023-01-17 10:45:24
         # add the spiketrains axis back to the layout (after creating it, if needed)
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37
         if not isinstance(self._spiketrains_axis_, pg.PlotItem):
             self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
-            # self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-            # self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
-            if self._spiketrains_axis_.scene() is not None:
-                self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
         if self._spiketrains_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._spiketrains_axis_, row = _n_signal_axes_ + 1, col = self._axesColumn_) # see NOTE: 2024-11-13 20:31:54 CAUTION
-            self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+            if self._spiketrains_axis_.scene() is not None:
+                self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
         # NOTE: 2023-06-02 12:57:26
         # now, remember the (new) _n_signal_axes_:
@@ -11379,7 +11378,7 @@ Var-keyword parameters ("name=value" pairs):
             #
             plotItem.axes["left"]["item"].setWidth(self.leftLabelSpace)
             to = plotItem.axes["left"]["item"].label.document().defaultTextOption()
-            to.setWrapMode(getattr(QtGui.QTextOption, self.leftLabelWrapMode))
+            to.setWrapMode(self.leftLabelWrapMode)
             to.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
             plotItem.axes["left"]["item"].label.document().setDefaultTextOption(to)
 

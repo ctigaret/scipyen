@@ -5982,7 +5982,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             self.retranslateUi(msgBox)
 
-            QtWidgets.QApplication.beep()
+            # QtWidgets.QApplication.beep()
             ret = msgBox.exec()
 
             if ret == QtWidgets.QMessageBox.No:
@@ -6033,7 +6033,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             msgBox.setWindowTitle(wintitle)
             msgBox.setText(prompt)
 
-            QtWidgets.QApplication.beep()
+            # QtWidgets.QApplication.beep()
             ret = msgBox.exec()
 
             if ret == QtWidgets.QMessageBox.No:
@@ -7124,7 +7124,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 if not targetDir.isEmpty():
                     entries = targetDir.entryList(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
                     if fileName in entries:
-                        QtWidgets.QApplication.beep()
+                        # QtWidgets.QApplication.beep()
                         ret = self.questionMessage("Paste Clipboard as File — Scipyen", f"File {fileName} already exists. Overwrite?")
                         if ret != QtWidgets.QMessageBox.Yes:
                             return
@@ -7164,7 +7164,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         if len(selectedFileSystemIndexes):
             src = list(map(lambda p: p.as_posix(), source))
-            QtWidgets.QApplication.beep()
+            # QtWidgets.QApplication.beep()
             if len(selectedFileSystemIndexes) == 1:
                 ret = self.detailedMessage("Move to Trash — Scipyen", f"Do you really want to move this item to trash?", info = f"<code>{src[0]}</code>",
                                            msgType = "Question", buttons=QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
@@ -7196,7 +7196,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         if len(selectedFileSystemIndexes):
             src = list(map(lambda p: p.as_posix(), source))
-            QtWidgets.QApplication.beep()
+            # QtWidgets.QApplication.beep()
             if len(selectedFileSystemIndexes) == 1:
                 ret = self.detailedMessage("Delete Items — Scipyen", f"Do you really want to delete this item",
                                            info = f"<code>{src[0]}</code>\n\n<p><b>This action cannot be undone!</b>",

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: tableeditorwidget.py $
 # SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -87,7 +86,7 @@ from core import qtutils
 from gui import (quickdialog, guiutils) # noqa
 from gui.delegates import PythonItemDelegate
 # from gui.widgets.tabledataview import TableDataView
-from gui.itemmodels.tabulardatamodel import TabularDataModel, TabularType
+from gui.itemmodels.tabulardatamodel import TabularDataModel, TABULAR_TYPE
 from gui.itemmodels.roles import * # noqa
 # from gui import resources_rc
 # from gui import icons_rc
@@ -207,7 +206,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
         self._dataModel_.dataChanged.connect(self._slot_modelDataChanged_)
 
-    def setValue(self: typing.Self, value: TabularType, *args, **kwargs):
+    def setValue(self: typing.Self, value: TABULAR_TYPE, *args, **kwargs):
         self.setData(value, *args, **kwargs)
 
     def value(self):
@@ -236,7 +235,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
             self.tableView.setCornerLabel(self._dataModel_._modelDataRowIndexName_)
 
 
-    def setData(self, data: TabularType, *args, **kwargs):
+    def setData(self, data: TABULAR_TYPE, *args, **kwargs):
         r"""Called when this widget is part of TableEditor
     """
         from imaging import vigrautils

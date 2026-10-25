@@ -323,7 +323,7 @@ class GuiMessages:
     r"""Mixin for GUI messages"""
     @safewrapper
     def errorMessage(self, title: str, text: str):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         errMsgDlg = QtWidgets.QErrorMessage(self)
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
@@ -332,14 +332,14 @@ class GuiMessages:
     def errorMessage_static(parent: QtWidgets.QWidget | None = None,
                             title: str = "Error Message",
                             text: str = "Error"):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         errMsgDlg = QtWidgets.QErrorMessage(parent)
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
 
     @safewrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.critical(self, title, text)
 
     @staticmethod
@@ -347,25 +347,25 @@ class GuiMessages:
                                title: str ="Critical",
                                text: str = "A critical error has occurred",
                                default = QtWidgets.QMessageBox.No):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.critical(parent, title, text)
 
     @safewrapper
     def informationMessage(self, title, text,
                            default=QtWidgets.QMessageBox.NoButton):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.information(self, title, text)
 
     @staticmethod
     def informationMessage_static(parent: QtWidgets.QWidget | None = None,
         title: str = "Information", text: str = "",
         default = QtWidgets.QMessageBox.NoButton):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.information(parent, title, text)
 
     @safewrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.question(self, title, text, defaultButton=default)
 
     @staticmethod
@@ -373,19 +373,19 @@ class GuiMessages:
                                title: str = "Question", text: str = "",
                                default = QtWidgets.QMessageBox.No):
         r"""Check the return value for equality to QtWidgets.QMessageBox.Yes"""
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.question(parent, title, text, defaultButton=default)
 
     @safewrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
 
     @staticmethod
     def warningMessage_static(parent: QtWidgets.QWidget | None = None,
                               title: str = "Warning", text: str = "",
                               default = QtWidgets.QMessageBox.No):
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.warning(parent, title, text, defaultButton=default)
 
     @safewrapper
@@ -413,7 +413,7 @@ class GuiMessages:
         # TODO 2026-01-21 09:03:35
         # transfer code from the following, to strutils: mypylight
         lexer = None
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         msgbox = QtWidgets.QMessageBox(parent=self)
         msgbox.setStandardButtons(buttons)
         if isinstance(msgType, str) and len(msgType.strip()):
@@ -498,7 +498,7 @@ class GuiMessages:
             pixmap file name, or a valid theme icon name.
 
         """
-        QtWidgets.QApplication.beep()
+        # QtWidgets.QApplication.beep()
         msgbox = QtWidgets.QMessageBox(parent=parent)
         msgbox.addButton(QtWidgets.QMessageBox.Ok)
         if isinstance(msgType, str) and len(msgType.strip()):

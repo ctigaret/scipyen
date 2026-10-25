@@ -1252,7 +1252,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._averaging_ = ABFAveragingMode(info_dict["protocol"]["nAverageAlgorithm"]) # 0 = Cumulative; 1 = Most recent
             self._averageWeighting_ =  info_dict["protocol"]["fAverageWeighting"]
 
-            self._protocolFile_ = info_dict["sProtocolPath"].decode()
+            # NOTE: 2026-10-25 10:21:38
+            # since python 3.13.16: all strings are now unicode!
+            # self._protocolFile_ = info_dict["sProtocolPath"].decode()
+            self._protocolFile_ = info_dict["sProtocolPath"]
 
             self._sourceHash_ = hash(obj)
             self._sourceId_ = id(obj)

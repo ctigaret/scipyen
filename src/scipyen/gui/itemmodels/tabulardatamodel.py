@@ -99,7 +99,7 @@ from gui.itemmodels.roles import *
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-TabularType = typing.Union[pd.DataFrame, # noqa: UP007
+TABULAR_TYPE = typing.Union[pd.DataFrame, # noqa: UP007
                            pd.Series,
                            neo.core.baseneo.BaseNeo,
                            neo.AnalogSignal,
@@ -125,9 +125,9 @@ TabularType = typing.Union[pd.DataFrame, # noqa: UP007
                            sdc.Schedule,
                            list, tuple, deque]
 
-TabularTypes = tuple(unwind_type(TabularType))
+TABULAR_TYPES = tuple(unwind_type(TABULAR_TYPE))
 
-TabularElementType = typing.Union[  # noqa: UP007
+TABULAR_ELEMENT_TYPE = typing.Union[  # noqa: UP007
     ephys_pathways.AuxiliaryInput,
     ephys_pathways.AuxiliaryOutput,
     ephys_pathways.RecordingEpisode,
@@ -138,7 +138,7 @@ TabularElementType = typing.Union[  # noqa: UP007
     TriggerProtocol,
     ]
 
-TabularElementTypes = tuple(unwind_type(TabularElementType))
+TABULAR_ELEMENT_TYPES = tuple(unwind_type(TABULAR_ELEMENT_TYPE))
 
 
 class TabularDataModel(QtCore.QAbstractTableModel):
@@ -1742,7 +1742,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._canAddRemoveRows_ = True
                     self._canAddRemoveRows_ = True
 
-                elif all(isinstance(d, TabularElementTypes) for d in data):
+                elif all(isinstance(d, TABULAR_ELEMENT_TYPES) for d in data):
                     self._modelData_ = data
                     self._original_data_ = data
                     self._makeColumnHeadersForTabularElement_(type(data[0]))
@@ -1888,7 +1888,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             mdata[row] = pyvalue
             return True
 
-        if all(isinstance(o, TabularElementTypes) for o in mdata):
+        if all(isinstance(o, TABULAR_ELEMENT_TYPES) for o in mdata):
             if (
                 isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
                 and attr in ("beginFrame", "nFrames")
