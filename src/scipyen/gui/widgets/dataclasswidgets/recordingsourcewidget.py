@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 # $Id: recordingsourcewidget.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
+Widget for UI interaction with a ephys_pathways.RecordingSource object
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
@@ -167,13 +167,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
         self.auxInPushButton.clicked.connect(self._slot_editAuxIn)
         self.auxOutPushButton.clicked.connect(self._slot_editAuxOut)
-
-        self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
-        self.createObjectPushButton.setToolTip("Create Recording Source")
-        self.createObjectPushButton.setWhatsThis("Create Recording Source")
-        self.createObjectPushButton.setStatusTip("Create Recording Source")
         self.createObjectPushButton.clicked.connect(self._slot_new)
+        self.createTwoPathwaysSourcePushButton.clicked.connect(self._slot_makeTwoPathwaysSource)
 
         self.stimulusListTable.isAutoResizeColumns = True
         self.stimulusListTable.setToolTip("Configured Stimulus Channels")
@@ -195,7 +190,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
 
-        self.createTwoPathwaysSourcePushButton.clicked.connect(self._slot_makeTwoPathwaysSource)
+
+        # self.statusBar = QtWidgets.QStatusBar(self)
+        # self.layout().addWidget(self.statusBar)
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
@@ -387,7 +384,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
     def _slot_singleStimulusChannelChanged(self, row: int | QtCore.QModelIndex,
                                            col: int | None = None
                                            ):
-        # print(f"{self.__class__.__name__}._slot_singleStimulusChannelChanged({row}, {col})")
         if all(isinstance(v, int) for v in (row, col)):
             self._pendingStimulusChange_ = (row, col)
         else:
@@ -403,7 +399,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
     def _slot_pathwaysListIndexesChanged(self, topLeft, bottomRight):
-        # print(f"{self.__class__.__name__}._slot_pathwaysListIndexesChanged")
         if topLeft.row() == bottomRight.row():
             row = topLeft.row()
             pathway = self.synapticPathwaysTable.value()[row]
@@ -413,7 +408,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                 p.electrodeMode = eMode
             self._electrode_ = eMode
             self._pathways_ = self._data_.pathways
-            self._data_.syn = ephys_pathways.SynapticStimulusChannelList(list(map(lambda p: p.stimulus, self._data_.pathways)))
+            self._data_.syn = ephys_pathways.SynapticStimulusChannelList([p.stimulus for p in self._data_.pathways])
             self._syn_ = self._data_.syn
 
             currentElectrodeModeNdx = self._electrodeModeNames_.index(eMode.name)
@@ -433,30 +428,18 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
     @Slot()
     def _slot_stimulusListChanged(self):
-        # print(f"\n***\n\n{self.__class__.__name__}._slot_stimulusListChanged()")
-        # print(f"\n\tdata.syn -> {len(self._data_.syn)};\n\tdata.pathways -> {len(self._data_.pathways)}")
         widget = self.sender()
         if widget == self.stimulusListTable:
             syn = widget.value()
-            # looks like these need to be "called" - no-ops but otherwise somehow
-            # the code still thinks there are fewer pathways
-            # syn
-            # self._data_.syn
-            # self._data_.pathways
-            # print(f"\n\tsyn -> {len(syn)};")
             if not isinstance(syn, ephys_pathways.SynapticStimulusChannelList):
                 return
 
             if not isinstance(self._data_, self._objectType_):
-                # print("\n\twill create new RecordingSource")
                 self._syn_ = syn
                 self._make_value_()
 
             else:
-                # self._data_.syn = self._syn_
-                # print(f"\n\tpendingStimChange: {self._pendingStimulusChange_}")
                 if len(self._data_.pathways) == 0:
-                    # print("\n\tadding new pathways")
                     self._data_.syn = syn
                     for stim in self._data_.syn:
                         pathway = ephys_pathways.SynapticPathway(stimulus = stim,
@@ -468,22 +451,16 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                         self._data_.pathways.append(pathway)
 
                 else:
-                    # print(f"syn has {len(syn)}; data.pathways has {len(self._data_.pathways)}")
                     if len(syn) < len(self._data_.pathways):
                         retainedPathways = ephys_pathways.SynapticPathwayList(list(filter(lambda p: p.stimulus in syn, self._data_.pathways)))
-                        # print(f"\n\tretainedPathways -> {retainedPathways}")
                         self._data_.pathways = retainedPathways
-                        # print(f"\n\tdata.pathways -> {self._data_.pathways}")
                         self._data_.syn = syn
-
 
                     elif len(syn) == len(self._data_.pathways):
                         if isinstance(self._pendingStimulusChange_, tuple) and len(self._pendingStimulusChange_) == 2:
                             stimNdx = self._pendingStimulusChange_[0]
-                            # print(f"\n\tstimulus at {stimNdx} changed")
                             if stimNdx < len(self._data_.syn):
                                 editedStim = syn[stimNdx]
-                                # col = self._pendingStimulusChange_[1]
                                 currentStim = self._data_.syn[stimNdx]
                                 pp = list(filter(lambda p: p.stimulus == currentStim, self._data_.pathways))
                                 if len(pp):
@@ -512,7 +489,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
             self.sig_valueChanged.emit(self._data_)
 
     @Slot(object)
-    def _slot_auxInChanged(self, val: typing.Optional[ephys_pathways.AuxiliaryInputList] = None):
+    def _slot_auxInChanged(self, val: ephys_pathways.AuxiliaryInputList | None = None):
         if isinstance(val, ephys_pathways.AuxiliaryInputList):
             self._auxin_ = val
         else:

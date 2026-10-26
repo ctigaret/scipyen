@@ -13,50 +13,63 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout_2">
-   <item row="4" column="0">
-    <widget class="QTabWidget" name="tabWidget">
-     <property name="currentIndex">
-      <number>0</number>
-     </property>
-     <widget class="QWidget" name="stimulusChannelsTab">
-      <attribute name="title">
-       <string>Simulus Channels</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0">
-        <widget class="TableEditorWidget" name="stimulusListTable" native="true">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="synapticPathwaysTab">
-      <attribute name="title">
-       <string>Synaptic Pathways</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout_3">
-       <item row="0" column="0">
-        <widget class="TableEditorWidget" name="synapticPathwaysTable" native="true">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </widget>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
+   <item>
+    <layout class="QHBoxLayout" name="newSourcesLayout">
+     <item>
+      <widget class="QPushButton" name="createObjectPushButton">
+       <property name="toolTip">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
+       <property name="statusTip">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
+       <property name="whatsThis">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
+       <property name="text">
+        <string>New Source</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-new"/>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="createTwoPathwaysSourcePushButton">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>Create a two-pathway source directly</string>
+       </property>
+       <property name="statusTip">
+        <string>Create a two-pathway source directly</string>
+       </property>
+       <property name="whatsThis">
+        <string>Create a two-pathway source directly</string>
+       </property>
+       <property name="text">
+        <string>New Two-Pathways Source</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-new-from-template"/>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
-   <item row="3" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_4">
+   <item>
+    <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="channelsLayout">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
@@ -181,62 +194,45 @@
      </item>
     </layout>
    </item>
-   <item row="1" column="0">
-    <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
-   </item>
-   <item row="5" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_7">
-     <item>
-      <widget class="QPushButton" name="createObjectPushButton">
-       <property name="toolTip">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="statusTip">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="whatsThis">
-        <string>Create a new RecordingSource from current data</string>
-       </property>
-       <property name="text">
-        <string>New</string>
-       </property>
-       <property name="flat">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-    </layout>
-   </item>
-   <item row="0" column="0">
-    <widget class="QPushButton" name="createTwoPathwaysSourcePushButton">
-     <property name="toolTip">
-      <string>Create a two-pathway source directly</string>
+   <item>
+    <widget class="QTabWidget" name="channelsAndPathwaysTabWidget">
+     <property name="currentIndex">
+      <number>0</number>
      </property>
-     <property name="statusTip">
-      <string>Create a two-pathway source directly</string>
-     </property>
-     <property name="whatsThis">
-      <string>Create a two-pathway source directly</string>
-     </property>
-     <property name="text">
-      <string>New Two-Pathways Source</string>
-     </property>
-     <property name="icon">
-      <iconset theme="document-new-from-template"/>
-     </property>
+     <widget class="QWidget" name="stimulusChannelsTab">
+      <attribute name="title">
+       <string>Simulus Channels</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="0" column="0">
+        <widget class="TableEditorWidget" name="stimulusListTable" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="synapticPathwaysTab">
+      <attribute name="title">
+       <string>Synaptic Pathways</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="0" column="0">
+        <widget class="TableEditorWidget" name="synapticPathwaysTable" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

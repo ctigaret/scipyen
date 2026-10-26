@@ -7769,6 +7769,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
 
+        pasteActionName = "Paste"
+
         if mimeData.hasUrls():
             nUrls = len(mimeData.urls())
             pasteActionName = f"Paste {nUrls} {pluralize('item', nUrls)}"
@@ -7806,9 +7808,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     fileName = self.fileSystemModel.filePath(index)
                     info = index.data(QtGui.QFileSystemModel.FileInfoRole)
                     if info.exists():
-                        # parent = i.parent()
-                        # parentInfo = parent.data(QtGui.QFileSystemModel.FileInfoRole)
-
                         if fileName not in fileNames:
                             fileNames.append(fileName)
                             infos.append(info)

@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'recordingsourcewidget.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.2
+## Created by: Qt User Interface Compiler version 6.12.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -17,8 +17,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QSpacerItem, QSpinBox, QTabWidget, QVBoxLayout,
-    QWidget)
+    QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
 from gui.widgets.tableeditorwidget import TableEditorWidget
@@ -28,45 +27,40 @@ class Ui_RecordingSourceWidget(object):
         if not RecordingSourceWidget.objectName():
             RecordingSourceWidget.setObjectName(u"RecordingSourceWidget")
         RecordingSourceWidget.resize(392, 390)
-        self.gridLayout_2 = QGridLayout(RecordingSourceWidget)
-        self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.tabWidget = QTabWidget(RecordingSourceWidget)
-        self.tabWidget.setObjectName(u"tabWidget")
-        self.stimulusChannelsTab = QWidget()
-        self.stimulusChannelsTab.setObjectName(u"stimulusChannelsTab")
-        self.gridLayout = QGridLayout(self.stimulusChannelsTab)
-        self.gridLayout.setObjectName(u"gridLayout")
-        self.stimulusListTable = TableEditorWidget(self.stimulusChannelsTab)
-        self.stimulusListTable.setObjectName(u"stimulusListTable")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.verticalLayout_2 = QVBoxLayout(RecordingSourceWidget)
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.newSourcesLayout = QHBoxLayout()
+        self.newSourcesLayout.setObjectName(u"newSourcesLayout")
+        self.createObjectPushButton = QPushButton(RecordingSourceWidget)
+        self.createObjectPushButton.setObjectName(u"createObjectPushButton")
+        icon = QIcon(QIcon.fromTheme(u"document-new"))
+        self.createObjectPushButton.setIcon(icon)
+        self.createObjectPushButton.setFlat(False)
+
+        self.newSourcesLayout.addWidget(self.createObjectPushButton)
+
+        self.createTwoPathwaysSourcePushButton = QPushButton(RecordingSourceWidget)
+        self.createTwoPathwaysSourcePushButton.setObjectName(u"createTwoPathwaysSourcePushButton")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.stimulusListTable.sizePolicy().hasHeightForWidth())
-        self.stimulusListTable.setSizePolicy(sizePolicy)
+        sizePolicy.setHeightForWidth(self.createTwoPathwaysSourcePushButton.sizePolicy().hasHeightForWidth())
+        self.createTwoPathwaysSourcePushButton.setSizePolicy(sizePolicy)
+        icon1 = QIcon(QIcon.fromTheme(u"document-new-from-template"))
+        self.createTwoPathwaysSourcePushButton.setIcon(icon1)
 
-        self.gridLayout.addWidget(self.stimulusListTable, 0, 0, 1, 1)
+        self.newSourcesLayout.addWidget(self.createTwoPathwaysSourcePushButton)
 
-        self.tabWidget.addTab(self.stimulusChannelsTab, "")
-        self.synapticPathwaysTab = QWidget()
-        self.synapticPathwaysTab.setObjectName(u"synapticPathwaysTab")
-        self.gridLayout_3 = QGridLayout(self.synapticPathwaysTab)
-        self.gridLayout_3.setObjectName(u"gridLayout_3")
-        self.synapticPathwaysTable = TableEditorWidget(self.synapticPathwaysTab)
-        self.synapticPathwaysTable.setObjectName(u"synapticPathwaysTable")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.synapticPathwaysTable.sizePolicy().hasHeightForWidth())
-        self.synapticPathwaysTable.setSizePolicy(sizePolicy1)
 
-        self.gridLayout_3.addWidget(self.synapticPathwaysTable, 0, 0, 1, 1)
+        self.verticalLayout_2.addLayout(self.newSourcesLayout)
 
-        self.tabWidget.addTab(self.synapticPathwaysTab, "")
+        self.nameDescriptionWidget = NameDescriptionWidget(RecordingSourceWidget)
+        self.nameDescriptionWidget.setObjectName(u"nameDescriptionWidget")
 
-        self.gridLayout_2.addWidget(self.tabWidget, 4, 0, 1, 1)
+        self.verticalLayout_2.addWidget(self.nameDescriptionWidget)
 
-        self.horizontalLayout_4 = QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.channelsLayout = QHBoxLayout()
+        self.channelsLayout.setObjectName(u"channelsLayout")
         self.verticalLayout = QVBoxLayout()
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.horizontalLayout = QHBoxLayout()
@@ -78,11 +72,8 @@ class Ui_RecordingSourceWidget(object):
 
         self.adcSpinBox = QSpinBox(RecordingSourceWidget)
         self.adcSpinBox.setObjectName(u"adcSpinBox")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.adcSpinBox.sizePolicy().hasHeightForWidth())
-        self.adcSpinBox.setSizePolicy(sizePolicy2)
+        sizePolicy.setHeightForWidth(self.adcSpinBox.sizePolicy().hasHeightForWidth())
+        self.adcSpinBox.setSizePolicy(sizePolicy)
 
         self.horizontalLayout.addWidget(self.adcSpinBox)
 
@@ -93,8 +84,8 @@ class Ui_RecordingSourceWidget(object):
 
         self.dacSpinBox = QSpinBox(RecordingSourceWidget)
         self.dacSpinBox.setObjectName(u"dacSpinBox")
-        sizePolicy2.setHeightForWidth(self.dacSpinBox.sizePolicy().hasHeightForWidth())
-        self.dacSpinBox.setSizePolicy(sizePolicy2)
+        sizePolicy.setHeightForWidth(self.dacSpinBox.sizePolicy().hasHeightForWidth())
+        self.dacSpinBox.setSizePolicy(sizePolicy)
 
         self.horizontalLayout.addWidget(self.dacSpinBox)
 
@@ -110,8 +101,8 @@ class Ui_RecordingSourceWidget(object):
 
         self.electrodeModeComboBox = QComboBox(RecordingSourceWidget)
         self.electrodeModeComboBox.setObjectName(u"electrodeModeComboBox")
-        sizePolicy2.setHeightForWidth(self.electrodeModeComboBox.sizePolicy().hasHeightForWidth())
-        self.electrodeModeComboBox.setSizePolicy(sizePolicy2)
+        sizePolicy.setHeightForWidth(self.electrodeModeComboBox.sizePolicy().hasHeightForWidth())
+        self.electrodeModeComboBox.setSizePolicy(sizePolicy)
         self.electrodeModeComboBox.setFrame(True)
 
         self.horizontalLayout_2.addWidget(self.electrodeModeComboBox)
@@ -120,7 +111,7 @@ class Ui_RecordingSourceWidget(object):
         self.verticalLayout.addLayout(self.horizontalLayout_2)
 
 
-        self.horizontalLayout_4.addLayout(self.verticalLayout)
+        self.channelsLayout.addLayout(self.verticalLayout)
 
         self.groupBox = QGroupBox(RecordingSourceWidget)
         self.groupBox.setObjectName(u"groupBox")
@@ -139,42 +130,50 @@ class Ui_RecordingSourceWidget(object):
         self.horizontalLayout_3.addWidget(self.auxOutPushButton)
 
 
-        self.horizontalLayout_4.addWidget(self.groupBox)
+        self.channelsLayout.addWidget(self.groupBox)
 
 
-        self.gridLayout_2.addLayout(self.horizontalLayout_4, 3, 0, 1, 1)
+        self.verticalLayout_2.addLayout(self.channelsLayout)
 
-        self.nameDescriptionWidget = NameDescriptionWidget(RecordingSourceWidget)
-        self.nameDescriptionWidget.setObjectName(u"nameDescriptionWidget")
+        self.channelsAndPathwaysTabWidget = QTabWidget(RecordingSourceWidget)
+        self.channelsAndPathwaysTabWidget.setObjectName(u"channelsAndPathwaysTabWidget")
+        self.stimulusChannelsTab = QWidget()
+        self.stimulusChannelsTab.setObjectName(u"stimulusChannelsTab")
+        self.gridLayout = QGridLayout(self.stimulusChannelsTab)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.stimulusListTable = TableEditorWidget(self.stimulusChannelsTab)
+        self.stimulusListTable.setObjectName(u"stimulusListTable")
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.stimulusListTable.sizePolicy().hasHeightForWidth())
+        self.stimulusListTable.setSizePolicy(sizePolicy1)
 
-        self.gridLayout_2.addWidget(self.nameDescriptionWidget, 1, 0, 1, 1)
+        self.gridLayout.addWidget(self.stimulusListTable, 0, 0, 1, 1)
 
-        self.horizontalLayout_7 = QHBoxLayout()
-        self.horizontalLayout_7.setObjectName(u"horizontalLayout_7")
-        self.createObjectPushButton = QPushButton(RecordingSourceWidget)
-        self.createObjectPushButton.setObjectName(u"createObjectPushButton")
-        self.createObjectPushButton.setFlat(True)
+        self.channelsAndPathwaysTabWidget.addTab(self.stimulusChannelsTab, "")
+        self.synapticPathwaysTab = QWidget()
+        self.synapticPathwaysTab.setObjectName(u"synapticPathwaysTab")
+        self.gridLayout_3 = QGridLayout(self.synapticPathwaysTab)
+        self.gridLayout_3.setObjectName(u"gridLayout_3")
+        self.synapticPathwaysTable = TableEditorWidget(self.synapticPathwaysTab)
+        self.synapticPathwaysTable.setObjectName(u"synapticPathwaysTable")
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.synapticPathwaysTable.sizePolicy().hasHeightForWidth())
+        self.synapticPathwaysTable.setSizePolicy(sizePolicy2)
 
-        self.horizontalLayout_7.addWidget(self.createObjectPushButton)
+        self.gridLayout_3.addWidget(self.synapticPathwaysTable, 0, 0, 1, 1)
 
-        self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.channelsAndPathwaysTabWidget.addTab(self.synapticPathwaysTab, "")
 
-        self.horizontalLayout_7.addItem(self.horizontalSpacer_2)
-
-
-        self.gridLayout_2.addLayout(self.horizontalLayout_7, 5, 0, 1, 1)
-
-        self.createTwoPathwaysSourcePushButton = QPushButton(RecordingSourceWidget)
-        self.createTwoPathwaysSourcePushButton.setObjectName(u"createTwoPathwaysSourcePushButton")
-        icon = QIcon(QIcon.fromTheme(u"document-new-from-template"))
-        self.createTwoPathwaysSourcePushButton.setIcon(icon)
-
-        self.gridLayout_2.addWidget(self.createTwoPathwaysSourcePushButton, 0, 0, 1, 1)
+        self.verticalLayout_2.addWidget(self.channelsAndPathwaysTabWidget)
 
 
         self.retranslateUi(RecordingSourceWidget)
 
-        self.tabWidget.setCurrentIndex(0)
+        self.channelsAndPathwaysTabWidget.setCurrentIndex(0)
 
 
         QMetaObject.connectSlotsByName(RecordingSourceWidget)
@@ -182,8 +181,26 @@ class Ui_RecordingSourceWidget(object):
 
     def retranslateUi(self, RecordingSourceWidget):
         RecordingSourceWidget.setWindowTitle(QCoreApplication.translate("RecordingSourceWidget", u"Form", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.stimulusChannelsTab), QCoreApplication.translate("RecordingSourceWidget", u"Simulus Channels", None))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.synapticPathwaysTab), QCoreApplication.translate("RecordingSourceWidget", u"Synaptic Pathways", None))
+#if QT_CONFIG(tooltip)
+        self.createObjectPushButton.setToolTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(statustip)
+        self.createObjectPushButton.setStatusTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
+#endif // QT_CONFIG(statustip)
+#if QT_CONFIG(whatsthis)
+        self.createObjectPushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
+#endif // QT_CONFIG(whatsthis)
+        self.createObjectPushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New Source", None))
+#if QT_CONFIG(tooltip)
+        self.createTwoPathwaysSourcePushButton.setToolTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(statustip)
+        self.createTwoPathwaysSourcePushButton.setStatusTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
+#endif // QT_CONFIG(statustip)
+#if QT_CONFIG(whatsthis)
+        self.createTwoPathwaysSourcePushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
+#endif // QT_CONFIG(whatsthis)
+        self.createTwoPathwaysSourcePushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New Two-Pathways Source", None))
         self.label_2.setText(QCoreApplication.translate("RecordingSourceWidget", u"ADC:", None))
         self.label_3.setText(QCoreApplication.translate("RecordingSourceWidget", u"DAC:", None))
 #if QT_CONFIG(tooltip)
@@ -217,25 +234,7 @@ class Ui_RecordingSourceWidget(object):
         self.auxOutPushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Configure auxiliary outputs", None))
 #endif // QT_CONFIG(whatsthis)
         self.auxOutPushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"Outputs...", None))
-#if QT_CONFIG(tooltip)
-        self.createObjectPushButton.setToolTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(statustip)
-        self.createObjectPushButton.setStatusTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
-#endif // QT_CONFIG(statustip)
-#if QT_CONFIG(whatsthis)
-        self.createObjectPushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Create a new RecordingSource from current data", None))
-#endif // QT_CONFIG(whatsthis)
-        self.createObjectPushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New", None))
-#if QT_CONFIG(tooltip)
-        self.createTwoPathwaysSourcePushButton.setToolTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(statustip)
-        self.createTwoPathwaysSourcePushButton.setStatusTip(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
-#endif // QT_CONFIG(statustip)
-#if QT_CONFIG(whatsthis)
-        self.createTwoPathwaysSourcePushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
-#endif // QT_CONFIG(whatsthis)
-        self.createTwoPathwaysSourcePushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New Two-Pathways Source", None))
+        self.channelsAndPathwaysTabWidget.setTabText(self.channelsAndPathwaysTabWidget.indexOf(self.stimulusChannelsTab), QCoreApplication.translate("RecordingSourceWidget", u"Simulus Channels", None))
+        self.channelsAndPathwaysTabWidget.setTabText(self.channelsAndPathwaysTabWidget.indexOf(self.synapticPathwaysTab), QCoreApplication.translate("RecordingSourceWidget", u"Synaptic Pathways", None))
     # retranslateUi
 
