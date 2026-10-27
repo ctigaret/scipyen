@@ -2550,7 +2550,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @markConfigurable("ScriptManagerAutoLaunch")
     @scriptManagerAutoLaunch.setter
-    def scriptManagerAutoLaunch(self, val: typing.Union[bool, str]):
+    def scriptManagerAutoLaunch(self, val:bool | str):
         if isinstance(val, str):
             val = True if val.lower() == "true" else False
 

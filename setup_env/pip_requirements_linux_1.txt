@@ -48,6 +48,7 @@ GitPython
 Jinja2
 MarkupSafe
 dbus-python ; sys_platform == "linux"
+dbus-next; sys-platform == "linux"
 Pillow
 PyLEMS
 PyQt-builder ; sys_platform == 'linux'

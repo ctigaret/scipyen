@@ -1930,8 +1930,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 params[attr] = pyvalue
 
-            new_obj = type(old_obj)(**params)
-            mdata[row] = new_obj
+            # BUG 2026-10-27 16:51:43 FIXME
+            # this creates a new instance effectively
+            # breaking the reference to the original
+            # new_obj = type(old_obj)(**params)
+            # mdata[row] = new_obj # not needed anymore!
+            #
+            # NOTE: 2026-10-27 16:55:19 FIXED here
+            for param_name, param_value in params.items():
+                if getattr(old_obj, param_name) != param_value:
+                    setattr(old_obj, param_name, param_value)
 
             return True
 

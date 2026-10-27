@@ -86,6 +86,12 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     sig_dataChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, name="sig_dataChanged")
     sig_modelDataChanged = Signal(name = "sig_modelDataChanged")
+    sig_introspectionToggled = Signal(bool, name = "sig_introspectionToggled")
+    sig_showValuesOnlyToggled = Signal(bool, name="sig_showValuesOnlyToggled")
+    sig_showCallablesToggled = Signal(bool, name="sig_showCallablesToggled")
+    sig_showPrivateMembersToggled = Signal(bool, name="sig_showPrivateMembersToggled")
+    sig_inlineTablesToggled = Signal(bool, name="sig_inlineTablesToggled")
+    sig_setReadOnly = Signal(bool, name="sig_setReadOnly")
 
     def __init__(self: typing.Self, *args, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
@@ -409,6 +415,66 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             viewInConsoleAction.triggered.connect(
                 self.slot_showInConsole)
 
+        cm.addSeparator()
+
+        isRO = self.sourceModel.readOnly
+        roIcon = guiutils.getIcon("object-locked") if isRO else guiutils.getIcon("object-unlocked")
+        roTip = "Editing disabled; toggle to enable" if isRO else "Editing enabled; toggle to disable"
+        setReadOnlyAction = cm.addAction("Toggle Read-only")
+        setReadOnlyAction.setToolTip(roTip)
+        setReadOnlyAction.setStatusTip(roTip)
+        setReadOnlyAction.setWhatsThis(roTip)
+        setReadOnlyAction.setIcon(roIcon)
+        setReadOnlyAction.setCheckable(True)
+        setReadOnlyAction.setChecked(isRO)
+        setReadOnlyAction.toggled.connect(self._slot_setReadOnly)
+
+        setInlineTablesAction = cm.addAction("Inline Tables")
+        setInlineTablesAction.setToolTip("Show Tables Inline")
+        setInlineTablesAction.setStatusTip("Show Tables Inline")
+        setInlineTablesAction.setWhatsThis("Show Tables Inline")
+        setInlineTablesAction.setIcon(guiutils.getIcon("table"))
+        setInlineTablesAction.setCheckable(True)
+        setInlineTablesAction.setChecked(self.sourceModel.inlineTables)
+        setInlineTablesAction.toggled.connect(self._slot_showInlineTables)
+
+        setIntrospectAction = cm.addAction("Introspect")
+        setIntrospectAction.setToolTip("Explore contents")
+        setIntrospectAction.setStatusTip("Explore contents")
+        setIntrospectAction.setWhatsThis("Explore contents")
+        setIntrospectAction.setIcon(guiutils.getIcon("view-list-details"))
+        setIntrospectAction.setCheckable(True)
+        setIntrospectAction.setChecked(self.sourceModel.showIntrospection)
+        setIntrospectAction.toggled.connect(self._slot_setIntrospectable)
+
+        showValuesOnlyAction = cm.addAction("Show Value Objects Only")
+        showValuesOnlyAction.setToolTip("Show Value Objects Only")
+        showValuesOnlyAction.setStatusTip("Show Value Objects Only")
+        showValuesOnlyAction.setWhatsThis("Show Value Objects Only")
+        showValuesOnlyAction.setIcon(guiutils.getIcon("object"))
+        showValuesOnlyAction.setCheckable(True)
+        showValuesOnlyAction.setChecked(self.sourceModel.showValuesOnly)
+        showValuesOnlyAction.toggled.connect(self._slot_showValuesOnly)
+
+        showCallablesAction = cm.addAction("Show Function and Method Members")
+        showCallablesAction.setToolTip("Show Function and Method Members")
+        showCallablesAction.setStatusTip("Show Function and Method Members")
+        showCallablesAction.setWhatsThis("Show Function and Method Members")
+        showCallablesAction.setIcon("code-function")
+        showCallablesAction.setCheckable(True)
+        showCallablesAction.setChecked(self.sourceModel.showCallables)
+        showCallablesAction.toggled.connect(self._slot_showCallables)
+
+        showPrivateMembersAction = cm.addAction("Show private members")
+        showPrivateMembersAction.setToolTip("Show private members")
+        showPrivateMembersAction.setStatusTip("Show private members")
+        showPrivateMembersAction.setWhatsThis("Show private members")
+        showPrivateMembersAction.setIcon(guiutils.getIcon("view-private"))
+        showPrivateMembersAction.setCheckable(True)
+        showPrivateMembersAction.setChecked(self.sourceModel.showPrivateMembers)
+        showPrivateMembersAction.toggled.connect(self._slot_showPrivateMembers)
+
+
         # TODO: 2022-10-11 13:45:44
         # use itemAt (point) to get the index of the item, then if index is in
         # the leaf column, check if the value is editable (and constraints)
@@ -423,6 +489,43 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # editItemData.tiggered.connect(self.slot_editItemData)
 
         cm.popup(self.mapToGlobal(point), copyItemData)
+
+    @Slot(bool)
+    def _slot_setReadOnly(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.readOnly = val is True
+            self.sig_setReadOnly.emit(val is True)
+
+
+    @Slot(bool)
+    def _slot_showInlineTables(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.inlineTables = val is True
+            self.sig_inlineTablesToggled.emit(val is True)
+
+    @Slot(bool)
+    def _slot_setIntrospectable(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.showIntrospection = val is True
+            self.sig_introspectionToggled.emit(val is True)
+
+    @Slot(bool)
+    def _slot_showValuesOnly(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.showValuesOnly = val is True
+            self.sig_showValuesOnlyToggled.emit(val is True)
+
+    @Slot(bool)
+    def _slot_showCallables(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.showCallables = val is True
+            self.sig_showCallablesToggled.emit(val is True)
+
+    @Slot(bool)
+    def _slot_showPrivateMembers(self, val: bool):
+        if self.sourceModel.hasData:
+            self.sourceModel.showPrivateMembers = val is True
+            self.sig_showPrivateMembersToggled.emit(val is True)
 
     @Slot()
     @safewrapper
@@ -605,7 +708,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if self.sourceModel._modelData_ is None:
+        if not self.sourceModel.hasData:
             painter = QtGui.QPainter(self.viewport())
             painter.save()
             col = self.palette().placeholderText().color()

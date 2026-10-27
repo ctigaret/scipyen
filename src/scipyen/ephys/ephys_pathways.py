@@ -19,7 +19,7 @@ import typing
 # from enum import Enum, IntEnum
 # from abc import ABC
 import dataclasses
-from dataclasses import (dataclass, MISSING, KW_ONLY)
+from dataclasses import (dataclass, MISSING, KW_ONLY)  # noqa: F401
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -472,7 +472,6 @@ class SynapticStimulusChannel(ScipyenDataclass):
         if not ret:
             return ret
 
-        # ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, dataclasses.fields(self)))
         ret &= all(getattr(self, n) == getattr(other, n) for n in (f.name for f in  dataclasses.fields(self)))
 
         return ret
@@ -484,8 +483,7 @@ class SynapticStimulusChannel(ScipyenDataclass):
                        entity_cache) -> h5py.Dataset:
 
         from iolib import h5io
-        # print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
-        # target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+
         _, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -496,9 +494,6 @@ class SynapticStimulusChannel(ScipyenDataclass):
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
-
-        # if isinstance(name, str) and len(name.strip()):
-        #     target_name = name
 
         entity = group.create_dataset(name, data = h5py.Empty("f"),
                                       track_order=track_order)
@@ -538,8 +533,13 @@ class SynapticStimulusChannelList(NeoObjectList):
 
         if len(items):
             if len(items) == 1:
-                if isinstance(items[0], typing.Sequence):
-                    items = items[0]
+                # if isinstance(items[0], typing.Sequence):
+                #     items = items[0]
+                #
+                # elif isinstance(items[0], typing.Iterable):
+                if isinstance(items[0], typing.Iterable):
+                    items = list(items[0])
+
                 else:
                     raise TypeError(f"Expecting a sequence, instead, got a {type(items[0]).__name__}")
 
@@ -547,7 +547,7 @@ class SynapticStimulusChannelList(NeoObjectList):
                 not isinstance(i, self.allowed_contents)
                 or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents))) # noqa
                 for i in items):
-                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(items[0]).__name__}")
 
             self._items = list(items)
 
@@ -561,11 +561,9 @@ class SynapticStimulusChannelList(NeoObjectList):
         return self._parent
 
     def __iter__(self):
-        """Implements iter(self)"""
+        """Implements ``iter(self)``"""
         # NOTE: 2026-09-02 20:32:36 -> this is a generator!
         yield from self._items
-        # for item in self._items:
-        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -578,7 +576,7 @@ class SynapticStimulusChannelList(NeoObjectList):
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int) -> SynapticStimulusChannel | None:
-        """x.__getitem__(y) <==> x[y]"""
+        """``x.__getitem__(y)`` implements the indexing statement ``x[y]``"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -834,16 +832,17 @@ class AuxiliaryInputList(NeoObjectList):
 
     def __init__(self, *items, name: str | None = None, parent: object = None):
         self.name = "" if not isinstance(name, str) else name
-        self._items = list()
+        self._items = []
 
         if len(items):
-            if len(items) == 1 and isinstance(items[0], typing.Sequence):
-                items = items[0]
+            if len(items) == 1 and isinstance(items[0], typing.Iterable):
+                items = list(items[0])
 
             if any(
                 not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
-                for i in items):
+                or not any(type(i).__name__ in n for n in (t.__name__ for t in self.allowed_contents))
+                for i in items
+                ):
                 raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
             self._items = list(items)
@@ -858,10 +857,8 @@ class AuxiliaryInputList(NeoObjectList):
         return self._parent
 
     def __iter__(self):
-        """Implement iter(self)"""
+        """Implements ``iter(self)``"""
         yield from self._items
-        # for item in self._items:
-        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -873,7 +870,7 @@ class AuxiliaryInputList(NeoObjectList):
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int | slice | str) -> AuxiliaryInput | None:
-        """x.__getitem__(y) <==> x[y]"""
+        """``x.__getitem__(y)`` implements for the indexing statement ``x[y]``"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -928,7 +925,8 @@ class AuxiliaryInputList(NeoObjectList):
 
         if len(self._items):
             s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            # s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            s.extend([f"{p[0]}: {p[1]}" for p in enumerate(self._items)])
 
         return "\n".join(s)
 
@@ -1088,7 +1086,7 @@ class AuxiliaryOutput(ScipyenDataclass):
         if not ret:
             return ret
 
-        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
+        ret &= all(getattr(self, fldname) == getattr(other, fldname) for fldname in (fld.name for fld in datalasses.fields(self)))
 
         return ret
 
@@ -1122,9 +1120,7 @@ class AuxiliaryOutput(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Dataset,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
-
+    def fromHDF5(cls, entity: h5py.Dataset, attrs: dict | None = None, cache: dict = {}):
         from iolib import h5io
 
         if entity in cache:
@@ -1138,17 +1134,12 @@ class AuxiliaryOutput(ScipyenDataclass):
 
         return cls(name, channel, digttl)
 
-# AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
-# AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
-# AuxiliaryOutput.digttl.__doc__ = "Tribool: flag to indicate if the output is used to send out triggers via a DIG (Tribool(True)), emulated via a DAC (Tribool(False)) or other waveforms (Tribool(None)); default is Tribool(None)"
-
 class AuxiliaryOutputList(NeoObjectList):
     allowed_contents = (AuxiliaryOutput, )
 
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
+    def __init__(self, *items, name: str | None = None, parent: object = None):
         self.name = "" if not isinstance(name, str) else name
-        self._items = list()
+        self._items = []
 
         if len(items):
             if len(items) == 1 and isinstance(items[0], typing.Sequence):
@@ -1156,7 +1147,7 @@ class AuxiliaryOutputList(NeoObjectList):
 
             if any(
                 not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                or not any(type(i).__name__ in n for n in (t.__name__ for t in self.allowed_contents))
                 for i in items):
                 raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
@@ -1172,9 +1163,8 @@ class AuxiliaryOutputList(NeoObjectList):
         return self._parent
 
     def __iter__(self):
-        """Implement iter(self)"""
-        for item in self._items:
-            yield item
+        """Implements ``iter(self)``"""
+        yield from self._items
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -1182,11 +1172,12 @@ class AuxiliaryOutputList(NeoObjectList):
 
         if i < len(self._items) and i >= -len(self._items):
             del(self._items[i])
+
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int | slice | str) -> AuxiliaryOutput | None:
-        """x.__getitem__(y) <==> x[y]"""
+        """``x.__getitem__(y)`` implements the indexing statement ``<==> x[y]``"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -1241,7 +1232,8 @@ class AuxiliaryOutputList(NeoObjectList):
 
         if len(self._items):
             s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            # s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            s.extend([f"{p[0]}: {p[1]}" for p in enumerate(self._items)])
 
         return "\n".join(s)
 
@@ -1354,7 +1346,6 @@ class AuxiliaryOutputList(NeoObjectList):
 
     def index(self, *args):
         return self._index(*args)
-
 
 
 def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
@@ -1725,11 +1716,7 @@ class PathwaysStimulationLayout:
     def _getSweepEpochsWithRoleForPathway_(self, pathway: SynapticPathway, sweep: int,
                             role: pab.ABFEpochRole,
                             ensureUnique: bool = True,
-                            asNeoEpoch: bool = False) -> typing.Optional[ # noqa
-                                typing.Union[pab.ABFEpoch, # noqa
-                                             typing.List[pab.ABFEpoch]
-                                             ]
-                                ]:
+                            asNeoEpoch: bool = False) -> pab.ABFEpoch | list[pab.ABFEpoch] | None:
         assert isinstance(pathway, SynapticPathway), f"'pathway' expected to be an SynapticPathway; instead, got a {type(pathway).__name__}"
         assert isinstance(role, pab.ABFEpochRole), f"'role' expected to be an ABFEpochRole; instead, got a {type(role).__name__}"
 
@@ -1879,13 +1866,8 @@ class PathwaysStimulationLayout:
         return result
 
     def getMembraneTestEpoch(self, pathway:SynapticPathway,
-                             sweep: typing.Optional[int] = None,
-                             asNeoEpoch: bool = False) -> typing.Optional[
-                                            typing.Union[pab.ABFEpoch,
-                                                        neo.Epoch,
-                                                        dict[int, pab.ABFEpoch],
-                                                        dict[int, neo.Epoch]]
-                                            ]:
+                             sweep: int | None = None,
+                             asNeoEpoch: bool = False) -> pab.ABFEpoch | neo.Epoch | dict[int, pab.ABFEpoch] | dict[int, neo.Epoch]:
         r"""Returns the ABF epochs used for membrane test in a pathway during a given sweep.
 
         .. |nbsp| unicode:: 0xA0
@@ -2052,6 +2034,7 @@ class PathwaysStimulationLayout:
         return fig
 
     def asciiTriggerTraces(self):
+        r"""Prints a schematic of trigger events as ASCII"""
         print("\n")
         for k, p in enumerate(self.pathways):
             pSweeps = self.getSweepsForPathway(p)
@@ -2086,11 +2069,8 @@ class SynapticPathway(ScipyenDataclass):
     """
     name: str = "pathway"
     adc: int = 0 # physical index of the ADC channel used in recording this pathway
-    # adc: int|None = None # physical index of the ADC channel used in recording this pathway
     dac: int = 0 # physical index of the DAC channel used in recording this pathway
-    # dac: int|None = None # physical index of the DAC channel used in recording this pathway
     stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
-    # stimulus: SynapticStimulusChannelList = dataclasses.field(default_factory = SynapticStimulusChannelList)
 
     # NOTE: 2024-10-16 11:57:17
     # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
@@ -2107,9 +2087,9 @@ class SynapticPathway(ScipyenDataclass):
     # Therefore:
     # NOTE: 2024-10-16 13:36:07
     # add clampMode to RecordingEpisode!
-    electrode: dataclasses.InitVar[typing.Union[ephys.ElectrodeMode, int, str]] = ephys.ElectrodeMode.Null
+    electrode: dataclasses.InitVar[ephys.ElectrodeMode | int | str] = ephys.ElectrodeMode.Null
 
-    pathType: dataclasses.InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+    pathType: dataclasses.InitVar[SynapticPathwayType | int | str] = SynapticPathwayType.Null
 
     schedule: RecordingSchedule = dataclasses.field(default_factory = RecordingSchedule)
 
@@ -2126,12 +2106,9 @@ class SynapticPathway(ScipyenDataclass):
     # are to be executed in the order given in the sequence
     #
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
-    # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
 
-    # index: int = dataclasses.field(default = 0)
-
-    def __post_init__(self, electrode:typing.Union[ephys.ElectrodeMode, int, str] = ephys.ElectrodeMode.Null,
-                      pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
+    def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null,
+                      pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):
 
         if isinstance(electrode, (int, str)):
             if electrode not in ephys.ElectrodeMode:
@@ -2171,7 +2148,7 @@ class SynapticPathway(ScipyenDataclass):
         return self._electrodeMode_
 
     @electrodeMode.setter
-    def electrodeMode(self, val:typing.Union[int, str, ephys.ElectrodeMode]):
+    def electrodeMode(self, val: int | str | ephys.ElectrodeMode):
         if isinstance(val, (int, str)):
             if val not in ephys.ElectrodeMode:
                 raise ValueError(f"Invalid electrode mode {val}")
@@ -2189,7 +2166,7 @@ class SynapticPathway(ScipyenDataclass):
         return self._pathwayType_
 
     @pathwayType.setter
-    def pathwayType(self, val:typing.Union[SynapticPathwayType, int, str]):
+    def pathwayType(self, val: SynapticPathwayType | int | str):
         if isinstance(val, (int, str)):
             if val not in SynapticPathwayType:
                 raise ValueError(f"Invalid syaptic pathway type {val}")
@@ -2205,13 +2182,13 @@ class SynapticPathway(ScipyenDataclass):
     def __repr__(self) -> str:
         import dataclasses
         fields  = dataclasses.fields(self.__class__)
-        all_attr_names = list(f.name for f in fields) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
+        all_attr_names = [f.name for f in fields] + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
 
-        a_val = lambda a: getFieldOrProperty(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(self, a)}'" if a == 'name' else getFieldOrProperty(self, a) # noqa
+        a_val = lambda a: getFieldOrProperty(self, a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(self, a)}'" if a == 'name' else getFieldOrProperty(self, a) # noqa
 
-        sub_fields = list()
+        sub_fields = []
 
         for a in all_attr_names:
             try:
@@ -2222,6 +2199,7 @@ class SynapticPathway(ScipyenDataclass):
 
         if len(sub_fields):
             ret += ", ".join(sub_fields)
+
         ret += [")"]
 
         return "".join(ret)
@@ -2235,21 +2213,10 @@ class SynapticPathway(ScipyenDataclass):
 
         return hash(self) == hash(other)
 
-        # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
-        #
-        # if ret:
-        #     ret &= self.pathwayType == other.pathwayType
-        #
-        # if ret:
-        #     ret &= self.electrodeMode == other.electrodeMode
-        #
-        # return ret
-
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
 
         from iolib import h5io
-        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2272,11 +2239,6 @@ class SynapticPathway(ScipyenDataclass):
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
 
-        # h5io.toHDF5(self.source, entity, name="source", oname="source",
-        #                     compression=compression, chunks=chunks,
-        #                     track_order=track_order,
-        #                     entity_cache=entity_cache)
-
         h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
@@ -2297,8 +2259,7 @@ class SynapticPathway(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None, cache:dict = {}):
 
         from iolib import h5io
         if entity in cache:
@@ -2312,7 +2273,6 @@ class SynapticPathway(ScipyenDataclass):
         dac = attrs["dac"]
         schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
         stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
-        # source = h5io.fromHDF5(entity["source"], cache=cache)
         measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
 
         return cls(name=name, adc=adc, dac=dac, pathType=pathwayType,
@@ -2327,7 +2287,7 @@ class SynapticPathway(ScipyenDataclass):
         """
         field_names = tuple(f.name for f in dataclasses.fields(cls))
 
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+        initkwargs = {i: kwargs[i] for i in field_names if i in kwargs}
 
         return cls(**initkwargs)
 
@@ -2335,20 +2295,20 @@ class SynapticPathway(ScipyenDataclass):
 class SynapticPathwayList(NeoObjectList): # noqa
     allowed_contents  = (SynapticPathway, )
 
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
+    def __init__(self, *items, name: str | None = None, parent: object = None):
 
         self.name = "" if not isinstance(name, str) else name
-        self._items = list()
+        self._items = []
 
         if len(items):
-            if len(items) == 1 and isinstance(items[0], typing.Sequence):
-                items = items[0]
+            if len(items) == 1 and isinstance(items[0], typing.Iterable):
+                items = list(items[0])
 
             if any(
                 not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
-                for i in items):
+                or not any(type(i).__name__ in n for n in (t.__name__ for t in self.allowed_contents))
+                for i in items
+                ):
                 raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
             self._items = list(items)
@@ -2370,10 +2330,8 @@ class SynapticPathwayList(NeoObjectList): # noqa
             self._parent = None
 
     def __iter__(self):
-        """Implement iter(self)"""
+        """Implements ``iter(self)``"""
         yield from self._items
-        # for item in self._items:
-        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -2401,7 +2359,7 @@ class SynapticPathwayList(NeoObjectList): # noqa
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int | slice | str) -> SynapticPathway | None:
-        """x.__getitem__(y) <==> x[y]"""
+        """``x.__getitem__(y)`` implements the indexing statement ``x[y]``"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -3123,8 +3081,8 @@ class RecordingSourceList(NeoObjectList):
         self._items = list()
 
         if len(items):
-            if len(items) == 1 and isinstance(items[0], typing.Sequence):
-                items = items[0]
+            if len(items) == 1 and isinstance(items[0], typing.Iterable):
+                items = list(items[0])
 
             if any(
                 not isinstance(i, self.allowed_contents)
@@ -3151,10 +3109,8 @@ class RecordingSourceList(NeoObjectList):
             self._parent = None
 
     def __iter__(self):
-        """Implement iter(self)"""
+        """Implements ``iter(self)``"""
         yield from self._items
-        # for item in self._items:
-        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -3166,7 +3122,7 @@ class RecordingSourceList(NeoObjectList):
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int | slice| str) -> RecordingSource | None:
-        """x.__getitem__(y) <==> x[y]"""
+        """``x.__getitem__(y)`` implements the indexing statement ``x[y]``"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -3775,6 +3731,7 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
     return ret
 
 class PathwayTrials(dict):
+    r"""Mapping pathway name: str ↦ electrophysiology data: neo.Block"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -3820,14 +3777,3 @@ class PathwayTrials(dict):
     @property
     def pathwayNames(self):
         yield from (p.name for p in self)
-
-    # def getPathway(self, name:str):
-    #     if name in self.pathwayNames:
-    #         pathway = [p for p in self.pathways if p.name == name]
-    #
-    #         if len(pathway) > 1:
-    #             raise RuntimeError(f"Duplicate pathway name: {name}")
-    #
-    #         return pathway[0]
-    #
-    #     raise KeyError(f"No pathway named {name} found")

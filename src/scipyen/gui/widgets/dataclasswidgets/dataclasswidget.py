@@ -166,6 +166,17 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         if isinstance(obj, self._objectTypes_):
             self.setValue(obj)
 
+    @property
+    def objectSymbol(self) -> str | None:
+        return self._objSymbol_
+
+    @objectSymbol.setter
+    def objectSymbol(self, val: str):
+        if isinstance(val, str):
+            self._objSymbol_ = val
+        else:
+            self._objSymbol_ = None
+
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass

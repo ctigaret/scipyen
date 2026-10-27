@@ -22,7 +22,7 @@ import typing, dataclasses #, numbers
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets) #, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot) # , Property,)
 __has_PySide6__ = False
@@ -30,7 +30,7 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6  # noqa: I001
+    import PySide6  # noqa: F401
     # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -51,29 +51,25 @@ else:
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
+
 if neo.__version__ >= '0.13.0':
-    from neo.core.objectlist import ObjectList as NeoObjectList
-import quantities as pq
+    from neo.core.objectlist import ObjectList as NeoObjectList  # noqa: F401
+import quantities as pq  # noqa: I001
 import numpy as np
 import pandas as pd
-import vigra
+import vigra  # noqa: F401
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 # import core.datatypes
 from core.triggerprotocols import TriggerProtocol
-from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerevent import (TriggerEvent, TriggerEventType)  # noqa: F401
 
-# import core.datasignal
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)  # noqa: F401
 from core import qtutils
-# from core import xmlutils, strutils
-# from core.workspacefunctions import validate_varname
-# from core.utilities import NestedFinder
 from core.prog import (safewrapper, scipywarn)
-# from core.prog import (safewrapper, safeguiwrapper, scipywarn)
 
-from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
+from core.traitcontainers import (DataBag, DataBagTraitsObserver,)  # noqa: F401
 from core.scipyendataclasses import ScipyenDataclass
 from core.scipyen_config import markConfigurable
 from core import bgbridge
@@ -82,9 +78,7 @@ from core import taxonbridge
 #### END pict.core modules
 
 # ### BEGIN imaging
-# import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
-# import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
 # ### END   imaging
 
@@ -92,21 +86,12 @@ from imaging.scandata import (ScanData, AnalysisUnit)
 from ephys import ephys_protocol
 
 #### BEGIN pict.gui modules
-# from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
-
-# from gui.widgets.interactivetreewidget import InteractiveTreeWidget
-# from gui.widgets.simpletablewidget import SimpleTableWidget
-# from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
 from gui.widgets.objectview import ObjectView
 from gui.itemmodels.roles import *
 from gui.itemmodels.datatree import objectnode as onode
-
-
-# from . import resources_rc
-# from . import icons_rc
 #### END pict.gui modules
 
 if "darwin" in sys.platform:
@@ -145,7 +130,6 @@ class ObjectInspector(ScipyenViewer):
         np.ndarray:0,
         AnalysisUnit:0,
         AxesCalibration:0,
-        # neo.core.baseneo.BaseNeo:0,
         ScanData:0,
         TriggerProtocol:0,
         types.SimpleNamespace:0,
@@ -250,7 +234,7 @@ class ObjectInspector(ScipyenViewer):
         self._autoResizeColumns_: set[int] = autoResizeColumns
 
         super().__init__(data=data, parent=parent, win_title=win_title,
-                         doc_title = doc_title, ID=ID, *args, **kwargs)
+                         doc_title = doc_title, ID=ID, *args, **kwargs)  # noqa: B026
 
     def _configureUI_(self):
         self.fileMenu = QtWidgets.QMenu("File")
@@ -271,16 +255,20 @@ class ObjectInspector(ScipyenViewer):
         self.settingsMenu.addAction(self.autoResizeColumnsAction)
 
         self.treeView = ObjectView(parent = self,
-                                    # supported_data_types = tuple(self.viewer_for_types),
-                                    # initialExpandDepth = self._initialExpandDepth_,
                                     autoResizeColumns = self._autoResizeColumns_)
+
+        self.treeView.sig_introspectionToggled.connect(self.slot_showIntrospect)
+        self.treeView.sig_showValuesOnlyToggled.connect(self.slot_showValuesOnly)
+        self.treeView.sig_showCallablesToggled.connect(self.slot_showCallables)
+        self.treeView.sig_showPrivateMembersToggled.connect(self.slot_showPrivateMembers)
+        self.treeView.sig_inlineTablesToggled.connect(self.slot_setInlineTables)
+        self.treeView.sig_setReadOnly.connect(self.slot_setReadOnly)
 
         self.model = self.treeView.sourceModel
         self.model.sig_modelDataChanged.connect(self.sig_modelDataChanged)
 
         self.setCentralWidget(self.treeView)
         self._sig_setTreeViewData_.connect(self.treeView.slot_setData)
-        # self.treeView.update() # force drawing placeholder text ?!?
 
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName(f"{self.__class__.__name__}_Main_Toolbar")
@@ -288,12 +276,6 @@ class ObjectInspector(ScipyenViewer):
         refreshAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
-
-        # self.alwaysSortAction = self.toolBar.addAction(
-        #     QtGui.QIcon.fromTheme("sort-name"), "Always sort rows ascending")
-        # self.alwaysSortAction.setCheckable(True)
-        # self.alwaysSortAction.setChecked(True)
-        # self.alwaysSortAction.toggled.connect(self.slot_alwaysSortRows)
 
         collapseAllAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("collapse-all"), "Collapse All")
@@ -664,7 +646,7 @@ class ObjectInspector(ScipyenViewer):
     #         return
     #
     #     if item.column() == 0:
-    #         readOnly = item.data(ReadOnlyRole) is True # noqa
+    #         readOnly = item.data(ReadOnlyRole) is True
     #         obj = self.treeView.sourceModel.getDataObjectForLeaf(item)
     #         if obj is None:
     #             return
@@ -693,7 +675,8 @@ class ObjectInspector(ScipyenViewer):
     #         self.alwaysSortAction.setChecked(self._alwaysSortRows_)
     #         if self._alwaysSortRows_ != self.model.sortedRows:
     #             self.model.sortedRows = self._alwaysSortRows_
-    #             self.slot_refreshDataDisplay()
+            # if self.model.modelData is not None:
+            #     self.slot_refreshDataDisplay()
 
     @property
     def showInlineTables(self) -> bool:
@@ -703,12 +686,13 @@ class ObjectInspector(ScipyenViewer):
     @showInlineTables.setter
     def showInlineTables(self, val: bool):
         self._showInlineTables_ = val is True
-        with qtutils.SignalBlocker(self.inlineTablesAction):
+        with qtutils.SignalBlocker((self.inlineTablesAction, self.treeView)):
             self.inlineTablesAction.setChecked(self._showInlineTables_)
 
         if self._data_ is not None and val != self.model.inlineTables:
             self.model.inlineTables = self._showInlineTables_
-            self.slot_refreshDataDisplay()
+            if self.model.modelData is not None:
+                self.slot_refreshDataDisplay()
 
     @property
     def initialExpandDepth(self) -> int:
@@ -721,7 +705,8 @@ class ObjectInspector(ScipyenViewer):
             self._initialExpandDepth_ = val
             self.treeView.initialExpandDepth = self._initialExpandDepth_
             self.treeView.update()
-            # self.slot_refreshDataDisplay()
+            # if self.model.modelData is not None:
+            #     self.slot_refreshDataDisplay()
 
     @property
     def autoResizeColumns(self) -> set:
@@ -734,13 +719,11 @@ class ObjectInspector(ScipyenViewer):
         if isinstance(val, str):
             try:
                 if len(val.strip()):
-                    # indices = set(list(map(lambda s: eval(s), val)))
-                    # indices = set(map(lambda s: eval(s), val))
-                    indices = set(eval(s) for s in val)
+                    indices = {eval(s) for s in val}
                     if not all((isinstance(v, int) and v in range(3)) for v in indices):
                         scipywarn("Invalid indices: all must be integers in range 0-2 inclusive")
                         indices = set()
-            except:
+            except:  # noqa: E722
                 traceback.print_exc()
 
         elif isinstance(val, (typing.Sequence, set)) and all((isinstance(v, int) and v in range(3)) for v in val):
@@ -749,7 +732,8 @@ class ObjectInspector(ScipyenViewer):
         self._autoResizeColumns_ = indices
         self.treeView.autoResizeColumns = self._autoResizeColumns_
         self.treeView.update()
-        # self.slot_refreshDataDisplay()
+        # if self.model.modelData is not None:
+        #     self.slot_refreshDataDisplay()
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -758,7 +742,7 @@ class ObjectInspector(ScipyenViewer):
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
-        with qtutils.SignalBlocker(self.setEditableAction):
+        with qtutils.SignalBlocker((self.setEditableAction, self.treeView)):
             if self._readOnly_:
                 self.setEditableAction.setIcon(QtGui.QIcon.fromTheme("object-locked"))
                 self.setEditableAction.setToolTip("Editing disabled; toggle to enable")
@@ -779,8 +763,9 @@ class ObjectInspector(ScipyenViewer):
         self._showPrivateMembers_ = value is True
         if self.model.showPrivateMembers != self._showPrivateMembers_:
             self.model.showPrivateMembers = self._showPrivateMembers_
-            self.slot_refreshDataDisplay()
-        with qtutils.SignalBlocker(self.showPrivateMembersAction):
+            if self.model.modelData is not None:
+                self.slot_refreshDataDisplay()
+        with qtutils.SignalBlocker((self.showPrivateMembersAction, self.treeView)):
             self.showPrivateMembersAction.setChecked(self._showPrivateMembers_)
 
     @property
@@ -793,8 +778,9 @@ class ObjectInspector(ScipyenViewer):
         self._showIntrospection_ = value is True
         if self.model.showIntrospection != self._showIntrospection_:
             self.model.showIntrospection = self._showIntrospection_
-            self.slot_refreshDataDisplay()
-        with qtutils.SignalBlocker(self.showIntrospectAction):
+            if self.model.modelData is not None:
+                self.slot_refreshDataDisplay()
+        with qtutils.SignalBlocker((self.showIntrospectAction, self.treeView)):
             self.showIntrospectAction.setChecked(self._showIntrospection_)
 
     @property
@@ -807,9 +793,10 @@ class ObjectInspector(ScipyenViewer):
         self._showValuesOnly_ = val is True
         if self.model.showValuesOnly != self._showValuesOnly_:
             self.model.showValuesOnly = val is True
-            self.slot_refreshDataDisplay()
+            if self.model.modelData is not None:
+                self.slot_refreshDataDisplay()
 
-        with qtutils.SignalBlocker(self.showValuesOnlyAction):
+        with qtutils.SignalBlocker((self.showValuesOnlyAction, self.treeView)):
             self.showValuesOnlyAction.setChecked(self._showValuesOnly_)
 
     @property
@@ -820,11 +807,12 @@ class ObjectInspector(ScipyenViewer):
     @showCallables.setter
     def showCallables(self, value: bool):
         self._showCallables_ = value is True
-        with qtutils.SignalBlocker(self.showCallablesAction):
+        with qtutils.SignalBlocker((self.showCallablesAction, self.treeView)):
             self.showCallablesAction.setChecked(self._showCallables_)
 
         if self.model.showCallables != self._showCallables_:
             self.model.showCallables = self._showCallables_ is True
-            self.slot_refreshDataDisplay()
+            if self.model.modelData is not None:
+                self.slot_refreshDataDisplay()
 
 

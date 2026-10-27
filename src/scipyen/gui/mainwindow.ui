@@ -171,7 +171,6 @@
       <addaction name="actionIconView"/>
       <addaction name="actionColumnView"/>
      </widget>
-     <addaction name="actionUse_Native_Menu_Bar"/>
      <addaction name="actionUse_New_Navigator_Look"/>
      <addaction name="actionTimeDisplayFormat"/>
      <addaction name="actionHide_Filtered_out_File_Names"/>
@@ -211,6 +210,7 @@
      <addaction name="actionTool_Button_Style"/>
      <addaction name="menuFonts"/>
      <addaction name="menuIcon_Sizes"/>
+     <addaction name="actionUse_Native_Menu_Bar"/>
     </widget>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>

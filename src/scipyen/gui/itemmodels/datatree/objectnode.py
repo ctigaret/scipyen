@@ -1441,6 +1441,7 @@ def _parseObject_(obj: typing.Union[list, tuple, deque,  # noqa: UP007,F811
     objId = id(obj)
     objType = type(obj)
     choices = check_obj_choices(objType, choices)
+    indirect = True
 
     tip = objType.__name__
     readOnly = True

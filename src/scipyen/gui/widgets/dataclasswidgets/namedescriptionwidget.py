@@ -444,3 +444,6 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self._data_ = obj
         self._objectType_ = type(self._data_)
         self._updateUIFields()
+
+    def data(self):
+        return self._data_

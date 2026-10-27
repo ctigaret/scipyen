@@ -177,7 +177,7 @@ class ObjectModel(QtGui.QStandardItemModel):
         self._maxRows_ = 10
         self._tree_: Tree = Tree()
         self._rootNode_: ObjectNode | None = None
-        self._modelData_: object | None = None
+        # self._modelData_: object | None = None
         self._rootTitle_ = "/" if not isinstance(dataName, str) or len(dataName.strip()) else dataName
         self._inlineTables_: bool = kwargs.pop("inlineTables", False)
         self._readOnly_: bool = kwargs.pop("readOnly", True)
@@ -623,7 +623,7 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         self._tree_.add_node(self._rootNode_)
         # print(f"\n\t-> assign to self._modelData_")
-        self._modelData_ = self._rootNode_.data
+        # self._modelData_ = self._rootNode_.data
 
         self.beginResetModel()
         rowItems = self._makeRowForNode_(self._rootNode_)
@@ -723,7 +723,7 @@ class ObjectModel(QtGui.QStandardItemModel):
                              byPath: bool = False) -> object:
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
-            path[-1] = "self._modelData_"
+            path[-1] = "self.modelData"
             accessExpr = "".join(list(reversed(path)))
             return eval(accessExpr)
 
@@ -735,30 +735,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         node = item.data(ObjectDataRole)
         return node.data
-
-    # def data(self, index = QtCore.QModelIndex, role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
-    #     if self._modelData_ is None:
-    #         return qVariant()
-    #
-    #     if role in (QtCore.Qt.EditRole, ObjectDataRole):
-    #         item = self.itemFromIndex(index)
-    #
-    #         if item.column() == 2 and role == ObjectDataRole:
-    #             # make sure we work on the sibling in column 0
-    #             parentItem = item.parent()
-    #             if not parentItem:
-    #                 return qVariant()
-    #
-    #             item = parentItem.child(item.row(), 0)
-    #
-    #         if role == QtCore.Qt.EditRole:
-    #             return item.data(role)
-    #
-    #         node = item.data(ObjectDataRole)
-    #
-    #         return qVariant(node.data)
-    #
-    #     return super().data(index, role)
 
     def getMasterItem(self, item: QtGui.QStandardItem):
         if item.column() == 0:
@@ -788,7 +764,7 @@ class ObjectModel(QtGui.QStandardItemModel):
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         # print(f"{self.__class__.__name__}.setData({modelIndex}, {value}, {role})")
-        if self._modelData_ is None:
+        if self.modelData is None:
             return False
 
         item = self.itemFromIndex(modelIndex)
@@ -816,7 +792,7 @@ class ObjectModel(QtGui.QStandardItemModel):
 
             path = self._getPathForItemOrIndex_(item)
             # I think this should always be so
-            path[-1] = "self._modelData_"
+            path[-1] = "self.modelData"
 
             accexpr = "".join(reversed(path))
             setexpr = accexpr + " = value"
@@ -1122,11 +1098,13 @@ class ObjectModel(QtGui.QStandardItemModel):
             else:
                 raise ValueError(f"Unsupported traversal mode {mode}")
 
+    @property
+    def modelData(self):
+        if isinstance(self._rootNode_, ObjectNode):
+            return self._rootNode_.data
 
-#     def canFetchMore(self, parent: QtCore.QModelIndex) -> bool:
-#         if not parent.isValid():
-#             return False
-#
-#         item = self.itemFromIndex(parent)
-#         if item.hasChildren():
+    @property
+    def hasData(self) -> bool:
+        return isinstance(self._rootNode_, ObjectNode) and self._rootNode_.data is not None
+
 

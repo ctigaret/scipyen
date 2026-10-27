@@ -8,25 +8,37 @@ r"""Table Editor widget and custom table model, for tabular-like data
 
 
 #### BEGIN core python modules
-from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing # noqa
-from collections import deque
+# import datetime
+# import inspect
+import os
+
+# import traceback
+import typing
+
+# import warnings
+# from collections import deque
 #### END core python modules
-
 #### BEGIN 3rd party modules
-import qtpy # noqa
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+# import qtpy
+from qtpy import (
+    QtCore,
+    QtGui,
+    QtWidgets,
+)
+from qtpy.QtCore import (
+    Signal,
+    Slot,
+)
+
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
+    # from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    from PySide6.QtUiTools import loadUiType  # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -42,7 +54,7 @@ else:
     __has_sip__ = True
 
 
-import pandas as pd
+import pandas as pd  # noqa: I001
 import quantities as pq # noqa
 #import xarray as xa
 import numpy as np
@@ -60,8 +72,8 @@ import matplotlib.mlab as mlb # noqa
 #from core.patchneo import *
 import core.datatypes
 
-import core.utilities as utilities
-import core.strutils as strutils # noqa
+from core import utilities
+from core import strutils
 from core.strutils import str2float # noqa
 
 from core.prog import (safewrapper, scipywarn) # noqa
@@ -87,9 +99,7 @@ from gui import (quickdialog, guiutils) # noqa
 from gui.delegates import PythonItemDelegate
 # from gui.widgets.tabledataview import TableDataView
 from gui.itemmodels.tabulardatamodel import TabularDataModel, TABULAR_TYPE
-from gui.itemmodels.roles import * # noqa
-# from gui import resources_rc
-# from gui import icons_rc
+from gui.itemmodels.roles import *
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -129,15 +139,15 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
     sig_requestDataRow = Signal(name="sig_requestDataRow")
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
-                 readOnly:bool=True, enforceFloat:bool=False,
-                 enforceReadOnly:bool=False,
+    def __init__(self, parent: QtWidgets.QMainWindow | None = None,
+                 readOnly:bool = True, enforceFloat: bool = False,
+                 enforceReadOnly: bool = False,
                  **kwargs) -> None:
         super().__init__(parent=parent)
         super(Ui_TableEditorWidget, self).__init__()
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
-        self._selectedIndexes_ = list()
+        self._selectedIndexes_ = []
         self._readOnly_:bool = readOnly is True
         self._enforceFloat_:bool = enforceFloat is True
         self._enforceReadOnly_:bool = False
@@ -662,8 +672,8 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
         return ret
 
-    def getColumnNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                    quoted:bool=False, sep:str = ", ", asList:bool=False):
+    def getColumnNames(self, ndx: int | typing.Sequence[int] | None = None,
+                    quoted: bool = False, sep: str = ", ", asList: bool = False):
         if ndx is None:
             ndx = range(self.tableView.model().columnCount())
 
@@ -727,13 +737,13 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     #             self._editItemDelegate_._externalDataEditor_.setValue(model._modelData_[row])
 
 
-    @Slot(int,int,int)
-    def _slot_rowsPopulated(self, start:int, fetched:int, total:int):
-        print(f"{self.__class__.__name__} fetched rows: {start}...{fetched}/{total}")
-
-    @Slot(int,int,int)
-    def _slot_columnsPopulated(self, start:int, fetched:int, total:int):
-        print(f"{self.__class__.__name__} fetched columns: {start}...{fetched}/{total}")
+    # @Slot(int,int,int)
+    # def _slot_rowsPopulated(self, start:int, fetched:int, total:int):
+    #     print(f"{self.__class__.__name__} fetched rows: {start}...{fetched}/{total}")
+    #
+    # @Slot(int,int,int)
+    # def _slot_columnsPopulated(self, start:int, fetched:int, total:int):
+    #     print(f"{self.__class__.__name__} fetched columns: {start}...{fetched}/{total}")
 
     @Slot()
     @safewrapper
