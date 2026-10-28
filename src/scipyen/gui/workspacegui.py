@@ -408,8 +408,8 @@ class GuiMessages:
 
         """
         # from core.strutils import (is_html, is_markdown)
-        from gui import guiutils # noqa
-        from helpsystem import helputils # noqa
+        from gui import guiutils
+        from helpsystem import helputils
         # TODO 2026-01-21 09:03:35
         # transfer code from the following, to strutils: mypylight
         lexer = None
@@ -1176,7 +1176,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # NOTE: 2023-05-27 13:46:40
         # mutable control data for the worker loops, to communicate with the
         # worker thread
-        self.loopControl = {"break":False}
+        self.loopControl = {"break": False}
         self.updateUiWithFileLoad = True
 
         scipyenWindow = kwargs.pop("scipyenWindow", None)

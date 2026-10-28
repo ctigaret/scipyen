@@ -8,7 +8,7 @@ r"""
 """
 # NOTE: 2018-04-15 10:34:03
 # frameVisibility parameter in graphics object creation:
-# only use it when creating a GraphicsObject from scratch; 
+# only use it when creating a GraphicsObject from scratch;
 # ignore it when using a PlanarGraphics object (backend) to generate a GraphicsObject
 # because the frames where the graphics object is visible are set by the frame-state
 # associations of the backend
@@ -27,7 +27,7 @@ r"""
 # unpickling old data
 #
 # TODO/FIXME define a pictgui.Geometry class for n-dimensional objects
-# TODO subclasses: mesh, plane, cuboid, spheroid, pyramid, cylinder, 
+# TODO subclasses: mesh, plane, cuboid, spheroid, pyramid, cylinder,
 # TODO              truncated_pyramid, truncated_cylinder
 # TODO              torus, etc etc etc
 # TODO read on Qt3D geometry
@@ -35,13 +35,13 @@ r"""
 
 #### BEGIN core python modules
 # NOTE: use Python re instead of QRegExp
-import sys, os, re, numbers, itertools, warnings, traceback, logging
+import sys, os, re, numbers, itertools, warnings, traceback, logging  # noqa: I001
 import typing
-import math
-from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
-from functools import (partial, partialmethod,)
-from enum import (Enum, IntEnum,)
-from copy import copy
+import math  # noqa: F401
+from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)  # noqa: F401
+from functools import (partial, partialmethod,)  # noqa: F401
+from enum import (Enum, IntEnum,)  # noqa: F401
+from copy import copy  # noqa: F401
 
 
 #### END core python modules
@@ -65,16 +65,16 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     # from qtpy import sip
     # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     # __has_sip__ = True
-    
 
-from core.pyqtgraph_patch import pyqtgraph as pg
+
+from core.pyqtgraph_patch import pyqtgraph as pg  # noqa: I001
 import numpy as np
 #### END 3rd party modules
 
@@ -94,7 +94,7 @@ from . import quickdialog
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
                            PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
                            HorizontalCursor, CrosshairCursor, PointCursor,
-                           PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
+                           PlanarGraphicsType, GraphicsObjectType, GraphicsObject,
                            __new_planar_graphic__, printQPainterPath,
                            PathElements, LinearElements, CurveElements,
                            Tier2PathElements, simplifyPath)
@@ -107,7 +107,7 @@ from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, P
 def generateColorCycle():
     pass
 
-def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None, 
+def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None,
                        gradients: typing.Optional[QtGui.QGradient] = None,
                        images=None,
                        pixmaps=None,
@@ -116,7 +116,7 @@ def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None,
         if all([isinstance(v, int)]) and len(value) == 4:
             # single value spec (R,G,B,A)
             brushes = itertools.cycle(QtGui.Brush(QtGui.QColor(*c)))
-            
+
     #pass
 
 def generatePenCycle():
@@ -139,44 +139,44 @@ class GuiWorkerSignals(QtCore.QObject):
     signal_Finished = Signal(name="signal_Finished")
     sig_error = Signal(tuple, name="sig_error")
     signal_Result = Signal(object, name="signal_Result")
-    
-    
+
+
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super(GuiWorker, self).__init__()
-        
+
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        
+
         self.signals = GuiWorkerSignals()
-        
+
         self.result = None
-        
+
     @Slot()
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
             self.signals.signal_Result.emit(self.result)  # Return the result of the processing
-            
+
         except:
             traceback.print_exc()
 
             exc_type, value = sys.exc_info()[:2]
-            
+
             self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
-            
+
         else:
             #self.signals.signal_Result.emit(self.result)  # Return the result of the processing
             self.signals.signal_Finished.emit()  # Done
-            
+
         finally:
             self.signals.signal_Finished.emit()  # Done
-            
+
 class ProgressWorkerSignals(QtCore.QObject):
-    r"""See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
+    r"""See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool
     https://martinfitzpatrick.name/article/multithreading-pyqt-applications-with-qthreadpool/
-    
+
     Defines the signals available from a running worker thread.
 
     Supported signals are:
@@ -194,14 +194,14 @@ class ProgressWorkerSignals(QtCore.QObject):
         `int` indicating % progress
 
     """
-    
+
     signal_Finished = Signal()
     sig_error = Signal(tuple)
     signal_Result = Signal(object)
     signal_Progress = Signal(int)
     signal_setMaximum = Signal(int)
     signal_Canceled = Signal()
-    
+
     @property
     def signals(self):
         return (self.signal_Finished,
@@ -210,34 +210,34 @@ class ProgressWorkerSignals(QtCore.QObject):
                 self.signal_Progress,
                 self.signal_setMaximum,
                 self.signal_Canceled)
-    
+
 class ProgressWorkerRunnable(QtCore.QRunnable):
     r"""
     ProgressWorkerRunnable thread
 
     Inherits from QRunnable to handle worker thread setup, signals and wrap-up.
 
-    :param fn:  The function callback to run on this worker thread. Supplied args and 
+    :param fn:  The function callback to run on this worker thread. Supplied args and
                      kwargs will be passed through to the runner.
-                     
+
     :type fn: function
-    
+
         The function is expected to execute a loop computation and its signature
-        should contain an optional named parameter "progressSignal" of type 
+        should contain an optional named parameter "progressSignal" of type
         Signal, to be emitted after each iteration of the loop code.
 
     :param args: Arguments to pass to the callback function
     :param kwargs: Keywords to pass to the callback function
-    
+
     NOTE: the entire loop is executed in a separate thread and periodically
-    signals its progress by emitting the progressSignal, connected to a 
+    signals its progress by emitting the progressSignal, connected to a
     progressDialog in the main (GUI) thread.
-    
+
     NOTE: because this inherits from a QRunnable, the operation cannot be aborted
 
     """
     # canceled = Signal(name="canceled")
-    
+
     def __init__(self, fn, progressDialog, *args, **kwargs):
         r"""
         fn: callable
@@ -252,7 +252,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
         self.signals = ProgressWorkerSignals()
         self.pd = progressDialog
         self.setAutoDelete(True)
-        
+
         if isinstance(self.pd, QtWidgets.QProgressDialog):
             self.pd.setValue(0)
             # self.pd.canceled.connect(self.slot_canceled)
@@ -261,7 +261,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
             self.kwargs['progressSignal'] = self.signals.signal_Progress
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
-            
+
 
     @Slot()
     def run(self):
@@ -272,49 +272,49 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
         # Retrieve args/kwargs here; and fire processing using them
         try:
             result = self.fn(*self.args, **self.kwargs)
-            
+
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
+
         else:
             self.signals.signal_Result.emit(result)  # Return the result of the processing
-            
+
         finally:
             self.signals.signal_Finished.emit()  # Done
-            
+
 def checkboxDialogPrompt(parent, title, slist):
     if not all([isinstance(s, str) for s in slist]):
         raise TypeError("Expecting a list of strings for the last argument")
     dlg = quickdialog.QuickDialog(parent, title)
     dlg.addWidget(QtWidgets.QLabel(title, parent=dlg))
     group = quickdialog.VDialogGroup(dlg)
-    
+
     checkboxes = [quickdialog.CheckBox(group, value) for value in slist]
-    
+
     # dlg.resize(dlg.minimumSize())
     dlg.adjustSize()
-    
+
     if dlg.exec() == 1:
         return [w.isChecked() for w in checkboxes]
-    
+
     else:
         return [True for w in checkboxes]
-    
+
 class MouseEventSink(QtCore.QObject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
     def eventFilter(self, obj, evt):
         return evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick,
-                          QtCore.QEvent.GraphicsSceneMousePress, 
+                          QtCore.QEvent.GraphicsSceneMousePress,
                           QtCore.QEvent.GraphicsSceneMouseRelease,
-                          QtCore.QEvent.GraphicsSceneHoverEnter, 
-                          QtCore.QEvent.GraphicsSceneHoverLeave, 
+                          QtCore.QEvent.GraphicsSceneHoverEnter,
+                          QtCore.QEvent.GraphicsSceneHoverLeave,
                           QtCore.QEvent.GraphicsSceneHoverMove,
                           QtCore.QEvent.GraphicsSceneMouseMove)
-        
+
     # don't use validate as this overrides a QWidget method and breaks the dialog code below
     def validateItems(self, itemsList):
         if itemsList is None or not all(isinstance(x,(str,unicode)) for x in itemsList):
@@ -322,32 +322,32 @@ class MouseEventSink(QtCore.QObject):
             return False
         return True
 
-      
+
     def selectItem(self, item):
         self.selectedColorMap = item.text()
         self.itemSelected.emit(item.text()) # this is a QString !!!
         #print(item.text())
 
-    
+
     def selectAndGo(self, item):
         self.selectedColorMap = item.text()
         self.itemSelected.emit(item.text())
         self.close()
-        
+
 class ProgressWorkerThreaded(QtCore.QObject):
     r"""Wraps a worker function in a separate QThread.
         The worker function is typically executing a time-consuming loop (such
         as an iteration through some data, where each cycle involves a time-
         consuming operation).
-        
-        The worker instance should be `moved` to a QThread instance, and the 
+
+        The worker instance should be `moved` to a QThread instance, and the
         thread's `started` signal must be connected to this worker's `run` slot
         which then calls the worker function.
-        
-        The worker function is called from within the run 
-        
+
+        The worker function is called from within the run
+
     """
-    def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None, 
+    def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None,
                  loopControl:typing.Optional[dict]=None, *args, **kwargs):
         r"""
         fn: callable
@@ -370,10 +370,10 @@ class ProgressWorkerThreaded(QtCore.QObject):
         self.kwargs["resultSignal"] = self.signals.signal_Result
         self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
         self.kwargs["loopControl"] = self.loopControl
-        
+
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.setProgressDialog(progressDialog)
-            
+
     def setProgressDialog(self, progressDialog:QtWidgets.QProgressDialog):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.pd = progressDialog
@@ -383,7 +383,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Finished.connect(self.pd.reset)
         else:
             self.pd is None
-            
+
     @Slot(int)
     def progress(self, value):
         # print(f"{self.__class__.__name__}.progress({value})")
@@ -391,11 +391,11 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.pd.setValue(value)
         # else:
         #     print("\tno progress dialog!")
-            
+
     @property
     def progressDialog(self):
         return self.pd
-    
+
     @Slot()
     def run(self):
         # print(f"{self.__class__.__name__}.run()")
@@ -404,23 +404,23 @@ class ProgressWorkerThreaded(QtCore.QObject):
         # self.signals.signal_Finished.emit()  # Done
         try:
             result = self.fn(*self.args, **self.kwargs)
-            
+
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
+
         else:
             self.signals.signal_Result.emit(result)  # Return the result of the processing
             self.signals.signal_Finished.emit()  # Done
-            
+
         finally:
             self.signals.signal_Finished.emit()  # Done
-        
+
 class ProgressThreadController(QtCore.QObject):
     r"""The problem(s) with this approach:
 • the progres dialog's timers would be stopped from another thread, thus generating
-        'QObject::killTimer: Timers cannot be stopped from another thread' which 
+        'QObject::killTimer: Timers cannot be stopped from another thread' which
         may crash Scipyen.
 • the progress dialog cannot be moved itself to another thread, it being a member
         of the ProgressWorkerThreaded instance (although the threaded worker IS
@@ -429,14 +429,14 @@ class ProgressThreadController(QtCore.QObject):
 """
     sig_start = Signal(name="sig_start")
     sig_ready = Signal(object, name="sig_ready")
-    
+
     # def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
     def __init__(self, progressWorker:ProgressWorkerThreaded, /, *args, **kwargs):
         super().__init__()
         if not isinstance(progressWorker, ProgressWorkerThreaded):
             raise TypeError(f"Expecting a ProgressWorkerThreaded; instead, got a {type(progressWorker).__name__}")
         self.result = None
-        
+
         # print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
         self.workerThread = QtCore.QThread()
         self.worker = progressWorker
@@ -452,16 +452,16 @@ class ProgressThreadController(QtCore.QObject):
         self.worker.signals.signal_Progress[int].connect(self.worker.progress)
         # self.sig_start.connect(self.worker.run)
         self.workerThread.start()
-        
+
     def __del__(self):
         self.workerThread.quit()
         self.workerThread.wait()
         # super().__del__()
-        
+
     # def setProgressDialog(self, progressDialog):
     #     if isinstance(progressDialog, QtWidgets.QProgressDialog):
     #         self.worker.setProgressDialog(progressDialog)
-            
+
     @Slot(object)
     def handleResult(self, result:object):
         # print(f"{self.__class__.__name__}.handleResult({result})")
@@ -470,17 +470,17 @@ class ProgressThreadController(QtCore.QObject):
             self.worker.pd.setValue(self.worker.progressDialog.maximum())
         self.sig_ready.emit(self.result)
         self.workerThread.quit()
-        
+
     @Slot()
     def finished(self):
         # print(f"{self.__class__.__name__}.finished")
         self.workerThread.quit()
-        
+
     @Slot()
     def abort(self):
         print(f"{self.__class__.__name__}.abort")
         self.sig_ready.emit(None)
-        
+
 class WorkerThread(QtCore.QThread):
     r"""Thread for a generic returning function
     """
@@ -489,9 +489,9 @@ class WorkerThread(QtCore.QThread):
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        
+
         self.signals = GuiWorkerSignals()
-        
+
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
@@ -501,19 +501,19 @@ class WorkerThread(QtCore.QThread):
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
+
         else:
             # self.signals.signal_Result.emit(result)
             self.signals.signal_Finished.emit()
-        
-        
+
+
 class LoopWorkerThread(QtCore.QThread):
     r"""Thread for an atomic function call in a loop.
     See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
     """
     # sig_ready = Signal(object, name="sig_ready")
-    
-    def __init__(self, parent, fn:typing.Callable, /, 
+
+    def __init__(self, parent, fn:typing.Callable, /,
                  loopControl:typing.Optional[dict]=None, *args, **kwargs):
         QtCore.QThread.__init__(self, parent)
         self.fn = fn
@@ -527,7 +527,7 @@ class LoopWorkerThread(QtCore.QThread):
         self.kwargs["resultSignal"] = self.signals.signal_Result
         # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
         self.kwargs["loopControl"] = self.loopControl
-        
+
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
@@ -536,12 +536,12 @@ class LoopWorkerThread(QtCore.QThread):
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
             self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
-            
+
         else:
             # self.signals.signal_Result.emit(result)
             self.signals.signal_Finished.emit()
         finally:
             # self.signals.signal_Result.emit(result)
             self.signals.signal_Finished.emit()
-            
-        
+
+

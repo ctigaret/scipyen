@@ -8703,7 +8703,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # self.updateUiWithFileLoad is def'ed in WorkspaceGuiMixin
         self.updateUiWithFileLoad = updateUi
 
-        # canceled = False # noqa
+        # canceled = False
 
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")

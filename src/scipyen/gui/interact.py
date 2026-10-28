@@ -113,7 +113,7 @@ def selectWSData(*args, title="", single=True, asDict=False,
     is False) or a dict.
 
     """
-    from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
+    from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)  # noqa: I001
 
     retrieve_all = kwargs.pop("retrieve_all", False)
 
@@ -129,7 +129,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
         scipywarn("In interact.selectWSData(): The supplied namespace is not the Scipyen's workspace")
         return
 
-    user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
+    # user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
+    user_ns_visible = {k:v for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden}
 
     name_vars = lsvars(*args, glob=glob, ws=user_ns_visible, **kwargs)
 
@@ -137,7 +138,7 @@ def selectWSData(*args, title="", single=True, asDict=False,
         name_vars = lsvars(glob=glob, ws = user_ns_visible, **kwargs)
 
     if len(name_vars) == 0:
-        return tuple()
+        return ()
 
     name_list = sorted([name for name in name_vars])
 
