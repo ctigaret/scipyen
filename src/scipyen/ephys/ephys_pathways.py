@@ -2107,7 +2107,7 @@ class SynapticPathway(ScipyenDataclass):
     #
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
 
-    def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null,
+    def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null, # noqa: RUF033
                       pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):
 
         if isinstance(electrode, (int, str)):
@@ -2534,13 +2534,22 @@ class RecordingSource(ScipyenDataclass):
     syn: SynapticStimulusChannelList    = dataclasses.field(default_factory=SynapticStimulusChannelList)
     auxin: AuxiliaryInputList           = dataclasses.field(default_factory=AuxiliaryInputList)
     auxout: AuxiliaryOutputList         = dataclasses.field(default_factory=AuxiliaryOutputList)
-    electrodeMode: ephys.ElectrodeMode  = dataclasses.field(default=ephys.ElectrodeMode.Null)
     pathways: SynapticPathwayList       = dataclasses.field(default_factory = SynapticPathwayList)
+    electrodeMode: dataclasses.InitVar[ephys.ElectrodeMode | int | str] = ephys.ElectrodeMode.Null
 
-    def __post_init__(self):
+    def __post_init__(self, electrodeMode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null):
         # print(f"{self.__class__.__name__}.__post_init__")
         # print(f"\tpathways = {self.pathways} with {len(self.pathways)} pathways")
         # pathways = list()
+        if isinstance(electrodeMode, (int, str)):
+            if electrodeMode not in ephys.ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrodeMode}")
+
+            electrodeMode = ephys.ElectrodeMode.type(electrodeMode)
+
+        if not isinstance(electrodeMode, ephys.ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrodeMode}")
+
         if len(self.pathways) == 0:
             self.pathways.name = self.name
             for ksyn, syn in enumerate(self.syn):
@@ -2549,7 +2558,7 @@ class RecordingSource(ScipyenDataclass):
                 pathway = SynapticPathway(stimulus = syn,
                                         name = name, adc = self.adc,
                                         dac = self.dac,
-                                        electrode = self.electrodeMode)
+                                        electrode = electrodeMode)
                 # print(f"\tcreated synaptic pathway {pathway}")
                 self.pathways.append(pathway)
 
@@ -2582,8 +2591,7 @@ class RecordingSource(ScipyenDataclass):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac,
-                 "electrodeMode": self.electrodeMode}
+        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac}
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -2625,7 +2633,7 @@ class RecordingSource(ScipyenDataclass):
         name = attrs["name"]
         adc  = attrs["adc"]
         dac  = attrs["dac"]
-        electrodeMode = attrs["electrodeMode"]
+        # electrodeMode = attrs["electrodeMode"]
 
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
@@ -2669,7 +2677,7 @@ class RecordingSource(ScipyenDataclass):
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple(s.channel for s in self.syn if s.dig)
 
-        return tuple()
+        return ()
 
     @property
     def syn_dac(self) -> tuple:

@@ -69,6 +69,7 @@ else:
 from core.prog import safewrapper  # noqa: I001
 from core import strutils
 
+from gui import guiutils
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import *

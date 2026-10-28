@@ -1612,26 +1612,24 @@ class ScipyenConfigurable:
             self.saveWindowSettings()
 
     def get_configurable_attribute(self, name, config_dict):
-        r"""Helper to get the actual attribute value correspondong to a config entry.
+        r"""Helper to get the actual attribute value corresponding to a config entry.
         Called in order to WRITE the value of a configurable attribute to the
         config file.
         """
         getset = config_dict.get(name, {})
         gettername = getset.get("getter", None)
-        if not isinstance(gettername, str) or len(gettername.strip()) == 0:
-            raise RuntimeError(f"{name} is not a configurable")
+        if isinstance(gettername, str) and len(gettername.strip()) > 0:
+            getter = inspect.getattr_static(self, gettername, None)
 
-        getter = inspect.getattr_static(self, gettername, None)
+            if isinstance(getter, property):
+                return getattr(self, gettername)
 
-        if isinstance(getter, property):
-            return getattr(self, gettername)
+            elif getter is not None:
+                getter = getattr(self, gettername)
+                return getter()
 
-        elif getter is not None:
-            getter = getattr(self, gettername)
-            return getter()
-
-        else:
-            raise RuntimeError(f"{gettername} is not a `get` property")
+            else:
+                raise RuntimeError(f"{gettername} is not a `get` property")
 
     def set_configurable_attribute(self, name, val, config_dict):
         r"""Helper function to assign the value of an attribute to a configurable attribute
