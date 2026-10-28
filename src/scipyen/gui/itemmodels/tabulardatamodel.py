@@ -327,7 +327,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return QtCore.Qt.ItemIsEditable | super().flags(modelIndex)
 
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
-                value: object, role=QtCore.Qt.EditRole) -> bool:
+                value: object, role = QtCore.Qt.EditRole) -> bool:
         r"""Set a new data with the specified role, at the specified model index in this model.
     Overrides QtCore.QAbstractTableModel.setData
     """
@@ -1882,7 +1882,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
     @_setValueInModelData_.register(sdc.Schedule)
     def __setValueInModelData__(self, mdata, pyvalue, row, col) -> bool: # noqa
-        old_obj = mdata[row]
+        obj = mdata[row]
         attr = self._modelDataColumnHeaders_[col]
         if attr.lower() == "edit":
             mdata[row] = pyvalue
@@ -1896,57 +1896,58 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 mdata.update()
                 return True
 
-            # old_obj = mdata[row]
-            # attr = self._modelDataColumnHeaders_[col]
-            attrs = [name for name in self._modelDataColumnHeaders_.values() if name.lower() != "edit"]
-
-            if isinstance(old_obj, ephys_pathways.SynapticPathway):
-                if "electrodeMode" in attrs:
-                    ndx = attrs.index("electrodeMode")
-                    attrs[ndx] = "electrode"
-
-
-                if "pathwayType" in attrs:
-                    ndx = attrs.index("pathwayType")
-                    attrs[ndx] = "pathType"
-
                 if attr == "electrodeMode":
                     attr = "electrode"
 
                 if attr == "pathwayType":
                     attr = "pathType"
 
-            params = {name: getattr(old_obj, name) for name in attrs}
-            old_val = getattr(old_obj, attr)
+            # params = {name: getattr(obj, name) for name in attrs}
+            old_val = getattr(obj, attr)
             # print(f"'{attr}' -> {old_val} ({type(old_val)})")
 
             if isinstance(old_val, enum.Enum):
                 if isinstance(pyvalue, int):
-                    params[attr] = type(old_val)(pyvalue)
+                    param = type(old_val)(pyvalue)
+                    # params[attr] = type(old_val)(pyvalue)
 
                 elif isinstance(pyvalue, str):
-                    params[attr] = type(old_val)[pyvalue]
+                    param = type(old_val)[pyvalue]
+                    # params[attr] = type(old_val)[pyvalue]
+
+                elif isinstance(pyvalue, type(old_val)):
+                    param = pyvalue
+
+                else:
+                    scipywarn(f"Wrong type for {attr}: {type(pyvalue).__name__} was received")
+                    return False
+
+
 
             else:
-                params[attr] = pyvalue
+                param = pyvalue
+                # params[attr] = pyvalue
+            if old_val != param:
+                setattr(obj, attr, param)
 
             # BUG 2026-10-27 16:51:43 FIXME
             # this creates a new instance effectively
             # breaking the reference to the original
-            # new_obj = type(old_obj)(**params)
+            # new_obj = type(obj)(**params)
             # mdata[row] = new_obj # not needed anymore!
             #
             # NOTE: 2026-10-27 16:55:19 FIXED here
-            for param_name, param_value in params.items():
-                if getattr(old_obj, param_name) != param_value:
-                    setattr(old_obj, param_name, param_value)
+            # for param_name, param_value in params.items():
+            #     print(f"{self.__class__.__name__}")
+            #     if getattr(obj, param_name) != param_value:
+            #         setattr(obj, param_name, param_value)
 
             return True
 
         else:
             try:
                 mdata[row][col] = pyvalue
-            except:
+            except:  # noqa: E722
                 traceback.print_exc()
                 return False
 

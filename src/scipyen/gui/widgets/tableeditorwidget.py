@@ -211,8 +211,9 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
             self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
 
         if hasattr(self._dataModel_, "sig_indexChanged") and isinstance(type(self._dataModel_).sig_indexChanged, Signal):
-            self._dataModel_.sig_indexRowColChanged.connect(self.sig_indexRowColChanged) # connect signal to signal directly
             self._dataModel_.sig_indexChanged.connect(self.sig_indexChanged) # connect signal to signal directly
+        if hasattr(self._dataModel_, "sig_indexRowColChanged") and isinstance(type(self._dataModel_).sig_indexRowColChanged, Signal):
+            self._dataModel_.sig_indexRowColChanged.connect(self.sig_indexRowColChanged) # connect signal to signal directly
 
         self._dataModel_.dataChanged.connect(self._slot_modelDataChanged_)
 

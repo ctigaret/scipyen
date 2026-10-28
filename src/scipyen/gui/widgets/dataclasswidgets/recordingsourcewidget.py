@@ -170,18 +170,17 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.stimulusListTable.setValue(self._data_.syn)
         self.stimulusListTable.autoResizeColumns()
 
-        self.stimulusListTable.sig_indexRowColChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
+        # self.stimulusListTable.sig_indexRowColChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_indexChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_dataChanged.connect(self._slot_stimulusListChanged)
-        self.stimulusListTable.sig_indexesChanged.connect(self._slot_stimulusListIndexesChanged)
+        # self.stimulusListTable.sig_indexesChanged.connect(self._slot_stimulusListIndexesChanged)
 
-        # self.synapticPathwaysTable.enforceReadOnly = True
         self.synapticPathwaysTable.isAutoResizeColumns = True
         self.synapticPathwaysTable.setToolTip("Configured Synaptic Pathways")
         self.synapticPathwaysTable.setValue(self._data_.pathways)
         self.synapticPathwaysTable.autoResizeColumns()
 
-        self.synapticPathwaysTable.sig_indexRowColChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
+        # self.synapticPathwaysTable.sig_indexRowColChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
 
@@ -271,6 +270,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
     @Slot(QtCore.QModelIndex)
     def _slot_singleSynapticPathwayChanged(self, row: int | QtCore.QModelIndex,
                                            col: int | None = None):
+        # print(f"{self.__class__.__name__}._slot_singleSynapticPathwayChanged({row}, {col})")
         with qtutils.SignalBlocker(self.synapticPathwaysTable):
             if isinstance(row, QtCore.QModelIndex):
                 col = row.column()
@@ -278,61 +278,26 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
             self._pendingPathwayChange_ = (row, col)
 
-    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
-    def _slot_pathwaysListIndexesChanged(self, topLeft, bottomRight):
-        # with qtutils.SignalBlocker((self.electrodeModeComboBox,
-        #                             self.synapticPathwaysTable,
-        #                             self.stimulusListTable)):
-        #     # self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
-        #
-        #     self.synapticPathwaysTable.setValue(self._data_.pathways) # to reflect ALL pathway changes
-        #     self.synapticPathwaysTable.autoResizeColumns()
-        #
-        #     self.stimulusListTable.setValue(self._data_.syn) # to reflect ALL stimulus changes
-        #     self.stimulusListTable.autoResizeColumns()
-
-        self.sig_valueChanged.emit(self._data_)
-
-        # if topLeft.row() == bottomRight.row():
-        #     row = topLeft.row()
-        #     pathway = self.synapticPathwaysTable.value()[row]
-        #     eMode = pathway.electrodeMode
-        #     self._data_.pathways[row] = pathway
-        #     for p in self._data_.pathways:
-        #         p.electrodeMode = eMode
-        #
-        #     pathStimsIDs = [id(p.stimulus) for p in self._data_.pathways]
-        #
-        #     excessStims = [stim for stim in self._data_.syn if id(stim) not in pathStimsIDs]
-        #
-        #     excessStimNdx = [self._data_syn.index(stim) for stim in excessStims]
-        #
-        #     for ndx in excessStimNdx:
-        #         del self._data_.syn[ndx]
-        #
-        #     for pathway in self._data_.pathways:
-        #         if id(pathway.stimulus) not in [id(stim) for stim in self._data_.syn]:
-        #             self._data_.syn.append(pathway.stimulus)
-        #
-        #     # self._data_.syn = ephys_pathways.SynapticStimulusChannelList(p.stimulus for p in self._data_.pathways)
-        #
-        #     currentElectrodeModeNdx = self._electrodeModeNames_.index(eMode.name)
-        #
-        #     with qtutils.SignalBlocker((self.electrodeModeComboBox,
-        #                                 self.synapticPathwaysTable,
-        #                                 self.stimulusListTable)):
-        #         # self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
-        #
-        #         self.synapticPathwaysTable.setValue(self._data_.pathways) # to reflect ALL pathway changes
-        #         self.synapticPathwaysTable.autoResizeColumns()
-        #
-        #         self.stimulusListTable.setValue(self._data_.syn) # to reflect ALL stimulus changes
-        #         self.stimulusListTable.autoResizeColumns()
-        #
-        #     self.sig_valueChanged.emit(self._data_)
+    # @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
+    # def _slot_pathwaysListIndexesChanged(self, topLeft, bottomRight):
+    #     print(f"{self.__class__.__name__}._slot_pathwaysListIndexesChanged({topLeft}, {bottomRight})")
+    #
+    #     # with qtutils.SignalBlocker((self.electrodeModeComboBox,
+    #     #                             self.synapticPathwaysTable,
+    #     #                             self.stimulusListTable)):
+    #     #     # self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
+    #     #
+    #     #     self.synapticPathwaysTable.setValue(self._data_.pathways) # to reflect ALL pathway changes
+    #     #     self.synapticPathwaysTable.autoResizeColumns()
+    #     #
+    #     #     self.stimulusListTable.setValue(self._data_.syn) # to reflect ALL stimulus changes
+    #     #     self.stimulusListTable.autoResizeColumns()
+    #
+    #     self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_synapticPathwaysListChanged(self):
+        # print(f"{self.__class__.__name__}._slot_synapticPathwaysListChanged")
         widget = self.sender()
         if widget == self.synapticPathwaysTable:
             pathways = widget.value()
@@ -350,7 +315,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         with qtutils.SignalBlocker((
                         self.stimulusListTable,
                         self.synapticPathwaysTable,
-                        # self.electrodeModeComboBox
+                        self.electrodeModeComboBox,
                     )):
             pathwayStimIDs = [id(p.stimulus) for p in self._data_.pathways]
 
@@ -384,12 +349,12 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
             self._pendingStimulusChange_ = (row, col)
 
-    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
-    def _slot_stimulusListIndexesChanged(self, topLeft, bottomRight):
-        if topLeft.row() == bottomRight.row():
-            row = topLeft.row()
-            self._data_.syn[row] = self.stimulusListTable.value()[row]
-        self.sig_valueChanged.emit(self._data_)
+    # @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
+    # def _slot_stimulusListIndexesChanged(self, topLeft, bottomRight):
+    #     if topLeft.row() == bottomRight.row():
+    #         row = topLeft.row()
+    #         self._data_.syn[row] = self.stimulusListTable.value()[row]
+    #     self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_stimulusListChanged(self):
@@ -412,13 +377,11 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         with qtutils.SignalBlocker((
                         self.stimulusListTable,
                         self.synapticPathwaysTable,
-                        # self.electrodeModeComboBox,
+                        self.electrodeModeComboBox,
                     )):
 
             if len(self._data_.syn) == 0:
                 return  # nothing to synchronize - NOTE: pathways without a stimulus channel are acceptable!
-
-            synIds = [id(obj) for obj in self._data_.syn]
 
             if len(self._data_.pathways) == 0:
                 for stim in self._data_.syn:
@@ -435,30 +398,12 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                 for stim in self._data_.syn:
                     if id(stim) not in pathwayStimIDs:
                         pathway = ephys_pathways.SynapticPathway(stimulus = stim,
-                                                                    name = f"{stim.name}_pathway",
-                                                                    adc= self._data_.adc,
-                                                                    dac = self._data_.dac,
-                                                                    electrode = self._electrode_
+                                                                name = f"{stim.name}_pathway",
+                                                                adc= self._data_.adc,
+                                                                dac = self._data_.dac,
+                                                                electrode = self._electrode_
                                                                 )
                         self._data_.pathways.append(pathway)
-
-
-                # synIds = [id(obj) for obj in syn]
-                # if len(syn) < len(self._data_.pathways):
-                #     retainedPathways = [p for p in self._data_.pathways if id(p.stimulus) in synIds]
-                #     # retainedPathways = ephys_pathways.SynapticPathwayList(p for p in self._data_.pathways if p.stimulus in syn) #list(filter(lambda p: p.stimulus in syn, self._data_.pathways)))
-                #     # retainedPathways = ephys_pathways.SynapticPathwayList(list(filter(lambda p: p.stimulus in syn, self._data_.pathways)))
-                #     self._data_.pathways = retainedPathways
-                #     self._data_.syn = syn
-                # elif len(syn) > len(self._data_.pathways):
-                #     for k in range(len(self._data_.pathways), len(syn)):
-                #         pathway = ephys_pathways.SynapticPathway(stimulus = syn[k],
-                #                                                 name = f"{syn[k].name}_pathway",
-                #                                                 adc= self._data_.adc,
-                #                                                 dac = self._data_.dac,
-                #                                                 electrode = self._data_.electrodeMode
-                #                                                 )
-                #         self._data_.pathways.append(pathway)
 
             self.synapticPathwaysTable.setValue(self._data_.pathways)
             self.synapticPathwaysTable.autoResizeColumns()

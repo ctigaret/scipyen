@@ -73,17 +73,6 @@ For code painting the NW corner label see
         if not isinstance(self._decimals_, int) or self._decimals_ < 0:
             self._decimals_ = None
 
-#     def openPersistentEditor(self, index):
-#         model = self.model()
-#         if model is None or model.rowCount() == 0 or model.columnCount() == 0:
-#             return
-#
-#         col = index.column()
-#
-#         if hasattr(model, "_modelDataColumnHeaders_"):
-#             colHeader = model._modelDataColumnHeaders_[col]
-#             if colHeader.lower() == "edit":
-
     def setCornerLabel(self, text:str = ""):
         btn = self.findChild(QtWidgets.QAbstractButton)
         btn.setText(text)
@@ -93,8 +82,7 @@ For code painting the NW corner label see
         opt = QtWidgets.QStyleOptionHeader()
         opt.text = btn.text()
         s = QtCore.QSize(btn.style().sizeFromContents(
-            QtWidgets.QStyle.CT_HeaderSection, opt, QtCore.QSize(), btn)#.
-            # expandedTo(QtWidgets.QApplication.globalStrut())
+            QtWidgets.QStyle.CT_HeaderSection, opt, QtCore.QSize(), btn)
             )
 
         if s.isValid():
