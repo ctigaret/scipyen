@@ -7703,9 +7703,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @Slot(object, object, QtCore.QPoint)
     @safewrapper
     def slot_loadDroppedURLs(self, urls: object,
-                             chdirs: typing.Union[bool, QtCore.Qt.KeyboardModifier],
+                             chdirs: bool | QtCore.Qt.KeyboardModifier,
                              pos: QtCore.QPoint):
-        # print(f"{self.__class__.__name__}.slot_loadDroppedURLs ({urls})")
         chdirs = chdirs is True or (isinstance(chdirs, QtCore.Qt.KeyboardModifier) and chdirs & QtCore.Qt.ShiftModifier)
         if isinstance(urls, (tuple, list)) and all([isinstance(url, QtCore.QUrl) for url in urls]):
             if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
@@ -7744,7 +7743,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             elif len(file_paths) and os.path.isdir(os.path.dirname(file_paths[-1])) and self._navigateToDroppedFileDir_:
                 url = QtCore.QUrl(pathlib.Path(file_paths[-1]).parent.as_uri())
-                # print(f"\n\t last dropped directory = {url}")
                 self.navigator.setLocationUrl(url)
                 self.navigator.urlChanged.emit(url)
 

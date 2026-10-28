@@ -1616,8 +1616,6 @@ class PathwaysStimulationLayout:
             self._source_ = RecordingSource(name, adc, dac, syn, electrodeMode = electrodeMode)
 
         else:
-            # self._source_ = None
-            # self._pathways_ = []
             raise TypeError(f"'source' must be a RecordingSource or a sequence of SynapticPathway objects; instead got {type(source).__name__}")
 
         assert isinstance(protocol, ElectrophysiologyProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
@@ -1627,21 +1625,18 @@ class PathwaysStimulationLayout:
         self.description = kwargs.pop("description", "")
 
         self._layout_ = self._parseLayout_(temporalOrder)
-        # if isinstance(self._source_, RecordingSource) and isinstance(self._protocol_, ElectrophysiologyProtocol):
-        #     self._layout_ = self._parseLayout_(temporalOrder)
-        # else:
-        #     self._layout = {}
-
 
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
-        stimulusLayout = dict()
+        stimulusLayout = {}
 
-        stimByPaths = tuple(
-            map( # noqa
-                lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)),
-                self._pathways_
-                )
-            )
+        # stimByPaths = tuple(
+        #     map( # noqa
+        #         lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)),
+        #         self._pathways_
+        #         )
+        #     )
+
+        stimByPaths = tuple((p, getPathwayStimulationSequence(p, self._protocol_)) for p in self._pathways_)
 
         for sweep in range(self._protocol_.nSweeps):
             for path, pStim in stimByPaths:
