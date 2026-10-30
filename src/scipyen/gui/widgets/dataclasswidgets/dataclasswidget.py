@@ -40,7 +40,7 @@ else:
     # __has_sip__ = True
 
 
-from core.prog import scipywarn #, safewrapper, print_styled
+from core.prog import scipywarn, timemethod #, safewrapper, print_styled
 from core import desktoputils
 # from core.sysutils import adapt_ui_path
 import core.taxonbridge as taxonbridge
@@ -181,6 +181,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         r"""Must override in subclasses"""
         pass
 
+    # @timemethod
     def setValue(self, *args, **kwargs):
         r"""Must override in subclasses, and called from there as super().setValue(…).
         Implementations must make sure it emits sig_valueChanged Qt signal.

@@ -2391,7 +2391,7 @@ def timemethod(func):
         selfName = ""
         if isinstance(self, QtCore.QObject) and hasattr(self, "objectName"):
             selfName = f"<{self.objectName()}>"
-        print(f"{self.__class__.__module__}{self.__class__.__name__}{selfName}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
+        print(f"{self.__class__.__module__}.{self.__class__.__name__}{selfName}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
         return r
 
     return wrapper

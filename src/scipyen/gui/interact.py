@@ -36,7 +36,7 @@ else:
     # __has_sip__ = True
 
 from core import prog # noqa
-from core.prog import scipywarn
+from core.prog import scipywarn, timefunc
 from core.inputspec import InputSpec
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
@@ -173,6 +173,7 @@ def selectWSData(*args, title="", single=True, asDict=False,
     return dict() if asDict else tuple() # noqa
 
 
+@timefunc
 def getInputs(**kwargs):
     r"""Calls 'getInput' with a prompt mapping created from key/value pairs
 Returns a list.

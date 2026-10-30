@@ -52,7 +52,7 @@ from core import (
     datatypes,  # noqa
     qtutils,
 )
-from core.prog import scipywarn  # noqa
+from core.prog import scipywarn, timefunc, timemethod  # noqa
 from ephys import ephys, ephys_pathways
 from gui import guiutils  # noqa: F401
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
@@ -432,6 +432,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self._data_ = val
 
     @Slot()
+    # @timemethod
     def _slot_makeTwoPathwaysSource(self):
         from gui import interact
 
@@ -452,21 +453,25 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.setValue(result)
         self.sig_valueChanged.emit(self._data_)
 
+    # @timemethod
     def setValue(self, val: T | None = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
-        if isinstance(val, self._objectType_):
-            self._data_ = val
+        if not isinstance(val, self._objectType_):
+            return
 
-        else:
-            self._name_ = "source"
-            self._adc_ = 0
-            self._dac_ = 0
-            self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
-            self._auxin_ = ephys_pathways.AuxiliaryInputList()
-            self._auxout_ = ephys_pathways.AuxiliaryOutputList()
-            self._electrode_ = ephys.ElectrodeMode.Null
-            self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
-            self._make_value_()
+        self._data_ = val
+        currentElectrodeModeNdx = self._electrodeModeNames_.index(self._data_.electrodeMode.name)
+
+        # else:
+        #     self._name_ = "source"
+        #     self._adc_ = 0
+        #     self._dac_ = 0
+        #     self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
+        #     self._auxin_ = ephys_pathways.AuxiliaryInputList()
+        #     self._auxout_ = ephys_pathways.AuxiliaryOutputList()
+        #     self._electrode_ = ephys.ElectrodeMode.Null
+        #     self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
+        #     self._make_value_()
 
         with qtutils.SignalBlocker(
             (
@@ -483,14 +488,13 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
             super().setValue(self._data_) # to populate the DataClassWidget fields
             self.adcSpinBox.setValue(self._data_.adc)
             self.dacSpinBox.setValue(self._data_.dac)
-            currentElectrodeModeNdx = self._electrodeModeNames_.index(self._data_.electrodeMode.name)
             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-        self.stimulusListTable.setValue(self._data_.syn)
-        self.stimulusListTable.autoResizeColumns()
+            self.stimulusListTable.setValue(self._data_.syn)
+            self.stimulusListTable.autoResizeColumns()
 
-        self.synapticPathwaysTable.setValue(self._data_.pathways)
-        self.synapticPathwaysTable.autoResizeColumns()
+            self.synapticPathwaysTable.setValue(self._data_.pathways)
+            self.synapticPathwaysTable.autoResizeColumns()
 
     def value(self) -> T:
         return self._data_

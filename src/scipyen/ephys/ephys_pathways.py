@@ -76,7 +76,7 @@ else:
 from core.basescipyen import BaseScipyenData # noqa
 # from core.traitcontainers import DataBag
 from core.prog import (safewrapper, with_doc,# noqa
-                       get_func_param_types, scipywarn,
+                       get_func_param_types, scipywarn, timefunc, timemethod,
                        DescriptorGenericValidator)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 from core.datazone import (DataZone, Interval) # noqa
@@ -3595,6 +3595,7 @@ def getPathwayStimulationSequence(pathway: SynapticPathway,
 
     return stimulation_sequence
 
+@timefunc
 def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
                       path0stim: int = 0, path1stim : int = 1,
                       name: str | None=None,
