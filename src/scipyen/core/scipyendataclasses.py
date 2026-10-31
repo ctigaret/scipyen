@@ -7,7 +7,7 @@
 r"""
 """
 # from abc import ABC, ABCMeta, abstractmethod
-import collections
+import collections  # noqa: I001
 # from collections import deque, namedtuple
 from functools import singledispatchmethod
 import itertools
@@ -1646,10 +1646,10 @@ class Episode(ScipyenDataclass):
     """
     name: str = dataclasses.field(default="episode")
     _: KW_ONLY
-    begin:datetime.datetime = datetime.datetime.now() # noqa
-    end:datetime.datetime = datetime.datetime.now() # noqa
-    beginFrame:int = 0
-    nFrames:int = 0
+    begin: datetime.datetime = datetime.datetime.now() # noqa
+    end: datetime.datetime = datetime.datetime.now() # noqa
+    beginFrame: int = 0
+    nFrames: int = 0
     procedure: Procedure = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
@@ -1673,6 +1673,10 @@ class Episode(ScipyenDataclass):
                     self.procedure
                 )
             )
+
+    @property
+    def endFrame(self):
+        return self.beginFrame + self.nFrames - 1
 
 @dataclass
 class Schedule(ScipyenDataclass):
@@ -2062,6 +2066,14 @@ class Schedule(ScipyenDataclass):
         self.episodes.sort(*args, **kwargs)
         self.__adjustBeginFrameAllEpisodes__()
 
+    def sortBeginTime(self):
+        self.episodes.sort(key = lambda x: x.begin)
+        self.__adjustBeginFrameAllEpisodes__()
+
+    def sortEndTime(self):
+        self.episodes.sort(key = lambda x: x.begin)
+        self.__adjustBeginFrameAllEpisodes__()
+
     def update(self):
         r"""Call this after individual changes to an episode frame boundaries in this schedule"""
         self.__adjustBeginFrameAllEpisodes__()
@@ -2082,6 +2094,24 @@ class Schedule(ScipyenDataclass):
             raise TypeError(f"Can only append a {self.__class__.__name__} or a sequence of {self.allowed_contents[0].__name__} objects")
 
         self.__adjustBeginFrameAllEpisodes__()
+
+    def indexOf(self, episodeName: str) -> int:
+        r"""
+            Index of first episode with specified name.
+
+        Returns -1 if no episode with the specified name exists.
+
+        Returns the index of the first episode with the specified name.
+
+        WARNING: duplicates are ignored, so best practice is to make sure that
+        each episode in the schedule has a unique name
+    """
+        ndx = [k for k in range(len(self.episodes)) if self.episodes[k].name == episodeName]
+        if len(ndx):
+            return ndx[0]
+
+        else:
+            return -1
 
     def index(self, episode:Episode):
         if not isinstance(episode, self.allowed_contents):
@@ -2134,8 +2164,7 @@ class Schedule(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict] = None, cache:dict={}):
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None, cache: dict={}):  # noqa: B006
 
         from iolib import h5io
         if entity in cache:

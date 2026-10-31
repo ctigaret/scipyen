@@ -3595,7 +3595,7 @@ def getPathwayStimulationSequence(pathway: SynapticPathway,
 
     return stimulation_sequence
 
-@timefunc
+# @timefunc
 def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
                       path0stim: int = 0, path1stim : int = 1,
                       name: str | None=None,

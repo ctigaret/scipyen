@@ -173,7 +173,7 @@ def selectWSData(*args, title="", single=True, asDict=False,
     return dict() if asDict else tuple() # noqa
 
 
-@timefunc
+# @timefunc
 def getInputs(**kwargs):
     r"""Calls 'getInput' with a prompt mapping created from key/value pairs
 Returns a list.

@@ -427,7 +427,7 @@ def nodesWithTag(tree: Tree, tag: str):
 def nodesWithPayload(tree: Tree, payload: typing.Any = None):
     yield from tree.filter_nodes(lambda node: node.data is payload)
 
-@timefunc
+# @timefunc
 def populateNode(tree: Tree, node: ObjectNode,
                 introspect: bool = False,
                 predicate = None,

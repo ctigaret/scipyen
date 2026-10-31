@@ -4732,6 +4732,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                           overwrite: bool = False) -> bool:
         r"""Binds a Python object to a symbol in the user workspace.
 
+        WARNING: DO NOT use inn a separate Qt thread!
+
         Parameters:
         -----------
         name (str): the symbol whch will be bound to the object
@@ -4814,6 +4816,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     # print(f"{self.__class__.__name__}.assignToWorkspace: btn -> {btn}")
 
                     if btn == 2: # ⇒ should rename
+                        # WARNING: 2026-10-31 09:36:12 Qt thread unsafe!
+                        # This creates a QObject with self as parent.
+                        # When self belongs to another thread than the one where
+                        # this method is called, will create issues
                         dlg = qd.QuickDialog(self, "Rename object")
                         dlg.addLabel(f"Rename {name}")
                         pw = qd.StringInput(dlg, "To :")
