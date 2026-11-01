@@ -204,6 +204,7 @@ from .prog import (
     signature_as_dict,
     with_doc,
     scipywarn,
+    timefunc,
 )
 
 
@@ -2890,7 +2891,7 @@ def get_sample_at_time(data, t, channel=None):
 
 def get_workspace_neo_blocks(
     *args,
-    sortby: typing.Optional[typing.Union[str, typing.Callable]] = None,
+    sortby: str | typing.Callable | None = None,
     ascending: bool = False,
 ):
     r"""Helper to get lookup neo.Blocks in the workspace by using globs or regexps"""
@@ -4313,7 +4314,7 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
     # NOTE: 2023-05-20 09:48:31
     # ### BEGIN allow overwriting these here,
     # and store the orignals in the new annotations of the new object;
-    sourceMetaData = dict()
+    sourceMetaData = {} # noqa: F841
     name = obj.name
     file_datetime = obj.file_datetime
     rec_datetime = obj.rec_datetime
@@ -4327,20 +4328,21 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
     # one of the Block's children (e.g., Segment, etc)
     # so we cache them here, to reinstate them later when copying the child
     # (see NOTE: 2023-04-13 09:45:26)
-    not_kwargs = dict()
+    not_kwargs = {}
 
     for kwarg in kwargs.keys():
         if kwarg not in obj._child_containers:
             not_kwargs[kwarg] = kwargs[kwarg]
 
-    for kw in not_kwargs.keys():
+    for kw in not_kwargs:
         kwargs.pop(kw, None)
 
     if "segments" not in kwargs and "segment" in kwargs:
         raise SyntaxError("Invalid keyword parameter 'segment' - did you mean 'segments'?")
     # if "signals" not in kwargs and "signal" in kwargs:
     #     raise SyntaxError("Invalid keyword parameter 'signal' - did you mean 'signals'?")
-    indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
+    indexing = {s: kwargs.pop(s, None) for s in obj._child_containers}
+    # indexing = dict((s, kwargs.pop(s, None)) for s in obj._child_containers)
 
     ret = make_neo_object(obj)
 
@@ -4360,6 +4362,7 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
 
     try:
         keep_segs_ndx = normalized_index(obj.segments, indexing["segments"])
+
     except:
         print(
             f"*****\nSegment index {indexing['segments']} is invalid for {len(obj.segments)} {pluralize('segment', len(obj.segments))} in {obj.name}\n*****\n"
@@ -4375,9 +4378,8 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
     kwargs.update(not_kwargs)
 
     try:
-        new_segments = list(
-            copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx
-        )
+        new_segments = [copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx]
+
     except:
         print(f"*****\nCannot copy segments from object {obj.name}\n*****\n")
         raise
@@ -4413,12 +4415,12 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
         else:
             groups = [obj.groups[k] for k in keep_groups_ndx]
 
-        new_groups = list()
+        new_groups = []
 
         for group in groups:
             new_group = neo.Group(name=group.name, allowed_types=group.allowed_types)
 
-            objects = list()
+            objects = []
 
             for child_class_name, child_container in group._container_lookup.items():
                 # NOTE: 2021-11-24 09:12:32
@@ -4564,7 +4566,7 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):
 
     return ret
 
-
+@timefunc
 @with_doc(copy_with_data_subset, use_header=True)
 @safewrapper
 def concatenate_blocks(*args, **kwargs):
@@ -4826,7 +4828,7 @@ def concatenate_blocks(*args, **kwargs):
 
 
     """
-    from neo.core.spiketrainlist import SpikeTrainList
+    from neo.core.spiketrainlist import SpikeTrainList # noqa: F401
 
     name = kwargs.get("name", "Concatenated block")
     description = kwargs.get("description", "Concatenated block")
@@ -4851,15 +4853,13 @@ def concatenate_blocks(*args, **kwargs):
         return None
 
     if len(args) == 1:
-        # if isinstance(args[0], (str, type)):
-        # print(f"args[0]: {type(args[0]).__name__}")
         if isinstance(args[0], str):
             try:
                 blocks = get_workspace_neo_blocks(
                     args[0], sortby=sortby, ascending=ascending
                 )  # sorting at NOTE: 2023-06-30 12:17:15
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print("String argument did not resolve to a list of neo.Block objects")
                 # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
                 traceback.print_exc()
@@ -4872,7 +4872,7 @@ def concatenate_blocks(*args, **kwargs):
                         args[0], sortby=sortby, ascending=ascending
                     )  # sorting below see NOTE: 2023-06-30 12:17:15
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(
                         "String argument did not resolve to a list of neo.Block objects"
                     )
@@ -5020,7 +5020,7 @@ def concatenate_blocks(*args, **kwargs):
                     seg.events = evts
 
                 if len(seg.epochs):
-                    epchs = list()
+                    epchs = []
                     for epoch in seg.epochs:
                         if checkTimeUnits(epoch.times):
                             # NOTE: 2023-12-19 10:58:26

@@ -1575,7 +1575,7 @@ class PathwaysStimulationLayout:
                  temporalOrder: bool = True,
                  **kwargs,
                  ):
-        """Constructor for PathwaysStimulationLayout.
+        r"""Constructor for PathwaysStimulationLayout.
 
         .. |nbsp| unicode:: 0xA0
             :trim:
@@ -1628,13 +1628,6 @@ class PathwaysStimulationLayout:
 
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
         stimulusLayout = {}
-
-        # stimByPaths = tuple(
-        #     map( # noqa
-        #         lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)),
-        #         self._pathways_
-        #         )
-        #     )
 
         stimByPaths = tuple((p, getPathwayStimulationSequence(p, self._protocol_)) for p in self._pathways_)
 
@@ -1691,8 +1684,12 @@ class PathwaysStimulationLayout:
         """
         return self._layout_
 
+    @property
+    def pathwaysADCs(self):
+        yield from (self.protocol.getADC(pathway.adc) for pathway in self.pathways)
+
     def getSweepsForPathway(self, pathway:SynapticPathway
-                            ) -> typing.Optional[int | tuple[int]]:
+                            ) -> int | tuple[int] | None:
         result = list() # noqa
         for sweep, sPCs in self.sweeps.items():
             if len(sPCs) == 0:

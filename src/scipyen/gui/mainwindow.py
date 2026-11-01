@@ -6076,26 +6076,31 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @safewrapper
     def slot_copyWorkspaceSelection(self):
         # NOTE: check out keyboard modifier WHEN this slot is called
-        selNdx = self.workspaceView.selectedIndexes()
+        selNdx = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
 
         if len(selNdx) == 0:
             return
 
-        items = list(map(lambda i: self.workspaceModel.item(i.row(), 0), selNdx))
+        items = [self.workspaceModel.item(i.row(), 0) for i in selNdx]
+        # items = list(map(lambda i: self.workspaceModel.item(i.row(), 0), selNdx))
 
         if len(items) == 0:
             return
 
         # wscol = standard_obj_summary_headers.index("Workspace")
         # wscol = self._wspace_headers_.index("Workspace")
-        wscol = list(map(lambda c: self.workspaceModel.headerData(c, QtCore.Qt.Horizontal),
-                         range(self.workspaceModel.columnCount()))).index("Workspace")
+        wscol = [self.workspaceModel.headerData(c, QtCore.Qt.Horizontal) for c in
+                         range(self.workspaceModel.columnCount())].index("Workspace")
+        # wscol = list(map(lambda c: self.workspaceModel.headerData(c, QtCore.Qt.Horizontal),
+        #                  range(self.workspaceModel.columnCount()))).index("Workspace")
 
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-            varnames = list(map(lambda i: f'"{i.text()}"', filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
+            varnames = [f'"{i.text()}"' for i in items if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+            # varnames = list(map(lambda i: f'"{i.text()}"', filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
 
         else:
-            varnames = list(map(lambda i: i.text(), filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
+            varnames = [i.text() for i in items if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+            # varnames = list(map(lambda i: i.text(), filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
 
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
             self.app.clipboard().setText(",\n".join(varnames))
@@ -6119,7 +6124,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # wscol = standard_obj_summary_headers.index("Workspace")
         wscol = self._wspace_headers_.index("Workspace")
 
-        varNames = list()
+        varNames = []
 
         for i in indexList:
             if self.workspaceModel.item(i.row(), wscol).text() == "Internal":
@@ -6640,7 +6645,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # TODO 2024-07-21 23:30:05
         # make this configurable (and locale-dependent?)
         self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
+        self.workspaceView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
 
+        # ### BEGIN workspaceView actions (context menu, buttons, workspace dock, variable filters)
+        #
         self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
         self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
         self.renameVarnameToolBtn.clicked.connect(self.slot_renameWorkspaceVar)
@@ -6681,6 +6689,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
                                                               QtWidgets.QLineEdit.TrailingPosition)
         #
+        # ### END   workspaceView actions (context menu, buttons, workspace dock, variable filters)
+
+        #
         # ### END workspace view
 
 
@@ -6707,6 +6718,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
         self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.fileSystemTreeView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         #
         # ### END   File system tree view
 
@@ -6752,7 +6764,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self.fileSystemColumnView.setModel(self.fileSystemModel)
         self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-
+        self.fileSystemColumnView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.fileSystemColumnView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
 

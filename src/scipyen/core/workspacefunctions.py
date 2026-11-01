@@ -329,13 +329,13 @@ def getvarsbytype(vartype, ws=None, predicate = None):
 
 @with_doc(lsvars, use_header=True)
 def getvars(*args,
-            glob:typing.Optional[bool]=None,
-            ws:typing.Union[dict, type(None)]=None,
-            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
-            as_dict:bool=False,
-            sort:bool= False,
-            sortkey:object=None,
-            reverse:bool = False,
+            glob: bool | None = None,
+            ws: dict | None = None,
+            var_type: type | list[type] | tuple[type] | None = None,
+            as_dict: bool = False,
+            sort: bool = False,
+            sortkey: object = None,
+            reverse: bool = False,
             predicate = None) -> typing.Sequence:
     r"""Collects a subset of variabes from a workspace or a dictionary.
 

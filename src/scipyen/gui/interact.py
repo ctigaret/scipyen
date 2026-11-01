@@ -253,9 +253,9 @@ In either case, the object values are those set in by interaction with the
 dialog.
 
 """
-    from gui.widgets.tableeditorwidget import TableEditorWidget
+    from gui.widgets.tableeditorwidget import TableEditorWidget  # noqa: I001
     from core import datatypes as dt
-    from core import strutils as strutils
+    from core import strutils
     dlg_title = kwargs.pop("dlg_title", "Input Values")
     dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
     modal = kwargs.pop("modal", False)
@@ -341,7 +341,8 @@ dialog.
             labels[k] = None
 
         elif issubclass(v_type, str):
-            w = qd.StringInput(widget_parent, f"{k}:")
+            w = qd.StringInput(widget_parent, f"{k}:", undoEnabled=True,
+                               redoEnabled=True, clearButtonEnabled=True)
             w.setText(def_val)
             w.setToolTip("Click to edit text")
             labels[k] = None

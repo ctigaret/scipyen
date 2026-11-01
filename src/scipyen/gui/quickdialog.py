@@ -271,7 +271,7 @@ class OptionalFloatInput(_OptionalValueInput):
     _mustContain = "a float"
 
 class FloatInput(OptionalFloatInput):
-    def setValue(self, x:typing.Union[float, str]):
+    def setValue(self, x: float | str):
         if isinstance(x, float):
             super().setValue(str(x))
         else:
@@ -283,11 +283,23 @@ class FloatInput(OptionalFloatInput):
 class OptionalStringInput(QtWidgets.QFrame):
     r"""Widget for plain text input"""
     valueChanged = Signal(str, name="valueChanged")
-    def __init__(self, parent:QtWidgets.QWidget, label:str):
+    def __init__(self, parent: QtWidgets.QWidget, label: str, **kwargs):
         QtWidgets.QFrame.__init__(self, parent)
+        redoAvailable = kwargs.pop("redoEnabled", None)
+        undoAvailable = kwargs.pop("undoEnabled", None)
+        clearButtonEnabled = kwargs.pop("clearButtonEnabled", None)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
+        if isinstance(clearButtonEnabled, bool):
+            self.variable.setClearButtonEnabled(clearButtonEnabled is True)
+
+        if isinstance(undoAvailable, bool):
+            self.variable.undoAvailable = undoAvailable is True
+
+        if isinstance(redoAvailable, bool):
+            self.variable.redoAvailable = redoAvailable is True
+
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
         self._layout.addWidget(self.label)
@@ -323,8 +335,8 @@ class OptionalStringInput(QtWidgets.QFrame):
 
 class StringInput(OptionalStringInput):
     def __init__(self, parent:QtWidgets.QWidget, label:str,
-                 allowEmptyString:bool = False):
-        OptionalStringInput.__init__(self, parent, label)
+                 allowEmptyString:bool = False, **kwargs):
+        OptionalStringInput.__init__(self, parent, label, **kwargs)
         self._allowEmptyString_ = allowEmptyString is True
 
     def validate(self):
