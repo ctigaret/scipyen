@@ -400,10 +400,7 @@ def get_codomain_name(obj):
 @get_codomain_name.register(DataZone)
 @get_codomain_name.register(DataMark)
 @get_codomain_name.register(TriggerEvent)
-def _get_codomain_name_(obj: typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal,
-                                          neo.Epoch, neo.Event, neo.SpikeTrain,
-                                          DataSignal, IrregularlySampledDataSignal,
-                                          DataZone, DataMark, TriggerEvent]):
+def _get_codomain_name_(obj: neo.AnalogSignal | neo.IrregularlySampledSignal | neo.Epoch | neo.Event | neo.SpikeTrain | DataSignal | IrregularlySampledDataSignal | DataZone | DataMark | TriggerEvent):
     codomain_name = None
     if hasattr(obj, "annotations"):
         codomain_name = obj.annotations.get("codomain_name", None)
@@ -420,24 +417,20 @@ def get_domain_name(obj):
 @get_domain_name.register(neo.Epoch)
 @get_domain_name.register(neo.Event)
 @get_domain_name.register(neo.SpikeTrain)
-def _get_domain_name_(obj: typing.Union[
-    neo.AnalogSignal, neo.IrregularlySampledSignal,
-    neo.Epoch, neo.Event,
-    neo.SpikeTrain,
-    ]):
+def _get_domain_name_(obj: neo.AnalogSignal | neo.IrregularlySampledSignal | neo.Epoch | neo.Event | neo.SpikeTrain):
     return unitFamilyName(obj.times)
 
 
 @get_domain_name.register(DataSignal)
 @get_domain_name.register(IrregularlySampledDataSignal)
-def _get_domain_name_(obj: DataSignal | IrregularlySampledDataSignal):
+def _get_domain_name_(obj: DataSignal | IrregularlySampledDataSignal):  # noqa: F811
     return obj.domain_name
 
 
 @get_domain_name.register(DataZone)
 @get_domain_name.register(DataMark)
 @get_domain_name.register(TriggerEvent)
-def _get_domain_name_(obj: typing.Union[DataZone, DataMark, TriggerEvent]):
+def _get_domain_name_(obj: typing.Union[DataZone, DataMark, TriggerEvent]):  # noqa: F811
     return unitFamilyName(obj.times)
 
 
@@ -467,13 +460,13 @@ def _set_relative_time_start_(data: neo.Epoch | DataZone, t=0):
         description = data.desscription,
         segment = data.segment,
         array_annotations = data.array_annotations,
-        **annotations
+        **data.annotations
     )
     ret.annotations.update(data.annotations)
     return ret
 
 @set_relative_time_start.register(Interval)
-def _set_relative_time_start_(data: Interval, t=0):
+def _set_relative_time_start_(data: Interval, t=0):  # noqa: F811
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -502,7 +495,7 @@ def _set_relative_time_start_(data: Interval, t=0):
 @set_relative_time_start.register(neo.Event)
 @set_relative_time_start.register(DataMark)
 @set_relative_time_start.register(TriggerEvent)
-def _set_relative_time_start_(data: typing.Union[neo.Event, DataMark, TriggerEvent], t=0):
+def _set_relative_time_start_(data: neo.Event | DataMark | TriggerEvent, t=0):  # noqa: F811
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -534,7 +527,7 @@ def _set_relative_time_start_(data: typing.Union[neo.Event, DataMark, TriggerEve
 
 
 @set_relative_time_start.register(neo.SpikeTrain)
-def _set_relative_time_start_(data: neo.SpikeTrain, t=0):
+def _set_relative_time_start_(data: neo.SpikeTrain, t=0):  # noqa: F811
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units wrong wrt signal's domain
 
@@ -556,14 +549,14 @@ def _set_relative_time_start_(data: neo.SpikeTrain, t=0):
         array_annotations=data.array_annotations,
     )
 
-    ret.annotations.update(spiketrain.annotations)
+    ret.annotations.update(data.annotations)
 
     return ret
 
 
 @set_relative_time_start.register(neo.AnalogSignal)
 @set_relative_time_start.register(DataSignal)
-def _set_relative_time_start_(data: neo.AnalogSignal | DataSignal, t=0):
+def _set_relative_time_start_(data: neo.AnalogSignal | DataSignal, t=0):  # noqa: F811
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -582,20 +575,24 @@ def _set_relative_time_start_(data: neo.AnalogSignal | DataSignal, t=0):
 
 @set_relative_time_start.register(neo.IrregularlySampledSignal)
 @set_relative_time_start.register(IrregularlySampledDataSignal)
-def _set_relative_time_start_(data: neo.IrregularlySampledSignal | IrregularlySampledDataSignal, t=0):
+def _set_relative_time_start_(data: neo.IrregularlySampledSignal | IrregularlySampledDataSignal, t=0):  # noqa: F811
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
     elif isinstance(t, numbers.Number):
         t = t * data.times.units
 
-    times = data.times - data_times + t if len(data.times) else data.times
+    # times = data.times - data_times + t if len(data.times) else data.times
+    if data.times.size:
+        times = data.times - t
+    else:
+        times = data.times
     ret = make_neo_object(times, data)
     return ret
 
 
 @set_relative_time_start.register(neo.Segment)
-def _set_relative_time_start_(data: neo.Segment, t=0):
+def _set_relative_time_start_(data: neo.Segment, t=0):  # noqa: F811
     from neo.core.spiketrainlist import SpikeTrainList
 
     ret = make_neo_object(data)
@@ -626,7 +623,7 @@ def _set_relative_time_start_(data: neo.Segment, t=0):
 
 
 @set_relative_time_start.register(neo.Block)
-def _set_relative_time_start_(data: neo.Block, t=0):
+def _set_relative_time_start_(data: neo.Block, t=0):  # noqa: F811
     r"""Set the components in each segment to the same t_start.
     WARNING: Modifies data in-place only for signals, because the `times`
     attribute is read-only for neo data objects, except analog signals and
@@ -651,7 +648,7 @@ def _set_relative_time_start_(data: neo.Block, t=0):
 
 @set_relative_time_start.register(tuple)
 @set_relative_time_start.register(list)
-def _set_relative_time_start_(data: tuple | list, t=0):
+def _set_relative_time_start_(data: tuple | list, t=0):  # noqa: F811
     return [set_relative_time_start(d, t) for d in data]
 
 
@@ -2927,7 +2924,7 @@ def get_workspace_neo_blocks(
                     reverse=reverse,
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print("String argument did not resolve to a list of neo.Block objects")
             # print("String argument did not resolve to a list of neo.Block or neo.Segment objects")
             traceback.print_exc()
@@ -4309,8 +4306,9 @@ def copy_with_data_subset(obj, **kwargs):
 
 
 @copy_with_data_subset.register(neo.Block)
-def _copy_with_data_subset_(obj:neo.Block, **kwargs):
+def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     r"""Deep copy for a subset of data & containers in Block."""
+    # print(f"neoutils.copy_with_data_subset() -> kwargs = {kwargs}")
     # NOTE: 2023-05-20 09:48:31
     # ### BEGIN allow overwriting these here,
     # and store the orignals in the new annotations of the new object;
@@ -4470,7 +4468,7 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
                                     **channelview.annotations,
                                 )
 
-                                new_group.channelviews.append(newchannel_view)
+                                new_group.channelviews.append(new_channelview)
 
                 new_groups.append(new_group)
 
@@ -4482,41 +4480,48 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
 
 
 @copy_with_data_subset.register(neo.Segment)
-def _copy_with_data_subset_(obj: neo.Segment, **kwargs):
+def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     from neo.core.spiketrainlist import SpikeTrainList
     import difflib
 
     # NOTE: 2023-05-20 09:48:31
     # ### BEGIN allow overwriting these here,
-    # and store the orignals in the new annotations of the new object;
-    sourceMetaData = dict()
+    # and store the originals in the new annotations of the new object;
+    sourceMetaData = {}
+
     name = kwargs.pop("name", obj.name)
     if name != obj.name:
         sourceMetaData["name"] = obj.name
+
     description = kwargs.pop("description", obj.description)
     if description != obj.description:
         sourceMetaData["description"] = obj.description
+
     file_origin = kwargs.pop("file_origin", obj.file_origin)
     if file_origin != obj.file_origin:
         sourceMetaData["file_origin"] = obj.file_origin
+
     file_datetime = kwargs.pop("file_datetime", obj.file_datetime)
     if file_datetime != obj.file_datetime:
         sourceMetaData["file_datetime"] = obj.file_datetime
+
     rec_datetime = kwargs.pop("rec_datetime", obj.rec_datetime)
     if rec_datetime != obj.rec_datetime:
         sourceMetaData["rec_datetime"] = obj.rec_datetime
+
     annotations = kwargs.pop("annotations", obj.annotations)
     if annotations is None:
-        annotations = dict()
+        annotations = {}
+
     if annotations != obj.annotations:
         sourceMetaData["annotations"] = obj.annotations
         if sourceMetaData["annotations"] is None:
-            sourceMetaData["annotations"] = dict()
+            sourceMetaData["annotations"] = {}
     # ### END
 
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
 
-    not_kwargs = dict()
+    not_kwargs = {}
 
     # see NOTE: 2023-04-13 09:45:19
     for kw in kwargs.keys():
@@ -4526,16 +4531,18 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):
     for k in not_kwargs.keys():
         kwargs.pop(k, None)
 
-    indexing = dict(
-        (_container_name(s), kwargs.pop(_container_name(s), None))
-        for s in obj._data_child_objects
-    )
+    # indexing = dict(
+    #     (_container_name(s), kwargs.pop(_container_name(s), None))
+    #     for s in obj._data_child_objects
+    # )
+    indexing = {_container_name(s): kwargs.pop(_container_name(s), None) for s in obj._data_child_objects}
 
     ret = make_neo_object(obj)
 
     for container_name, indices in indexing.items():
         # NOTE: 2021-11-23 13:39:15
         # the conversion to list also takes care of SpikeTrainList object
+        # print(f"neoutils.copy_with_data_subset[neo.Segment] -> _container_name = {container_name}")
         container = list(getattr(obj, container_name))
         try:
             keep_ndx = normalized_index(container, indices)
@@ -4547,8 +4554,10 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):
             )
             raise
 
+        print(f"neoutils.copy_with_data_subset[neo.Segment] -> _container_name = {container_name}, indices {indices} => keep_ndx = {keep_ndx}")
         if isinstance(keep_ndx, (typing.Sequence, range)):
             keep_data = list(make_neo_object(container[k]) for k in keep_ndx)  # copy c'tor
+
         elif isinstance(keep_ndx, slice):
             keep_data = list(make_neo_object(container[k]) for k in keep_ndx.indices(len(container)))  # copy c'tor
 
@@ -4884,6 +4893,7 @@ def concatenate_blocks(*args, **kwargs):
 
         elif isinstance(args[0], neo.Block):
             blocks = args[0]
+
         else:
             raise ValueError(
                 "Expecting a sequence of blocks or symbols (str) bound to blocks n the workspace, a block or a single str (symbol) bound to a block in the workspace"
@@ -4915,6 +4925,9 @@ def concatenate_blocks(*args, **kwargs):
 
     # NOTE: 2023-12-19 09:43:19
     # ### BEGIN main code
+
+    # NOTE: 2026-11-02 17:02:23
+    # by now, `blocks` should be a neo.Block or a sequence of neo.Blocks
 
     if isinstance(blocks, neo.Block):
         # nothing to do here: return a copy of 'args'
@@ -4981,11 +4994,7 @@ def concatenate_blocks(*args, **kwargs):
                 seg.file_origin = block_src_copy.file_origin
                 seg.rec_datetime = (
                     block_src_copy.rec_datetime
-                )  # not quite correct, is it ?!?
-                # if ks == 0:
-                #     seg.rec_datetime = block_src_copy.rec_datetime # not quite correct, is it ?!?
-                # else:
-                #     seg_start = tfloat(segment_start(seg).magnitude)
+                )
 
                 # NOTE: 2023-12-19 09:48:51
                 # also propagate the time to the t_start of contained signals,
@@ -4998,11 +5007,11 @@ def concatenate_blocks(*args, **kwargs):
                         sig.times += deltaSeconds
 
                 if len(seg.events):
-                    evts = list()
+                    evts = []
                     for event in seg.events:
                         if checkTimeUnits(event.times):
                             # NOTE: 2023-12-19 10:55:13
-                            # an event may be a DataMsrk or TriggerEvent, not just neo.Event!
+                            # an event may be a DataMark or TriggerEvent, not just neo.Event!
                             evt = event.__class__(
                                 times=event.times + deltaSeconds,
                                 labels=event.labels,
@@ -5061,7 +5070,7 @@ def concatenate_blocks(*args, **kwargs):
                         )
 
                         st_copy.annotations.update(st.annotations)
-                        st_copy.array_annotate(*st_array_annotations)
+                        st_copy.array_annotate(*st.array_annotations)
                         stt.append(st_copy)
 
                     seg.spiketrains.clear()
@@ -5155,14 +5164,11 @@ def concatenate_blocks(*args, **kwargs):
                                         )
 
                                         target_group.channelviews.append(
-                                            newchannel_view
+                                            new_channelview
                                         )
 
     else:
-        raise TypeError(
-            "Expecting a neo.Block or a sequence of neo.Block objects, got %s instead"
-            % type(args).__name__
-        )
+        raise TypeError(f"Expecting a neo.Block or a sequence of neo.Block objects, got {type(args).__name__} instead")
 
     # ### END main block
 

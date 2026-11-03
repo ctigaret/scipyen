@@ -461,7 +461,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         showCallablesAction.setToolTip("Show Function and Method Members")
         showCallablesAction.setStatusTip("Show Function and Method Members")
         showCallablesAction.setWhatsThis("Show Function and Method Members")
-        showCallablesAction.setIcon("code-function")
+        showCallablesAction.setIcon(guiutils.getIcon("code-function"))
         showCallablesAction.setCheckable(True)
         showCallablesAction.setChecked(self.sourceModel.showCallables)
         showCallablesAction.toggled.connect(self._slot_showCallables)
