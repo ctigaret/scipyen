@@ -3732,7 +3732,7 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
     return ret
 
 class PathwayTrials(dict):
-    r"""Mapping pathway name: str ↦ electrophysiology data: neo.Block"""
+    r"""Mapping of pathway name: str ↦ electrophysiology data: neo.Block"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

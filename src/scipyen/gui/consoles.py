@@ -3772,6 +3772,66 @@ class ScipyenConsoleWidget(ConsoleWidget):
         elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
             self.__write_text_in_console_buffer__("\n".join(text))
 
+    # def highlightBlock(self, string):
+    #     """ Highlight a block of text. Reimplemented to highlight selectively.
+    #     Overrides frontend_widget.FrontendWidget.highlightBlock()
+    #     """
+    #     # NOTE: 2026-11-06 10:11:41 BUG:
+    #     #
+    #     # the following happens randomly in PySide6 6.12.0a1, Qt 6.12.0:
+    #     # Fatal Python error: Segmentation fault
+    #     #
+    #     # Thread 0x00007f25bf0666c0 (most recent call first):
+    #     #   File "/usr/lib64/python3.13/selectors.py", line 452 in select
+    #     #   File "/usr/lib64/python3.13/asyncio/base_events.py", line 2023 in _run_once
+    #     #   File "/usr/lib64/python3.13/asyncio/base_events.py", line 684 in run_forever
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/tornado/platform/asyncio.py", line 211 in start
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/ipykernel/iostream.py", line 92 in _thread_main
+    #     #   File "/usr/lib64/python3.13/threading.py", line 995 in run
+    #     #   File "/usr/lib64/python3.13/threading.py", line 1044 in _bootstrap_inner
+    #     #   File "/usr/lib64/python3.13/threading.py", line 1015 in _bootstrap
+    #     #
+    #     # Thread 0x00007f25c08696c0 (most recent call first):
+    #     #   File "/usr/lib64/python3.13/threading.py", line 359 in wait
+    #     #   File "/usr/lib64/python3.13/threading.py", line 660 in wait
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/IPython/core/history.py", line 1272 in run
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/IPython/core/history.py", line 163 in wrapper
+    #     #   File "/usr/lib64/python3.13/threading.py", line 1044 in _bootstrap_inner
+    #     #   File "/usr/lib64/python3.13/threading.py", line 1015 in _bootstrap
+    #     #
+    #     # Current thread 0x00007f264fae4780 (most recent call first):
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/qtconsole/pygments_highlighter.py", line 149 in highlightBlock
+    #     #   File "/home/cezar/scipyenv/lib64/python3.13/site-packages/qtconsole/frontend_widget.py", line 82 in highlightBlock
+    #     #   File "/home/cezar/scipyen/src/scipyen/scipyen.py", line 454 in main
+    #     #   File "/home/cezar/scipyen/src/scipyen/scipyen.py", line 464 in <module>
+    #     #
+    #     # Extension modules: markupsafe._speedups, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, pyarrow.lib, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._pcg64, numpy.random._generator, numpy.random._mt19937, numpy.random._philox, numpy.random._sfc64, numpy.random.mtrand, _cyutility, pandas._libs._cyutility, pandas._libs.tslibs.ccalendar, pandas._libs.tslibs.np_datetime, pandas._libs.tslibs.dtypes, pandas._libs.tslibs.base, pandas._libs.tslibs.nattype, pandas._libs.tslibs.timezones, pandas._libs.properties, pandas._libs.tslibs.fields, pandas._libs.tslibs.timedeltas, pandas._libs.tslibs.tzconversion, pandas._libs.tslibs.timestamps, pandas._libs.tslibs.offsets, pandas._libs.tslibs.strptime, pandas._libs.tslibs.parsing, pandas._libs.tslibs.conversion, pandas._libs.tslibs.period, pandas._libs.tslibs.vectorized, pandas._libs.ops_dispatch, pandas._libs.missing, pandas._libs.hashtable, pandas._libs.algos, pandas._libs.interval, pandas._libs.lib, pyarrow._compute, pandas._libs.ops, numexpr.interpreter, pandas._libs.hashing, pandas._libs.arrays, pandas._libs.tslib, pandas._libs.sparse, pandas._libs.internals, pandas._libs.indexing, pandas._libs.index, pandas._libs.writers, pandas._libs.join, pandas._libs.window.aggregations, pandas._libs.window.indexers, pandas._libs.reshape, pandas._libs.groupby, pandas._libs.json, pandas._libs.parsers, pandas._libs.testing, shiboken6.Shiboken, PySide6.QtCore, PySide6.QtGui, PySide6.QtDataVisualization, PySide6.QtOpenGL, PySide6.QtWidgets, PySide6.QtOpenGLWidgets, PIL._imaging, PySide6.QtXml, PySide6.QtSvg, PySide6.QtNetwork, yaml._yaml, kiwisolver._cext, charset_normalizer.md, charset_normalizer.cd, vigra.vigranumpycore, vigra.impex, vigra.sampling, vigra.filters, vigra.analysis, vigra.learning, vigra.colors, vigra.noise, vigra.geometry, vigra.optimization, vigra.histogram, vigra.graphs, vigra.utilities, vigra.blockwise, vigra.fourier, PySide6.QtTest, cuda.bindings._internal.utils, cuda.bindings._internal.driver, cuda.bindings.cydriver, cuda.bindings.driver, cuda.bindings._internal.runtime_ptds, cuda.bindings._internal.runtime, cuda.bindings.cyruntime, cuda.bindings.runtime, h5py._errors, h5py.defs, h5py._objects, h5py.h5, h5py.utils, h5py.h5t, h5py.h5s, h5py.h5ac, h5py.h5p, h5py.h5r, h5py._npystrings, h5py._proxy, h5py._conv, h5py.h5z, h5py.h5a, h5py.h5d, h5py.h5ds, h5py.h5g, h5py.h5i, h5py.h5o, h5py.h5f, h5py.h5fd, h5py.h5pl, h5py.h5l, h5py._selector, PySide6.QtDBus, cython.cimports.libc.math, scipy._cyutility, scipy._lib._ccallback_c, scipy.sparse._sparsetools, _csparsetools, scipy.sparse._csparsetools, scipy.io.matlab._mio_utils, scipy.io.matlab._streams, scipy.io.matlab._mio5_utils, _brotli, zstandard.backend_c, marisa_trie, zmq.backend.cython._zmq, tornado.speedups, msgpack._cmsgpack, psutil._psutil_linux, PySide6.QtUiTools, scipy._lib._uarray._uarray, scipy.special._ufuncs_cxx, scipy.linalg._fblas, scipy.linalg._flapack, scipy.linalg._batched_linalg, scipy.linalg._cythonized_array_utils, scipy.linalg._solve_toeplitz, scipy.linalg._internal_matfuncs, scipy.linalg._linalg_pythran, scipy.linalg.cython_blas, scipy.linalg.cython_lapack, scipy.linalg._decomp_update, scipy.special._ellip_harm_2, scipy.special._special_ufuncs, scipy.special._gufuncs, scipy.special._ufuncs, scipy.special._specfun, scipy.special._comb, scipy.fftpack.convolve, multidict._multidict, yarl._quoting_c, propcache._helpers_c, aiohttp._http_writer, aiohttp._http_parser, aiohttp._websocket.mask, aiohttp._websocket.reader_c, frozenlist._frozenlist, numcodecs.compat_ext, numcodecs.blosc, numcodecs.zstd, numcodecs.lz4, numcodecs._shuffle, numcodecs.jenkins, google_crc32c._crc32c, numcodecs.vlen, numcodecs.fletcher32, scipy.ndimage._nd_image, scipy.ndimage._rank_filter_1d, _ni_label, scipy.ndimage._ni_label, DracoPy, chardet.pipeline.ascii, chardet.pipeline.escape, chardet.pipeline.language, chardet.models, chardet._kernel, chardet.models._format, chardet.pipeline.magic, chardet.pipeline.markup, chardet.pipeline.structural, chardet.pipeline.postprocess, chardet.pipeline.confusion, chardet.pipeline.statistical, chardet.pipeline.utf8, chardet.pipeline.utf1632, chardet.pipeline.validity, chardet.pipeline.orchestrator, simplejson._speedups, requests.packages.chardet.pipeline.ascii, requests.packages.chardet.pipeline.escape, requests.packages.chardet.pipeline.language, requests.packages.chardet.models, requests.packages.chardet._kernel, requests.packages.chardet.models._format, requests.packages.chardet.pipeline.magic, requests.packages.chardet.pipeline.markup, requests.packages.chardet.pipeline.structural, requests.packages.chardet.pipeline.postprocess, requests.packages.chardet.pipeline.confusion, requests.packages.chardet.pipeline.statistical, requests.packages.chardet.pipeline.utf8, requests.packages.chardet.pipeline.utf1632, requests.packages.chardet.pipeline.validity, requests.packages.chardet.pipeline.orchestrator, scipy.sparse.linalg._dsolve._superlu, scipy.sparse.linalg._eigen.arpack._arpacklib, scipy.sparse.linalg._propack, scipy.optimize._group_columns, scipy._lib.messagestream, scipy.optimize._trlib._trlib, scipy.optimize._lbfgsb, _moduleTNC, scipy.optimize._moduleTNC, scipy.optimize._slsqplib, scipy.optimize._minpack, scipy.optimize._lsq.givens_elimination, scipy.optimize._zeros, scipy.linalg._decomp_interpolative, scipy.optimize._bglu_dense, scipy.optimize._lsap, scipy.spatial._ckdtree, scipy.spatial._hausdorff, scipy.spatial._distance_wrap, scipy.spatial._qhull, scipy.spatial._voronoi, scipy.spatial.transform._rotation_cy, scipy.spatial.transform._rigid_transform_cy, scipy.optimize._direct, pywt._extensions._dwt, pywt._extensions._cwt, pywt._extensions._pywt, pywt._extensions._swt, scipy.cluster.vq._vq, scipy.cluster.hierarchy._hierarchy, scipy.cluster.hierarchy._optimal_leaf_ordering, scipy.signal._sigtools, scipy.signal._max_len_seq_inner, scipy.signal._upfirdn_apply, scipy.signal._spline, scipy.interpolate._fitpack, scipy.interpolate._dierckx, scipy.interpolate._ppoly, scipy.interpolate._interpnd, scipy.interpolate._rbfinterp_pythran, scipy.interpolate._rgi_cython, scipy.signal._sosfilt, scipy.integrate._odepack, scipy.integrate._quadpack, scipy.integrate._vode, scipy.integrate._dop, scipy.special.cython_special, scipy.stats._stats, scipy.stats._biasedurn, scipy.stats._levy_stable.levyst, scipy.stats._stats_pythran, scipy.stats._ansari_swilk_statistics, scipy.sparse.csgraph._tools, scipy.sparse.csgraph._shortest_path, scipy.sparse.csgraph._traversal, scipy.sparse.csgraph._min_spanning_tree, scipy.sparse.csgraph._flow, scipy.sparse.csgraph._matching, scipy.sparse.csgraph._reordering, scipy.stats._sobol, scipy.stats._qmc_cy, scipy.stats._rcont.rcont, scipy.stats._qmvnt_cy, scipy.signal._peak_finding_utils, shapely.lib, shapely._geos, shapely._geometry_helpers, statsmodels.robust._qn, statsmodels.tsa._innovations, statsmodels.nonparametric._smoothers_lowess, statsmodels.nonparametric.linbin, statsmodels.tsa.statespace._smoothers._conventional, statsmodels.tsa.statespace._smoothers._univariate, statsmodels.tsa.statespace._smoothers._univariate_diffuse, statsmodels.tsa.statespace._smoothers._classical, statsmodels.tsa.statespace._smoothers._alternative, statsmodels.tsa.statespace._kalman_smoother, statsmodels.tsa.statespace._filters._conventional, statsmodels.tsa.statespace._filters._univariate, statsmodels.tsa.statespace._filters._univariate_diffuse, statsmodels.tsa.statespace._filters._inversions, statsmodels.tsa.statespace._kalman_filter, statsmodels.tsa.statespace._tools, statsmodels.tsa.statespace._initialization, statsmodels.tsa.statespace._representation, statsmodels.tsa.statespace._cfa_simulation_smoother, statsmodels.tsa.statespace._simulation_smoother, _arma_innovations, statsmodels.tsa.innovations._arma_innovations, statsmodels.tsa.exponential_smoothing._ets_smooth, statsmodels.tsa.stl._stl, statsmodels.tsa.holtwinters._exponential_smoothers, _hamilton_filter, statsmodels.tsa.regime_switching._hamilton_filter, _kim_smoother, statsmodels.tsa.regime_switching._kim_smoother, wcwidth._wcwidth_c, PySide6.QtPrintSupport, _pydevd_bundle.pydevd_cython, _pydevd_sys_monitoring_cython, _pydevd_sys_monitoring._pydevd_sys_monitoring_cython, lxml._elementpath, lxml.etree (total: 316)
+    #     if not hasattr(self, 'highlighting_on') or not self.highlighting_on:
+    #         return
+    #
+    #     # The input to this function is a unicode string that may contain
+    #     # paragraph break characters, non-breaking spaces, etc. Here we acquire
+    #     # the string as plain text so we can compare it.
+    #     current_block = self.currentBlock()
+    #     string = current_block.text()
+    #
+    #     # QTextBlock::text() can still return non-breaking spaces
+    #     # for the continuation prompt
+    #     string = string.replace("\xa0", " ")
+    #
+    #     # Only highlight if we can identify a prompt, but make sure not to
+    #     # highlight the prompt.
+    #     without_prompt = self.transform_ipy_prompt(string)
+    #     diff = len(string) - len(without_prompt)
+    #     if diff > 0:
+    #         self._current_offset = diff
+    #         try:
+    #             super().highlightBlock(without_prompt)
+    #         except:
+    #             traceback.print_exc()
+
+
+
     def _format_text_selection(self, text):
         # code below from qtconsole.frontend_widget.FrontendWidget
         if len(text.strip()):
@@ -3831,6 +3891,39 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 text = text[:-1]
 
         return text
+
+    def _update_prompt(self, new_prompt_number):
+        """Replace the last displayed prompt with a new one."""
+        if self._previous_prompt_obj is None:
+            return
+
+        block = self._previous_prompt_obj.block
+
+        # Make sure the prompt block has not been erased.
+        if qtutils.isQObjectAlive(block) and block.isValid() and block.text():
+
+            # Remove the old prompt and insert a new prompt.
+            cursor = QtGui.QTextCursor(block)
+            cursor.movePosition(QtGui.QTextCursor.Right,
+                                QtGui.QTextCursor.KeepAnchor,
+                                self._previous_prompt_obj.length)
+            prompt = self._make_in_prompt(new_prompt_number)
+            self._prompt = self._insert_html_fetching_plain_text(
+                cursor, prompt)
+
+            # When the HTML is inserted, Qt blows away the syntax
+            # highlighting for the line, so we need to rehighlight it.
+            self._highlighter.rehighlightBlock(cursor.block())
+
+            # Update the prompt cursor
+            self._prompt_cursor.setPosition(cursor.position() - 1)
+
+            # Store the updated prompt.
+            block = self._control.document().lastBlock()
+            length = len(self._prompt)
+            self._previous_prompt_obj = self._PromptBlock(block, length, new_prompt_number)
+
+
 
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # NOTE: 2023-09-27 12:55:24 TODO

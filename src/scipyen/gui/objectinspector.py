@@ -133,7 +133,8 @@ class ObjectInspector(ScipyenViewer):
         ScanData:0,
         TriggerProtocol:0,
         types.SimpleNamespace:0,
-        ScipyenDataclass:0
+        ScipyenDataclass:0,
+        object: 0
         }
 
     read_only_types = (
@@ -384,7 +385,7 @@ class ObjectInspector(ScipyenViewer):
     def slot_showIntrospect(self, value: bool):
         self.showIntrospection = value is True
 
-        if self._data_ not in self._supportedTypes_:
+        if type(self._data_) not in self._supportedTypes_:
             enable = (
                 self.showIntrospection
                 and onode.introspectable(self._data_)

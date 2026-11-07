@@ -171,7 +171,7 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
     @property
     def scriptFileNames(self):
-        return [self.scriptsTable.item(row, 1).text() for row in range(self.scriptsTable.rowCount())]
+        return [f"{pathlib.Path(self.scriptsTable.item(row, 1).text())/self.scriptsTable.item(row, 0).text()}" for row in range(self.scriptsTable.rowCount())]
 
     @Slot("QPoint")
     @safewrapper
@@ -225,9 +225,12 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
     @Slot(int, int)
     @safewrapper
     def slot_cellDoubleClick(self, row, col):
-        item = self.scriptsTable.item(row, 1)
+        item = self.scriptsTable.item(row, 0).text()
+        path = self.scriptsTable.item(row, 1).text()
+        script = f"{pathlib.Path(path) / item}"
 
-        self.signal_executeScript.emit(item.text())
+        self.signal_executeScript.emit(script)
+
 
     @Slot()
     @safewrapper
@@ -271,6 +274,12 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
                 if any("python" in s for s in mft):
                     self.signal_pythonFileAdded.emit(fileName)
 
+    def _getItemFullPath_(self, row: int) -> str:
+        item = self.scriptsTable.item(row, 0).text()
+        path = self.scriptsTable.item(row, 1).text()
+
+        return f"{pathlib.Path(path)/item}"
+
     @Slot()
     @safewrapper
     def slot_forgetScripts(self):
@@ -279,7 +288,8 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         rows = list(set([i.row() for i in self.scriptsTable.selectedItems()]))  # noqa: C403
 
-        items = [self.scriptsTable.item(r, 1).text() for r in rows]
+        # items = [self.scriptsTable.item(r, 1).text() for r in rows]
+        items = [self._getItemFullPath_(r) for r in rows]
 
         for r in rows:
             self.scriptsTable.removeRow(r)
@@ -289,8 +299,10 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
     @Slot()
     @safewrapper
     def slot_forgetAll(self):
-        items = [self.scriptsTable.item(r, 1).text()
+        items = [self._getItemFullPath_(r)
                  for r in range(self.scriptsTable.rowCount())]
+        # items = [self.scriptsTable.item(r, 1).text()
+        #          for r in range(self.scriptsTable.rowCount())]
 
         self.scriptsTable.clearContents()
         self.scriptsTable.setRowCount(0)
@@ -305,9 +317,12 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
-        item = self.scriptsTable.item(row, 1).text()
+        # script = f"{pathlib.Path(self.scriptsTable.item(row, 1).text()) / self.scriptsTable.item(row, 0).text()}"
+        script = self._getItemFullPath_(row)
 
-        self.signal_executeScript.emit(item)
+        # item = self.scriptsTable.item(row, 1).text()
+
+        self.signal_executeScript.emit(script)
 
     @Slot()
     @safewrapper
@@ -317,9 +332,11 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
-        item = self.scriptsTable.item(row, 1).text()
+        # item = self.scriptsTable.item(row, 1).text()
+        # script = f"{pathlib.Path(self.scriptsTable.item(row, 1).text()) / self.scriptsTable.item(row, 0).text()}"
+        script = self._getItemFullPath_(row)
 
-        self.signal_importScript.emit(item)
+        self.signal_importScript.emit(script)
 
     @Slot()
     @safewrapper
@@ -329,11 +346,13 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
-        fileName = self.scriptsTable.item(row, 1).text()
+        script = self._getItemFullPath_(row)
+        # script = f"{pathlib.Path(self.scriptsTable.item(row, 1).text()) / self.scriptsTable.item(row, 0).text()}"
+        # fileName = self.scriptsTable.item(row, 1).text()
 
-        self.scipyenWindow.slot_systemEditScript(fileName)
+        self.scipyenWindow.slot_systemEditScript(script)
 
-        # self.signal_editScript.emit(fileName)
+        # self.signal_editScript.emit(script)
 
     @Slot()
     @safewrapper
@@ -343,9 +362,11 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
-        item = self.scriptsTable.item(row, 1).text()
+        # item = self.scriptsTable.item(row, 1).text()
+        # script = f"{pathlib.Path(self.scriptsTable.item(row, 1).text()) / self.scriptsTable.item(row, 0).text()}"
+        script = self._getItemFullPath_(row)
 
-        self.signal_openScriptFolder.emit(item)
+        self.signal_openScriptFolder.emit(script)
 
     @Slot()
     @safewrapper
@@ -355,7 +376,9 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]  # noqa: RUF015
 
-        item = self.scriptsTable.item(row, 1).text()
+        # item = self.scriptsTable.item(row, 1).text()
+        # # script = f"{pathlib.Path(self.scriptsTable.item(row, 1).text()) / self.scriptsTable.item(row, 0).text()}"
+        script = self._getItemFullPath_(row)
 
-        self.signal_pasteScript.emit(item)
+        self.signal_pasteScript.emit(script)
 

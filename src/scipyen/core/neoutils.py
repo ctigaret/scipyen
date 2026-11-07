@@ -739,8 +739,14 @@ def _make_neo_object_(obj, /, **kwargs):
     to be added manually to the returned Container instance.
 
     Fingers crossed, the neo API doesn't fundamentally change in the future...
+
+    NOTE: 2026-11-07 08:53:50
+    Now uses deepcopy to avoid passing by reference (pointer) of objects like
+    `t_start`, etc.
     """
-    # simple namespace with:
+
+    # NOTE: 2026-11-07 08:54:43
+    # This is a simple namespace with:
     # "positional": mapping name: type
     # "named":      mapping name: tuple(default, type)
     # "varpos":     mapping  *args name: None (one element)
@@ -749,23 +755,23 @@ def _make_neo_object_(obj, /, **kwargs):
     signature = signature_as_dict(type(obj).__init__)
 
     # NOTE: 2021-11-23 10:36:53
-    # obj._quantity_attr names the parameter for the actual numeric data
+    # `obj._quantity_attr` names the parameter for the actual numeric data
     # going into the signal
 
     # NOTE: 2021-11-23 10:37:12
-    # attr_params: tuples: (name, type or ndim for ndarrays)
+    # `attr_params`: tuples: (name, type or ndim for ndarrays)
     attr_params = obj._necessary_attrs + obj._recommended_attrs
 
     attr_named_params = dict((p[0], getattr(obj, p[0], None)) for p in attr_params)
 
     sig_named_params = dict(
-        (param_name, getattr(obj, param_name, param_value[0]))
+        (param_name, deepcopy(getattr(obj, param_name, param_value[0])))
         for param_name, param_value in signature.named.items()
         if hasattr(obj, param_name)
-    )  # and isinstance(getattr(obj, param_name), param_value[1]))
+    )
 
     factory_pos_params = tuple(
-        getattr(obj, param_name)
+        deepcopy(getattr(obj, param_name))
         for param_name, param_type in signature.positional.items()
         if hasattr(obj, param_name) and isinstance(getattr(obj, param_name), param_type)
     )
@@ -778,7 +784,7 @@ def _make_neo_object_(obj, /, **kwargs):
     # this is the "annotations"
     sig_kwargs_param = list(signature.varkw.keys())[0]
     factory_kwarg_params = (
-        getattr(obj, sig_kwargs_param)
+        deepcopy(getattr(obj, sig_kwargs_param))
         if hasattr(obj, sig_kwargs_param)
         and isinstance(getattr(obj, sig_kwargs_param, None), dict)
         else dict()
@@ -790,13 +796,9 @@ def _make_neo_object_(obj, /, **kwargs):
     factory_params.update(factory_named_params)
     factory_params.update(factory_kwarg_params)
 
-    # factory = partial(type(obj), *factory_pos_params, **factory_params)
-    # return factory()
-
     # NOTE: 2024-06-18 08:52:02
     # more recent verison of neo library enforce against the use of int as annotations keys
 
-    # print(f"neoutils.make_neo_object({type(obj).__name__}): factory_pos_params = {factory_pos_params}")
     factory = partial(type(obj), *factory_pos_params)
 
     ret = factory()
@@ -842,8 +844,14 @@ def _make_neo_object_(obj, /, **kwargs):
 
     Fingers crossed, the neo API doesn't fundamentally change in the future...
 
+    NOTE: 2026-11-07 08:53:50
+    Now uses deepcopy to avoid passing by reference (pointer) of objects like
+    `t_start`, etc.
+
     """
-    # simple namespace with:
+
+    # NOTE: 2026-11-07 08:54:43
+    # This is a simple namespace with:
     # "positional": mapping name: type
     # "named":      mapping name: tuple(default, type)
     # "varpos":     mapping  *args name: None (one element)
@@ -854,13 +862,13 @@ def _make_neo_object_(obj, /, **kwargs):
     attr_params = obj._necessary_attrs + obj._recommended_attrs
 
     sig_named_params = dict(
-        (param_name, kwargs.pop(param_name, getattr(obj, param_name, param_value[0])))
+        (param_name, kwargs.pop(param_name, deepcopy(getattr(obj, param_name, param_value[0]))))
         for param_name, param_value in signature.named.items()
         if hasattr(obj, param_name)
     )
 
     factory_pos_params = tuple(
-        kwargs.pop(param_name, getattr(obj, param_name, None))
+        kwargs.pop(param_name, deepcopy(getattr(obj, param_name, None)))
         for param_name, param_type in signature.positional.items()
         if hasattr(obj, param_name) and isinstance(getattr(obj, param_name), param_type)
     )
@@ -873,14 +881,14 @@ def _make_neo_object_(obj, /, **kwargs):
         # obj._quantity_attr names the parameter for the actual numeric data
         # going into the signal
         attr_named_params = dict(
-            (p[0], kwargs.pop(p[0], getattr(obj, p[0], None)))
+            (p[0], kwargs.pop(p[0], deepcopy(getattr(obj, p[0], None))))
             for p in attr_params
             if p[0] != obj._quantity_attr
         )
         factory_named_params[obj._quantity_attr] = obj.magnitude
 
     else:
-        attr_named_params = dict((p[0], getattr(obj, p[0], None)) for p in attr_params)
+        attr_named_params = dict((p[0], deepcopy(getattr(obj, p[0], None))) for p in attr_params)
 
     factory_named_params.update(attr_named_params)
     factory_named_params.update(sig_named_params)
@@ -889,7 +897,7 @@ def _make_neo_object_(obj, /, **kwargs):
     # this is the "annotations"
     sig_kwargs_param = list(signature.varkw.keys())[0]
     factory_kwarg_params = (
-        getattr(obj, sig_kwargs_param)
+        deepcopy(getattr(obj, sig_kwargs_param))
         if hasattr(obj, sig_kwargs_param)
         and isinstance(getattr(obj, sig_kwargs_param, None), dict)
         else kwargs
@@ -901,9 +909,6 @@ def _make_neo_object_(obj, /, **kwargs):
     factory_params.update(factory_named_params)
     factory_params.update(factory_kwarg_params)
 
-    # print(f"neoutils.make_neo_object({type(obj).__name__}):")
-    # print(f"\nfactory_pos_params = {factory_pos_params}")
-    # print(f"\nfactory_params = {factory_params}")
     if neo.__version__ >= "0.13.0":
         # NOTE: 2025-03-31 09:14:58 avoid "copy" in recent neo
         factory_params["copy"] = None
@@ -4328,6 +4333,8 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     # (see NOTE: 2023-04-13 09:45:26)
     not_kwargs = {}
 
+    time_shift = kwargs.pop("time_shift", None)
+
     for kwarg in kwargs.keys():
         if kwarg not in obj._child_containers:
             not_kwargs[kwarg] = kwargs[kwarg]
@@ -4374,6 +4381,7 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     # as they may be useful for copy_with_data_subset on the child (in this case,
     # the Segment)
     kwargs.update(not_kwargs)
+    kwargs["time_shift"] = time_shift
 
     try:
         new_segments = [copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx]
@@ -4478,15 +4486,44 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
 
     return ret
 
-
+# @timefunc
 @copy_with_data_subset.register(neo.Segment)
 def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
-    from neo.core.spiketrainlist import SpikeTrainList
-    import difflib
+    r"""Allows time shifting the contained neo objects.
+    Unfortunately this also comes at an overhead cost, as it creates NEW objects.
+    However, the data in original is left unchanged.
 
-    # NOTE: 2023-05-20 09:48:31
-    # ### BEGIN allow overwriting these here,
-    # and store the originals in the new annotations of the new object;
+"""
+    import difflib
+    from neo.core.spiketrainlist import SpikeTrainList
+    # print(f"neoutils.copy_with_data_subset[neo.Segment](segment name {obj.name} index {obj.index})")
+
+    domain_shift = kwargs.pop("domain_shift", None)
+
+    # NOTE: 2026-11-07 06:45:29
+    # neo objects supporting domain_shift are:
+    #
+    # AnalogSignal, IrregularlySampledSignal, Event, Epoch, SpikeTrain
+    #
+    # and the subclasses defined in Scipyen:
+    #
+    # DataSignal, IrregularlySampledDataSignal, DataMark, TriggerEvent,
+    # DataZone, Interval, and MarkTrain
+
+    if isinstance(domain_shift, pq.Quantity):
+        if domain_shift.size > 1:
+            scipywarn("Ignoring domain_shift because it is not a scalar")
+            domain_shift = None
+        # if not scq.checkTimeUnits(domain_shift):
+        #     scipywarn("Ignoring domain_shift because it is not a Time quantity")
+        #     domain_shift = None
+
+
+
+    # ### BEGIN 2023-05-20 09:48:31
+    # allow overwriting metadata here,
+    # and store in the new annotations of the new object;
+    #
     sourceMetaData = {}
 
     name = kwargs.pop("name", obj.name)
@@ -4517,7 +4554,9 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
         sourceMetaData["annotations"] = obj.annotations
         if sourceMetaData["annotations"] is None:
             sourceMetaData["annotations"] = {}
-    # ### END
+
+    #
+    # ### END   2023-05-20 09:48:31
 
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
 
@@ -4539,6 +4578,10 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
     ret = make_neo_object(obj)
 
+    # ### BEGIN 2026-11-07 06:35:22
+    # this is where a subset of child container elements are stored in the
+    # new object, possibly with a time shift
+    #
     for container_name, indices in indexing.items():
         # NOTE: 2021-11-23 13:39:15
         # the conversion to list also takes care of SpikeTrainList object
@@ -4554,20 +4597,36 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
             )
             raise
 
-        print(f"neoutils.copy_with_data_subset[neo.Segment] -> _container_name = {container_name}, indices {indices} => keep_ndx = {keep_ndx}")
+        # print(f"\t -> _container_name = {container_name}, indices {indices} => keep_ndx = {keep_ndx}")
+
         if isinstance(keep_ndx, (typing.Sequence, range)):
-            keep_data = list(make_neo_object(container[k]) for k in keep_ndx)  # copy c'tor
+            keep_data = [make_neo_object(container[k]) for k in keep_ndx]  # copy c'tor
 
         elif isinstance(keep_ndx, slice):
-            keep_data = list(make_neo_object(container[k]) for k in keep_ndx.indices(len(container)))  # copy c'tor
+            keep_data = [make_neo_object(container[k]) for k in keep_ndx.indices(len(container))]  # copy c'tor
 
         elif isinstance(keep_ndx, int):
             keep_data = [make_neo_object(container[keep_ndx])]
 
-        for d in keep_data:
+        for k, d in enumerate(keep_data):
             d.segment = ret
+            if isinstance(domain_shift, pq.Quantity): # and scq.checkTimeUnits(d.times):
+                if hasattr(d, "time_shift") and scq.unitsConvertible(domain_shift, d.times):
+                    # NOTE: 2026-11-07 06:53:23
+                    # this creates a COPY of `d` (which should already be a copy
+                    # of the original data, having been created with make_neo_object(…))
+                    d1 = d.time_shift(domain_shift)
+                    keep_data[k] = d1
+                elif isinstance(d, neo.ImageSequence) and scq.unitsConvertible(domain_shift, d.times):
+                    # exceptionally here t_start MUST be used
+                    d1 = make_neo_object(d) # first, copy contruct it
+                    d1.t_start += domain_shift
+                    keep_data[k] = d1
 
         setattr(ret, container_name, keep_data)
+
+    #
+    # ### END   2026-11-07 06:35:22
 
     ret.annotate(sourceMetaData=sourceMetaData)
 
@@ -4575,7 +4634,7 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
     return ret
 
-@timefunc
+# @timefunc
 @with_doc(copy_with_data_subset, use_header=True)
 @safewrapper
 def concatenate_blocks(*args, **kwargs):
@@ -4626,23 +4685,57 @@ def concatenate_blocks(*args, **kwargs):
 
     Var-keyword parameters:
     -----------------------
+        domain_shift: pq.Quantity | None (default)
 
-    There are three groups of keyword parameters:
+        This parameter allows the introduction of a shift in the domain of neo data
+        objects (e.g. time shift) such that the concatenated block reflects the
+        evolution of the entire experiment in the domain (usually, time).
+
+        In most cases you don't need to use this parameter (by default, it is
+        None).
+
+        When concatenating neo.Blocks with time-varying data, and domain_shift
+        is None, the data from individual blocks will be time-shifted with
+        respect to the first segment in the resulting neo.Block, so that the
+        global time sequence of recordings is reflected in the result. This algorithm
+        uses the `rec_datetime` attribute of each neo.Block supplied in `args`.
+
+        However, the data contained in the Blocks may not necessarily be defined
+        in the time domain. Exceptions are data created in the space domain during
+        image analysis, for example. In theory, Block data can be defined in ANY
+        physical domain as long as it makes sense for the given data (e.g. frequency
+        domain)
+        At the time of this writing, the `neo` package does not prevent this).
+
+        In such cases, the `rec_datetime` of each Block may not predictably depend
+        on the first domain coordinate of the data. Therefore, the `domain_shift`
+        must be supplied as a Quantity array of domain coordinates which may have:
+
+        * as many elements as the number of blocks to concatenate; these values
+        will be used for domain shifting of the data in each segment in the
+        resulting block.
+
+        * just one element (i.e. a scalar Quantity) - this value will be used
+        for domain shifting of ALL segments in the result.
+
+
+    Other keyword parameters:
 
     1. Parameters that specify new metadata for the newly created Block (see the
         documentation of the neo.Block):
 
-        name:str
+        name: str
 
-        description:str
+        description: str
 
-        rec_datetime:datetime.datetime
+        rec_datetime: datetime.datetime
 
-        file_origin:str
+        file_origin: str
 
-        file_datetime:datetime.datetime
+        file_datetime: datetime.datetime
 
-        annotation:dict
+        annotation: dict
+
 
     2. Parameters for choosing subsets of the Block's contents (WARNING: no
         checks are performed on these parameters; if they are wrong, exceptions
@@ -4839,6 +4932,8 @@ def concatenate_blocks(*args, **kwargs):
     """
     from neo.core.spiketrainlist import SpikeTrainList # noqa: F401
 
+    # ### BEGIN parse kwargs
+    #
     name = kwargs.get("name", "Concatenated block")
     description = kwargs.get("description", "Concatenated block")
     file_origin = kwargs.get("file_origin", "")
@@ -4847,14 +4942,25 @@ def concatenate_blocks(*args, **kwargs):
     annotations = kwargs.get("annotations", {})
     sortby = kwargs.pop("sortby", None)
     ascending = kwargs.pop("ascending", True)
+    domain_shift = kwargs.pop("domain_shift", None)
+
+    if not isinstance(domain_shift, pq.Quantity):
+        domain_shift = None
+
+    # elif domain_shift.size > 1:
+    #     scipywarn("Ignoring domain_shift keyword parameter because it is not a scalar Quantity")
+    #     domain_shift = None
 
     if not bool(ascending):
         ascending = False
 
     reverse = not ascending
+    #
+    # ### END   parse kwargs
 
 
     # ### BEGIN parse args
+    #
 
     # print(f"args: {type(args).__name__}: {len(args)} elements")
 
@@ -4921,6 +5027,7 @@ def concatenate_blocks(*args, **kwargs):
         elif all(isinstance(a, neo.Block) for a in args):
             blocks = args
 
+    #
     # ### END parse args
 
     # NOTE: 2023-12-19 09:43:19
@@ -4930,7 +5037,12 @@ def concatenate_blocks(*args, **kwargs):
     # by now, `blocks` should be a neo.Block or a sequence of neo.Blocks
 
     if isinstance(blocks, neo.Block):
-        # nothing to do here: return a copy of 'args'
+        # just one Block -> return a copy of 'args', possibly with a restricted
+        # data subset
+        # bring domain_shoft back into kwargs, only if it s a scalar quantity
+        if isinstance(domain_shift, pq.Quantity) and domain_shift.size > 1:
+            domain_shift = none
+        kwargs["domain_shift"] = domain_shift
         return copy_with_data_subset(blocks, **kwargs)
 
     if isinstance(blocks, collections.abc.Sequence) and all(
@@ -4970,11 +5082,35 @@ def concatenate_blocks(*args, **kwargs):
 
         firstBlockDatetime = blocks[0].rec_datetime
 
+        if isinstance(domain_shift, pq.Quantity):
+            if domain_shift.size > 1 and domain_shift.size != len(blocks):
+                scipywarn(f"Ignoring domain shift because it is neither a scalar, nor a sequence of {len(block)} shifts")
+                domain_shift = None
+
         for k, block in enumerate(blocks):
             # copy arg to a new block (block_src_copy); the **kwargs will take
             # care of selective copy of segments and of their contents
+            kw = deepcopy(kwargs)
+
+            # NOTE: 2026-11-07 08:01:12
+            # use the time shift code executed in copy_with_data_subset(…) function.!!
+
+            if not isinstance(domain_shift, pq.Quantity):
+                deltaSeconds = (
+                    block.rec_datetime - firstBlockDatetime
+                ).total_seconds() * pq.s
+
+                kw["domain_shift"] = deltaSeconds
+
+            else:
+                if domain_shift.size == 1:
+                    kw["domain_shift"] = domain_shift
+
+                elif domain_shift.size == len(blocks):
+                    kw["domain_shift"] = domain_shift[k]
+
             try:
-                block_src_copy = copy_with_data_subset(block, **kwargs)
+                block_src_copy = copy_with_data_subset(block, **kw)
             except:
                 print(
                     f"*****\nCannot copy block {k} (named: {getattr(block, 'name', None)}) with data subset\n*****\n"
@@ -4986,96 +5122,96 @@ def concatenate_blocks(*args, **kwargs):
             #
             # NOTE: 2023-12-19 09:52:44
             # store the time interval(in s) since the last prev block (may be 0):
-            deltaSeconds = (
-                block_src_copy.rec_datetime - firstBlockDatetime
-            ).total_seconds() * pq.s
+            # deltaSeconds = (
+            #     block_src_copy.rec_datetime - firstBlockDatetime
+            # ).total_seconds() * pq.s
 
-            for ks, seg in enumerate(block_src_copy.segments):
-                seg.file_origin = block_src_copy.file_origin
-                seg.rec_datetime = (
-                    block_src_copy.rec_datetime
-                )
-
-                # NOTE: 2023-12-19 09:48:51
-                # also propagate the time to the t_start of contained signals,
-                # RELATIVE to the first segment
-                for sig in seg.analogsignals:
-                    sig.t_start += deltaSeconds
-
-                for sig in seg.irregularlysampledsignals:
-                    if checkTimeUnits(sig.times):
-                        sig.times += deltaSeconds
-
-                if len(seg.events):
-                    evts = []
-                    for event in seg.events:
-                        if checkTimeUnits(event.times):
-                            # NOTE: 2023-12-19 10:55:13
-                            # an event may be a DataMark or TriggerEvent, not just neo.Event!
-                            evt = event.__class__(
-                                times=event.times + deltaSeconds,
-                                labels=event.labels,
-                                units=event.units,
-                                name=event.name,
-                                description=event.description,
-                                file_origin=event.file_origin,
-                            )
-                            evt.annotations.update(event.annotations)
-                            evt.array_annotate(*event.array_annotations)
-                            evts.append(evt)
-                        else:
-                            evts.append(event)
-
-                    seg.events = evts
-
-                if len(seg.epochs):
-                    epchs = []
-                    for epoch in seg.epochs:
-                        if checkTimeUnits(epoch.times):
-                            # NOTE: 2023-12-19 10:58:26
-                            # this may be a DataZone!
-                            epch = epoch.__class__(
-                                times=epoch.times + deltaSeconds,
-                                durations=epoch.durations,
-                                labels=epoch.labels,
-                                units=epoch.units,
-                                name=epoch.name,
-                                description=epoch.description,
-                                file_origin=epoch.file_origin,
-                            )
-                            epch.annotations.update(epoch.annotations)
-                            epch.array_annotate(*epoch.array_annotations)
-                            epchs.append(epch)
-                        else:
-                            epchs.append(epoch)
-
-                if len(seg.imagesequences):
-                    for iseq in seg.imagesequences:
-                        iseq.t_start += deltaSeconds
-
-                if len(seg.spiketrains):
-                    stt = []
-                    for st in seg.spiketrains:
-                        st_copy = neo.SpikeTrain(
-                            st.times + deltaSeconds,
-                            st.t_stop + deltaSeconds,
-                            units=st.units,
-                            sampling_rate=st.sampling_rate,
-                            t_start=st.t_start + deltaSeconds,
-                            waveforms=st.waveforms,
-                            left_sweep=st.left_sweep,
-                            name=st.name,
-                            file_origin=st.file_origin,
-                            description=st.description,
-                        )
-
-                        st_copy.annotations.update(st.annotations)
-                        st_copy.array_annotate(*st.array_annotations)
-                        stt.append(st_copy)
-
-                    seg.spiketrains.clear()
-                    for s in stt:
-                        seg.spiketrains.append(s)
+            # for ks, seg in enumerate(block_src_copy.segments):
+            #     seg.file_origin = block_src_copy.file_origin
+            #     seg.rec_datetime = (
+            #         block_src_copy.rec_datetime
+            #     )
+            #
+            #     # NOTE: 2023-12-19 09:48:51
+            #     # also propagate the time to the t_start of contained signals,
+            #     # RELATIVE to the first segment
+            #     for sig in seg.analogsignals:
+            #         sig.t_start += deltaSeconds
+            #
+            #     for sig in seg.irregularlysampledsignals:
+            #         if checkTimeUnits(sig.times):
+            #             sig.times += deltaSeconds
+            #
+            #     if len(seg.events):
+            #         evts = []
+            #         for event in seg.events:
+            #             if checkTimeUnits(event.times):
+            #                 # NOTE: 2023-12-19 10:55:13
+            #                 # an event may be a DataMark or TriggerEvent, not just neo.Event!
+            #                 evt = event.__class__(
+            #                     times=event.times + deltaSeconds,
+            #                     labels=event.labels,
+            #                     units=event.units,
+            #                     name=event.name,
+            #                     description=event.description,
+            #                     file_origin=event.file_origin,
+            #                 )
+            #                 evt.annotations.update(event.annotations)
+            #                 evt.array_annotate(*event.array_annotations)
+            #                 evts.append(evt)
+            #             else:
+            #                 evts.append(event)
+            #
+            #         seg.events = evts
+            #
+            #     if len(seg.epochs):
+            #         epchs = []
+            #         for epoch in seg.epochs:
+            #             if checkTimeUnits(epoch.times):
+            #                 # NOTE: 2023-12-19 10:58:26
+            #                 # this may be a DataZone!
+            #                 epch = epoch.__class__(
+            #                     times=epoch.times + deltaSeconds,
+            #                     durations=epoch.durations,
+            #                     labels=epoch.labels,
+            #                     units=epoch.units,
+            #                     name=epoch.name,
+            #                     description=epoch.description,
+            #                     file_origin=epoch.file_origin,
+            #                 )
+            #                 epch.annotations.update(epoch.annotations)
+            #                 epch.array_annotate(*epoch.array_annotations)
+            #                 epchs.append(epch)
+            #             else:
+            #                 epchs.append(epoch)
+            #
+            #     if len(seg.imagesequences):
+            #         for iseq in seg.imagesequences:
+            #             iseq.t_start += deltaSeconds
+            #
+            #     if len(seg.spiketrains):
+            #         stt = []
+            #         for st in seg.spiketrains:
+            #             st_copy = neo.SpikeTrain(
+            #                 st.times + deltaSeconds,
+            #                 st.t_stop + deltaSeconds,
+            #                 units=st.units,
+            #                 sampling_rate=st.sampling_rate,
+            #                 t_start=st.t_start + deltaSeconds,
+            #                 waveforms=st.waveforms,
+            #                 left_sweep=st.left_sweep,
+            #                 name=st.name,
+            #                 file_origin=st.file_origin,
+            #                 description=st.description,
+            #             )
+            #
+            #             st_copy.annotations.update(st.annotations)
+            #             st_copy.array_annotate(*st.array_annotations)
+            #             stt.append(st_copy)
+            #
+            #         seg.spiketrains.clear()
+            #         for s in stt:
+            #             seg.spiketrains.append(s)
 
             ret.segments.extend(block_src_copy.segments)
 

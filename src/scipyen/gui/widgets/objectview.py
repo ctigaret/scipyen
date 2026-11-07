@@ -740,7 +740,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             return
 
         model = self.sourceModel
-        objData = item.parent().data(ObjectDataRole) # NOTE: 2026-09-26 23:54:52 this is an ObjectNode
+        if isinstance(item,parent(), QtGui.QStandardItem):
+            objData = item.parent().data(ObjectDataRole) # NOTE: 2026-09-26 23:54:52 this is an ObjectNode
+        else:
+            objdata = item.data(ObjectDataRole)
 
         hasEditorWidgetChild = item.data(StandaloneEditorWidgetRole)
         if hasEditorWidgetChild is True:

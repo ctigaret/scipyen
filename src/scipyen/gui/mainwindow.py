@@ -5480,6 +5480,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         if not cm.isEmpty():
             cm.addSeparator()
 
+        # print(f"{self.__class__.__name__}._genInternalVarContextMenu: {len(indexList)} indexes")
+
         namestr = InflectEngine.plural('name', len(indexList))
 
         copyVarNames = cm.addAction(f"Copy {namestr}")
@@ -5719,7 +5721,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # internal_var_indices = [ndx for ndx in indexList
         #                         if self.workspaceModel.item(ndx.row(), standard_obj_summary_headers.index("Workspace")).text() == "Internal"]
         internal_var_indices = [ndx for ndx in indexList
-                                if self.workspaceModel.item(ndx.row(), self._wspace_headers_.index("Workspace")).text() == "Internal"]
+                                if (self.workspaceModel.item(ndx.row(), self._wspace_headers_.index("Workspace")).text() == "Internal"
+                                    and ndx.column() == 0)]
 
         external_var_indices = [
             ndx for ndx in indexList if ndx not in internal_var_indices]
