@@ -1,16 +1,16 @@
-# -*- coding: utf-8 -*-
 # $Id: scipyendataclasses.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r""" Contains the main dataclasses and descriptors in Scipyen
 """
 # from abc import ABC, ABCMeta, abstractmethod
 import collections  # noqa: I001
 # from collections import deque, namedtuple
 from functools import singledispatchmethod
 import itertools
+import more_itertools
 import datetime
 from enum import (Enum, IntEnum, EnumMeta, Flag, auto) #noqa
 import inspect
@@ -43,7 +43,7 @@ import quantities as pq
 from core import scipyen_quantities as scq
 # from core import xmlutils
 # from core import strutils
-from core.prog import (ImmutableDescriptor, scipywarn)
+from core.prog import (ImmutableDescriptor, scipywarn)  # noqa: F401
 # from core.datazone import DataZone
 # from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 # from core import bgbridge
@@ -52,7 +52,7 @@ from core.prog import (ImmutableDescriptor, scipywarn)
 from core.taxonbridge import TaxonDescriptor
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, # noqa
-                            EQUAL_NAN, GENOTYPES) # noqa
+                            EQUAL_NAN, GENOTYPES)
 
 #### END pict.core.modules
 
@@ -88,13 +88,10 @@ class ModelFunctionDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj:object, value: pq.Quantity | None = None):
+    def __set__(self, obj: object, value: types.FunctionType | None = None):
         from core import models
-        if isinstance(value, types.FunctionType) and not models.isModelFunction(value):
-            raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
-
-        elif value is not None:
-            raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
+        if value is not None and (not isinstance(value, types.FunctionType) or not models.isModelFunction(value)) :
+            raise ValueError(f"Expecting a model function or None; instead, {value.__name__} is an ordinary function")
 
         setattr(obj, self._name, value)
 
@@ -218,27 +215,17 @@ class ScipyenDataclass:
         entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
 
-        for name, value in data.items():
-            cached_entity = h5io.getCachedEntity(entity_cache, value)
+        for item_name, item_value in data.items():
+            cached_entity = h5io.getCachedEntity(entity_cache, item_value)
             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-                entity[name] = cached_entity
+                entity[item_name] = cached_entity
             else:
                 # element_entity = h5io.toHDF5(value, entity, name=name,
-                h5io.toHDF5(value, entity, name=name,
+                h5io.toHDF5(item_value, entity, name=item_name,
                                              compression=compression,
                                              chunks=chunks,
                                              track_order=track_order,
                                              entity_cache=entity_cache)
-                # ### BEGIN for debugging
-#                 if name in ("dose", "route"):
-#                     msg = f"{self.__class__.__name__}.toHDF5 created entity {element_entity} for field '{name}' ({type(value).__name__})"
-#                     if isinstance(value, np.ndarray):
-#                         msg += f" with size: {value.size} and shape: {value.shape}\n"
-#                     else:
-#                         msg += "\n"
-#
-#                     print(msg)
-                # ### END   for debugging
 
         return entity
 
@@ -761,29 +748,24 @@ class Biometrics(ScipyenDataclass):
     # These are entirely conventional, and, within the same line of genetic
     # animal model they would have a well-defined meaning
     #
-    genotype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    genotype: str | type(pd.NA) = dataclasses.field(default=pd.NA)
 
     geneticSex: GeneticSex = GeneticSex.undefined
     # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
     #
     stage: DevelopmentalStage = DevelopmentalStage.postnatal
 
-    age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    age: pq.Quantity | type(pd.NA) = dataclasses.field(default=pd.NA)
 
     #
     # NOTE: these are simply for a quick information; in the future Scipyen will
     # provide a more standardized way to store this information, hopefully more
     # suitable to some sort of database management
 
-    weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    weight: pq.Quantity | type(pd.NA) = dataclasses.field(default=pd.NA)
+    height: pq.Quantity | type(pd.NA) = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t") # noqa
-        # repr_attr = lambda x: (f": {type(x).__name__} → '{x}'" if isinstance(x, str)
-        #                        else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x))
-        #                        else f": {type(x).__name__} → {x.name} ({x})" if isinstance(x, Enum)
-        #                        else f": {type(x).__name__} → {x}") # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -792,16 +774,14 @@ class Biometrics(ScipyenDataclass):
 
 @dataclass
 class Organism(ScipyenDataclass):
-    taxon: TaxonDescriptor = TaxonDescriptor()
+    taxon: TaxonDescriptor = dataclasses.field(default_factory = TaxonDescriptor)
     subspecies: str = ""
     strain: str = ""
 
     biometrics: Biometrics = dataclasses.field(default_factory=Biometrics)
-    ID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    ID: str | type(pd.NA) = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t") # noqa
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -814,7 +794,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.genotype
 
     @genotype.setter
-    def genotype(self, val: typing.Optional[str]):
+    def genotype(self, val: str):
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, str) and len(val.strip()):
                 self.biometrics.genotype = val
@@ -827,7 +807,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.age
 
     @age.setter
-    def age(self, val: typing.Optional[pq.Quantity]):
+    def age(self, val: pq.Quantity):
         from core import scipyen_quantities as scq
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, pq.Quantity) and scq.checkTimeUnits(val.units):
@@ -841,7 +821,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.geneticSex
 
     @sex.setter
-    def sex(self, val: typing.Optional[GeneticSex]):
+    def sex(self, val: GeneticSex):
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, GeneticSex):
                 self.biometrics.sex = val
@@ -854,7 +834,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.stage
 
     @stage.setter
-    def stage(self, val: typing.Optional[DevelopmentalStage]):
+    def stage(self, val: DevelopmentalStage):
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, DevelopmentalStage):
                 self.biometrics.stage = val
@@ -868,7 +848,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.weight
 
     @weight.setter
-    def weight(self, val: typing.Optional[pq.Quantity]):
+    def weight(self, val: pq.Quantity):
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, pq.Quantity):
                 self.biometrics.weight = val
@@ -881,7 +861,7 @@ class Organism(ScipyenDataclass):
             return self.biometrics.height
 
     @height.setter
-    def height(self, val: typing.Optional[pq.Quantity]):
+    def height(self, val: pq.Quantity):
         if isinstance(self.biometrics, Biometrics):
             if isinstance(val, pq.Quantity):
                 self.biometrics.height = val
@@ -897,9 +877,7 @@ class Organism(ScipyenDataclass):
 @dataclass
 class BiologicalProduct(ScipyenDataclass):
     r"""Biological product (not cell, tissue, organ or organism)"""
-    parentType: typing.ClassVar[
-                typing.Tuple[ScipyenDataclass]
-        ] = (Organism, )
+    parentType: typing.ClassVar[tuple[ScipyenDataclass]] = (Organism, )
 
     type: BioProductType = dataclasses.field(default = BioProductType.undefined)
 
@@ -919,9 +897,7 @@ class BiologicalProduct(ScipyenDataclass):
 
 @dataclass
 class Organ(ScipyenDataclass):
-    parentTypes: typing.ClassVar[
-                typing.Tuple[ScipyenDataclass]
-        ] = (Organism, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Organism, )
 
     parent: Organism = dataclasses.field(default_factory = Organism)
 
@@ -951,9 +927,7 @@ class NervousSystem(Organ):
     """
     from core.bgbridge import BGStructureDescriptor
 
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Organism, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Organism, )
 
     # Specific organ structure, if relevant.
     #
@@ -978,9 +952,9 @@ class NervousSystem(Organ):
     #   and by the atlas is belongs to; therefore they can be uniquely compared
     #   for equality using only these two attributes (or rather elements of the
     #   source underlying dictionary)
-    atlasName: typing.Union[str, type(pd.NA)] = pd.NA
+    atlasName: str | type(pd.NA) = pd.NA
 
-    structure: BGStructureDescriptor = BGStructureDescriptor()
+    structure: BGStructureDescriptor = dataclasses.field(default_factory = BGStructureDescriptor)
 
     parent: Organism = dataclasses.field(default_factory = Organism)
 
@@ -996,18 +970,16 @@ class NervousSystem(Organ):
         return
 
     def __hash__(self) -> int:
-        return hash((self.atlasName))
+        return hash((self.atlasName,))
 
 Brain = NervousSystem # alias for backward copmatibility
 
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
-    parentTypes: typing.ClassVar[
-                typing.Tuple[ScipyenDataclass]
-        ] = (Organ, NervousSystem)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Organ, NervousSystem)
 
-    parent: typing.Union[Organ, NervousSystem] = dataclasses.field(default_factory = Organ)
+    parent: Organ | NervousSystem = dataclasses.field(default_factory = Organ)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
@@ -1024,15 +996,13 @@ class Tissue(ScipyenDataclass):
 
 @dataclass
 class Cell(ScipyenDataclass):
-    parentTypes: typing.ClassVar[
-                typing.Tuple[ScipyenDataclass]
-        ] = (Organ, Tissue, NervousSystem)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Organ, Tissue, NervousSystem)
 
-    cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+    cellType: str | type(pd.NA) = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
 
-    cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
+    cellSubType: str | type(pd.NA) = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
 
-    parent: typing.Union[Organ, Tissue] = dataclasses.field(default_factory = Tissue)
+    parent: Organ | Tissue = dataclasses.field(default_factory = Tissue)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
@@ -1041,7 +1011,6 @@ class Cell(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
-        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1049,13 +1018,11 @@ class Cell(ScipyenDataclass):
 
 @dataclass
 class Neuron(Cell):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Organ, Tissue, NervousSystem)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Organ, Tissue, NervousSystem)
 
     cellSubType: NeuronType = NeuronType.undefined
 
-    parent: typing.Optional[typing.Union[Organ, Tissue, NervousSystem]] = dataclasses.field(default_factory = NervousSystem)
+    parent: Organ | Tissue | NervousSystem = dataclasses.field(default_factory = NervousSystem)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
@@ -1070,9 +1037,7 @@ class Neuron(Cell):
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Cell, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Cell, )
 
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
 
@@ -1092,7 +1057,6 @@ class CellCompartment(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
-        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1100,9 +1064,7 @@ class CellCompartment(ScipyenDataclass):
 
 @dataclass
 class NeuronCompartment(CellCompartment):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Neuron, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Neuron, )
 
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
 
@@ -1121,9 +1083,7 @@ class NeuronCompartment(CellCompartment):
 
 @dataclass
 class AxonalCompartment(NeuronCompartment):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Neuron, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Neuron, )
 
     compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
 
@@ -1135,9 +1095,7 @@ class AxonalCompartment(NeuronCompartment):
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Neuron, )
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (Neuron, )
 
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
 
@@ -1152,15 +1110,13 @@ class UltrastructureElement:
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (CellCompartment, UltrastructureElement)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (CellCompartment, UltrastructureElement)
 
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
     # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    postsynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
-    presynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
+    postsynaptic: CellCompartment | UltrastructureElement = dataclasses.field(default_factory = NeuronCompartment)
+    presynaptic: CellCompartment | UltrastructureElement = dataclasses.field(default_factory = NeuronCompartment)
     transmitter: Neurotransmitter = Neurotransmitter.undefined
     retrograde: bool = False
 
@@ -1170,12 +1126,11 @@ class ChemicalSynapse(ScipyenDataclass):
 
     def getOrganism(self):
         if all(isinstance(p, (CellCompartment, NeuronCompartment)) for p in (self.postsynaptic, self.presynaptic)):
-            organisms = tuple(map(lambda p: p.getOrganism(), (self.postsynaptic, self.presynaptic)))
+            organisms = tuple(p.getOrganism() for p in (self.postsynaptic, self.presynaptic))
             if organisms[0] == organisms[1]:
                 return organisms[0]
 
     def setOrganism(self, organism: Organism):
-        # print(f"{self.__class__.__name__}.setOrganism({organism})")
         if not isinstance(organism, Organism):
             organism = Organism()
 
@@ -1184,19 +1139,16 @@ class ChemicalSynapse(ScipyenDataclass):
 
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (Cell, Neuron, NeuronCompartment, AxonalCompartment,
-             DendriticCompartment,
-             CellCompartment,
-             ChemicalSynapse, Tissue, Organ)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (
+        Cell, Neuron, NeuronCompartment, AxonalCompartment,
+        DendriticCompartment,
+        CellCompartment,
+        ChemicalSynapse, Tissue, Organ
+        )
 
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
 
-    parent: typing.Union[Cell, Neuron, NeuronCompartment, AxonalCompartment,
-             DendriticCompartment,
-             CellCompartment,
-             ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
+    parent: Cell | Neuron | NeuronCompartment | AxonalCompartment | DendriticCompartment | CellCompartment | ChemicalSynapse | Tissue | Organ = dataclasses.field(default_factory = Cell)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
@@ -1213,11 +1165,9 @@ class UltrastructureElement(ScipyenDataclass):
 
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
-    parentTypes: typing.ClassVar[
-            typing.Tuple[ScipyenDataclass]
-        ] = (ChemicalSynapse,)
+    parentTypes: typing.ClassVar[tuple[ScipyenDataclass]] = (ChemicalSynapse,)
 
-    elementType: ChemicalSynapseUltrastructureElementType = ChemicalSynapseUltrastructureElementType.undefined # noqa
+    elementType: ChemicalSynapseUltrastructureElementType = dataclasses.field(default = ChemicalSynapseUltrastructureElementType.undefined)
 
     parent: ChemicalSynapse = dataclasses.field(default_factory = ChemicalSynapse)
 
@@ -1281,9 +1231,7 @@ class BiologicalSource(ScipyenDataclass):
     #
 
 
-    sourceSpecimenTypeMap: typing.ClassVar[
-        dict[BioSourceType, typing.Tuple[type]]
-        ] = {
+    sourceSpecimenTypeMap: typing.ClassVar[dict[BioSourceType, tuple[type]]] = {
             BioSourceType.undefined: (
                                         Organism,
                                         Organ,
@@ -1416,18 +1364,7 @@ class BiologicalSource(ScipyenDataclass):
     # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — should
     # also be specified)
     # Equivalent to the unit of analysis
-    specimen: typing.Union[
-        Organism,
-        Organ,
-        NervousSystem,
-        Tissue,
-        Cell,
-        CellCompartment,
-        ChemicalSynapse,
-        UltrastructureElement,
-        ChemicalSynapseUltrastructureElement,
-        BiologicalProduct,
-        ] = dataclasses.field(
+    specimen: Organism | Organ | NervousSystem | Tissue | Cell | CellCompartment | ChemicalSynapse | UltrastructureElement | ChemicalSynapseUltrastructureElement | BiologicalProduct = dataclasses.field(
                 default_factory = Cell
             )
 
@@ -1463,8 +1400,8 @@ class BiologicalSource(ScipyenDataclass):
 
 # ------------------------------------------------------------------------------
 
-class PPLProtocol: pass # noqa
-class PPLProtocolStep: pass # noqa
+class PPLProtocol: pass
+class PPLProtocolStep: pass
 
 @dataclass
 class PPL(ScipyenDataclass):
@@ -1590,15 +1527,12 @@ class SubstanceDosage(ScipyenDataclass):
                 discrete, possibly irregular, times
     """
     name:str = "Vehicle"
-    dose: DoseDescriptor = DoseDescriptor()
-    # dose: DoseDescriptor = DoseDescriptor(default=None)
+    dose: DoseDescriptor = dataclasses.field(default_factory = DoseDescriptor)
 
     # Required for interconversion with HDF5
     __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t")
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1618,11 +1552,11 @@ class Treatment(Procedure):
     # Required for interconversion with HDF5
     __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
     _:KW_ONLY
-    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = dataclasses.field(default_factory=SubstanceDosage)
+    substance: SubstanceDosage | typing.Sequence[SubstanceDosage] = dataclasses.field(default_factory=SubstanceDosage)
     # allow combination of compounds
-    route:AdministrationRoute = AdministrationRoute.null
+    route: AdministrationRoute = AdministrationRoute.null
 
-    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment) # does not work ?!?
+    procedureType: ProcedureType = dataclasses.field(default = ProcedureType.treatment)
 
     def __post_init__(self):
         self.procedureType = ProcedureType.treatment
@@ -1656,8 +1590,6 @@ class Episode(ScipyenDataclass):
         return super().__eq__(other)
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t")
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1676,6 +1608,7 @@ class Episode(ScipyenDataclass):
 
     @property
     def endFrame(self):
+        r"""Read-only, dynamic property"""
         return self.beginFrame + self.nFrames - 1
 
 @dataclass
@@ -1704,13 +1637,11 @@ class Schedule(ScipyenDataclass):
     """
     # name:str = ""
     _:KW_ONLY
-    episodes:typing.Sequence[Episode] = dataclasses.field(default_factory = lambda : list())
+    episodes: typing.Sequence[Episode] = dataclasses.field(default_factory = list)
 
     allowed_contents: typing.ClassVar = (Episode, )
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t")
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1723,7 +1654,7 @@ class Schedule(ScipyenDataclass):
     def __len__(self)->int:
         return len(self.episodes)
 
-    def __getitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
+    def __getitem__(self, key: int | slice | range | tuple | list | collections.deque | str):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
@@ -1755,10 +1686,12 @@ class Schedule(ScipyenDataclass):
 
         elif isinstance(key, (tuple, list, collections.deque)):
             if len(key) == 0:
-                return list()
+                return []
+
             elif all(isinstance(k, int) for k in key):
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                     raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+
                 return [self.episodes[k] for k in key]
 
             else:
@@ -1767,9 +1700,8 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __setitem__(self, key:typing.Union[int, slice, range, tuple,
-                                           list, collections.deque],
-                    value:typing.Union[Episode, typing.Iterable[Episode]]):
+    def __setitem__(self, key: int | slice | range | tuple | list | collections.deque,
+                    value: Episode | typing.Iterable[Episode]):
         from core.utilities import unique
 
         if isinstance(key, int):
@@ -1783,7 +1715,7 @@ class Schedule(ScipyenDataclass):
 
             if key < len(self.episodes)-1:
                 nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
-                self.__adjustEpisodeBeginFrame__(value, nFramesBefore)
+                self._adjustEpisodeBeginFrame_(value, nFramesBefore)
 
                 if self.episodes[key].nFrames != value.nFrames:
                     delta = value.nFrames - self.episodes[key].nFrames
@@ -1797,7 +1729,7 @@ class Schedule(ScipyenDataclass):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
 
             if not all(isinstance(v, self.allowed_contents) for v in value):
-                raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
+                raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique(type(v).__name__ for v in value)}")
 
             value = list(map(deepcopy, value))
 
@@ -1817,7 +1749,7 @@ class Schedule(ScipyenDataclass):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
 
             if not all(isinstance(v, Episode) for v in value):
-                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique(type(v).__name__ for v in value)}")
 
             if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                 raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
@@ -1840,7 +1772,7 @@ class Schedule(ScipyenDataclass):
                     raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
 
                 if not all(isinstance(v, self.allowd_contents) for v in value):
-                    raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
+                    raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique(type(v).__name__ for v in value)}")
 
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                     raise IndexError(f"Index {k} out of range for {len(self.episodes)} episodes")
@@ -1862,9 +1794,7 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __delitem__(self, key:typing.Union[int, slice, range,
-                                           tuple, list, collections.deque,
-                                           str]):
+    def __delitem__(self, key: int | slice | range | tuple | list | collections.deque | str):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
@@ -1872,7 +1802,7 @@ class Schedule(ScipyenDataclass):
             if key < len(self.episodes)-1:
                 nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
                 for episode in self.episodes[key+1:]:
-                    self.__adjustEpisodeBeginFrame__(episode, nFramesBefore)
+                    self._adjustEpisodeBeginFrame_(episode, nFramesBefore)
 
             del self.episodes[key]
 
@@ -1896,7 +1826,7 @@ class Schedule(ScipyenDataclass):
                 nFramesBefore = sum([e.nFrames for e in self.episodes[:ndx]])
 
                 for ep in self.episodes[ndx+1:]:
-                    self.__adjustEpisodeBeginFrame__(ep, nFramesBefore)
+                    self._adjustEpisodeBeginFrame_(ep, nFramesBefore)
 
             keep  = [e for e in self.episodes if e.name != key]
 
@@ -1959,11 +1889,12 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
 
-        ret.__adjustBeginFrameAllEpisodes__()
+        ret._adjustBeginFrameAllEpisodes_()
 
         return ret
 
     def __iadd__(self, other):
+        r"""Implements a += b"""
         if isinstance(other, self.__class__):
             self.episodes.__iadd__(list(map(deepcopy, other.episodes)))
 
@@ -1975,19 +1906,19 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
 
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
         return self
 
     def __mul__(self, value:int):
         ret = self.__class__(name=self.name, description=self.description,
                              episodes = self.episodes.__mul__(value))
-        ret.__adjustBeginFrameAllEpisodes__()
+        ret._adjustBeginFrameAllEpisodes_()
         return ret
 
     def __imul__(self, value:int):
         self.episodes.__imul__(value)
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
         return self
 
     def __contains__(self, value:Episode):
@@ -2009,6 +1940,38 @@ class Schedule(ScipyenDataclass):
 
         self.episodes.append(value)
 
+    def add(self, value: Episode):
+        r"""Inserts or appends an episode according to its `begin` value.
+        If `value.begin` is larger than that of any exisitng episode, `value` is
+        appended; else, is inserted just before the efisrt episode with `begin`
+        larger than `value.begin`.
+
+        .. warning::
+            Assumes the schedule's episodes are all sorted in increasing order.
+    """
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
+
+        if len(self.episodes) == 0:
+            self.episodes.append(value)
+            self.episodes[0].beginFrame = 0
+            return
+
+        ndx = list(more_itertools.locate(self.episodes, lambda x: x.begin <= value.begin))
+
+        if len(ndx) == 0:
+            self.episodes.insert(0, value)
+            self.episodes[0].beginFrame = 0
+
+        else:
+            nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
+
+            self.episodes.insert(ndx[-1]+1, value) # now, value will be at ndx[-1]+1
+            self.episodes[ndx[-1]+1].beginFrame = nFrames[ndx[-1]]
+
+
+        # self._adjustBeginFrameAllEpisodes_() # don't think this is needed anymore
+
     def insert(self, index: int, value: Episode):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
@@ -2020,7 +1983,7 @@ class Schedule(ScipyenDataclass):
 
         else:
             if index >= len(self.episodes):
-                self.episodes.append(value)# will adapt value.beginFrame
+                self.episodes.append(value) # will adapt value.beginFrame
 
             else:
                 # list.insert(index, obj) -> inserts object BEFORE index
@@ -2038,7 +2001,7 @@ class Schedule(ScipyenDataclass):
                 # for episode in self.episodes[index+1:]:
                     # episode.beginFrame += nFramesBefore
 
-        self.__adjustBeginFrameAllEpisodes__()
+        # self._adjustBeginFrameAllEpisodes_()  # don't think this is needed anymore
 
     def pop(self, index:int=-1) -> Episode:
         # adjust the episodes AFTER the one to be removed
@@ -2059,24 +2022,23 @@ class Schedule(ScipyenDataclass):
 
     def reverse(self):
         self.episodes.reverse()
-
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def sort(self, *args, **kwargs):
         self.episodes.sort(*args, **kwargs)
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def sortBeginTime(self):
         self.episodes.sort(key = lambda x: x.begin)
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def sortEndTime(self):
         self.episodes.sort(key = lambda x: x.begin)
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def update(self):
         r"""Call this after individual changes to an episode frame boundaries in this schedule"""
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def extend(self, value):
         if isinstance(value, self.__class__):
@@ -2093,7 +2055,7 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Can only append a {self.__class__.__name__} or a sequence of {self.allowed_contents[0].__name__} objects")
 
-        self.__adjustBeginFrameAllEpisodes__()
+        self._adjustBeginFrameAllEpisodes_()
 
     def indexOf(self, episodeName: str) -> int:
         r"""
@@ -2113,7 +2075,7 @@ class Schedule(ScipyenDataclass):
         else:
             return -1
 
-    def index(self, episode:Episode):
+    def index(self, episode: Episode):
         if not isinstance(episode, self.allowed_contents):
             raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
@@ -2184,35 +2146,32 @@ class Schedule(ScipyenDataclass):
         raise NotImplementedError(f"Wrong index type: {type(ndx).__name__}")
 
     @episode.register(int)
-    def __episode__(self, ndx:int) -> Episode:
+    def _episode_(self, ndx:int) -> Episode:
         if ndx >= len(self.episodes) or ndx < -1 * len(self.episodes):
             raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
 
         return self.episodes[ndx]
 
     @episode.register(str)
-    def __episode__(self, name:str) -> Episode: # noqa
+    def _episode_(self, name:str) -> Episode: # noqa
         episodes = [e for e in self.episodes if e.name == name]
         if len(episodes):
             return episodes[0]
         else:
             raise IndexError(f"Episode name {name} does not exist")
 
-    def __adjustBeginFrameAllEpisodes__(self):
-        nFrames = 0
-
+    def _adjustBeginFrameAllEpisodes_(self):
+        nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
         for k, episode in enumerate(self.episodes):
             if k == 0:
                 if episode.beginFrame != 0:
                     episode.beginFrame = 0
 
             else:
-                if episode.beginFrame != nFrames:
-                    episode.beginFrame = nFrames
+                if episode.beginFrame != nFrames[k-1]:
+                    episode.beginFrame = nFrames[k-1]
 
-            nFrames += episode.nFrames
-
-    def __adjustEpisodeBeginFrame__(self, episode: Episode, nFramesBefore: int):
+    def _adjustEpisodeBeginFrame_(self, episode: Episode, nFramesBefore: int):
         if episode.beginFrame < nFramesBefore:
             newBeginFrame = nFramesBefore - episode.beginFrame
             episode.beginFrame = newBeginFrame
@@ -2317,7 +2276,7 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
 
     """
     # from copy import deepcopy
-    from core.utilities import unique
+    # from core.utilities import unique
 
     if not isinstance(typename, str):
         raise TypeError(f"'typename' expected a str; instead, got a {type(typename).__name__}")
@@ -2331,11 +2290,11 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     if len(args) < 2:
         raise ValueError("At least two dataclass types or instances are required")
 
-    fields = list(map(lambda f: (f.name, f.type, f), dataclasses.fields(args[0])))
+    fields = [(f.name, f.type, f) for f in dataclasses.fields(args[0])]
 
-    bases = list()
+    # bases = []
 
-    master_dict = dict()
+    master_dict = {}
 
     argfields = dataclasses.fields(args[0])
 
@@ -2345,12 +2304,13 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
 
     for arg in args[1:]:
         argfields = dataclasses.fields(arg)
-        f_0 = list(map(lambda f: f[0], fields))
+        f_0 = [f[0] for f in fields]
         # NOTE: 2025-04-24 22:03:31
         # dataclasses.make_dataclass does NOT allow any field duplicates
-        fields.extend(list(map(lambda f: (f.name, f.type, f), filter(lambda x: x.name not in f_0, argfields))))
+        fields.extend([(f.name, f.type, f) for f in filter(lambda x: x.name not in f_0, argfields)])
+                      # list(map(lambda f: (f.name, f.type, f), filter(lambda x: x.name not in f_0, argfields))))
 
-        if not isinstance(arg,type):
+        if not isinstance(arg, type):
             for f in argfields:
                 master_dict[f.name] = deepcopy(getattr(arg, f.name))
 
@@ -2361,7 +2321,7 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     nodefaults = list(filter(lambda f: f[2].default is dataclasses.MISSING and f[2].default_factory is dataclasses.MISSING,
                              fields))
 
-    if len(nodefaults) and not all(f[0] in master_dict.keys() for f in nodefaults):
+    if len(nodefaults) and not all(f[0] in master_dict for f in nodefaults):
         # no value found for these fields in args, indicating that at least
         # some of them were types, not instances
         ret = None
@@ -2420,7 +2380,7 @@ def getField(obj, field: dataclasses.Field) -> typing.Any:
     return getattr(obj, field.name, field.default_factory() if field.default is dataclasses.MISSING else field.default)
 
 
-def getFieldOrProperty(obj, field:typing.Union[dataclasses.Field, str],
+def getFieldOrProperty(obj, field: dataclasses.Field | str,
              default: typing.Any = dataclasses.MISSING) -> typing.Any:
     r"""Returns the value of a field of a dataclass instance.
 

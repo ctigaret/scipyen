@@ -9,7 +9,7 @@ import os  # noqa: I001
 # import sys
 import collections
 # import traceback
-# import datetime
+import datetime
 # import numbers
 import inspect
 import typing
@@ -165,6 +165,8 @@ class RecordingEpisodeType(TypeEnum):
 class RecordingEpisode(Episode):
     r"""
     Specification of an electrophysiology recording episode.
+
+    Specialization of scipyendataclasses.Episode
 
     An "episode" is a contiguous series of sweeps recorded under a common set
     of experimental conditions -- typically, a subset of a larger
@@ -1445,7 +1447,10 @@ class SweepPathCommands(ScipyenDataclass):
         return hash((self.pathway, self.abfEpochs, self.triggers))
 
 class PathwaysStimulationLayout:
-    r"""Represents the sequence of pathway stimulations per sweep, as defined in a protocol.
+    r"""Represents the sequence of pathway stimulations per recorded sweep.
+
+Applies to electrophysiology recordings obtained with episodic stimulation (i.e.
+in 'sweeps')
 
     .. |nbsp| unicode:: 0xA0
         :trim:
@@ -1662,7 +1667,7 @@ class PathwaysStimulationLayout:
 
     @property
     def pathways(self):
-        r"""The SynapticPathways in this instrance of PathwaysStimulationLayout"""
+        r"""The SynapticPathways associated with this instance of PathwaysStimulationLayout"""
         return self._pathways_
 
     @property
@@ -2063,6 +2068,7 @@ class SynapticPathway(ScipyenDataclass):
     adc: int = 0 # physical index of the ADC channel used in recording this pathway
     dac: int = 0 # physical index of the DAC channel used in recording this pathway
     stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
+    # rec_datetime: datetime.datetime = dataclasses.field(default = datetime.datetime.now())
 
     # NOTE: 2024-10-16 11:57:17
     # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
@@ -2100,7 +2106,7 @@ class SynapticPathway(ScipyenDataclass):
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
 
     def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null, # noqa: RUF033
-                      pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):
+                      pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):  # noqa: RUF033
 
         if isinstance(electrode, (int, str)):
             if electrode not in ephys.ElectrodeMode:
@@ -2134,6 +2140,12 @@ class SynapticPathway(ScipyenDataclass):
                     tuple(self.measurements)
                 )
             )
+
+    @property
+    def rec_datetime(self) -> datetime.datetime:
+        if len(self.schedule):
+            return self.schedule[0].begin
+        return datetime.datetime.now()
 
     @property
     def electrodeMode(self) -> ephys.ElectrodeMode:
