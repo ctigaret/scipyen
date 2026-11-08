@@ -137,13 +137,16 @@ def genColorTable(cmap, ncolors=256):
 
 class GuiWorkerSignals(QtCore.QObject):
     signal_Finished = Signal(name="signal_Finished")
-    sig_error = Signal(tuple, name="sig_error")
+    signal_Error = Signal(tuple, name="signal_Error")
     signal_Result = Signal(object, name="signal_Result")
 
 
 class GuiWorker(QtCore.QRunnable):
+    r"""
+Use with QThreadPool
+"""
     def __init__(self, fn, *args, **kwargs):
-        super(GuiWorker, self).__init__()
+        super().__init__()
 
         self.fn = fn
         self.args = args
@@ -157,18 +160,16 @@ class GuiWorker(QtCore.QRunnable):
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
-            self.signals.signal_Result.emit(self.result)  # Return the result of the processing
 
-        except:
+        except Exception:  # noqa: BLE001
             traceback.print_exc()
-
             exc_type, value = sys.exc_info()[:2]
-
-            self.signals.sig_error.emit((exc_type, value, traceback.format_exc()))
+            self.signals.signal_Error.emit((exc_type, value, traceback.format_exc()))
 
         else:
+            self.signals.signal_Result.emit(self.result)  # Return the result of the processing
             #self.signals.signal_Result.emit(self.result)  # Return the result of the processing
-            self.signals.signal_Finished.emit()  # Done
+            # self.signals.signal_Finished.emit()  # Done
 
         finally:
             self.signals.signal_Finished.emit()  # Done
@@ -184,7 +185,7 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_Finished
         No data
 
-    sig_error
+    signal_Error
         `tuple` (exctype, value, traceback.format_exc() )
 
     signal_Result
@@ -196,7 +197,7 @@ class ProgressWorkerSignals(QtCore.QObject):
     """
 
     signal_Finished = Signal()
-    sig_error = Signal(tuple)
+    signal_Error = Signal(tuple)
     signal_Result = Signal(object)
     signal_Progress = Signal(int)
     signal_setMaximum = Signal(int)
@@ -205,7 +206,7 @@ class ProgressWorkerSignals(QtCore.QObject):
     @property
     def signals(self):
         return (self.signal_Finished,
-                self.sig_error,
+                self.signal_Error,
                 self.signal_Result,
                 self.signal_Progress,
                 self.signal_setMaximum,
@@ -276,7 +277,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            self.signals.signal_Error.emit((exctype, value, traceback.format_exc()))
 
         else:
             self.signals.signal_Result.emit(result)  # Return the result of the processing
@@ -408,7 +409,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            self.signals.signal_Error.emit((exctype, value, traceback.format_exc()))
 
         else:
             self.signals.signal_Result.emit(result)  # Return the result of the processing
@@ -495,15 +496,15 @@ class WorkerThread(QtCore.QThread):
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
-            if result:
-                self.signals.signal_Result.emit(result)
-        except:
+        except Exception:  # noqa: BLE001
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            self.signals.signal_Error.emit((exctype, value, traceback.format_exc()))
 
         else:
-            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Result.emit(result)
+
+        finally:
             self.signals.signal_Finished.emit()
 
 
@@ -535,7 +536,7 @@ class LoopWorkerThread(QtCore.QThread):
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
-            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            self.signals.signal_Error.emit((exctype, value, traceback.format_exc()))
 
         else:
             # self.signals.signal_Result.emit(result)

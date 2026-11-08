@@ -1230,6 +1230,14 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             self.add_menu_action(self.kernel_menu, self.initialize_neuron_act)
 
+    @Slot()
+    def _slot_set_syntax_style(self):
+        r"""Slot for PySide6"""
+        action = self.sender()
+        styleName = action.text()
+        # print(f"{self.__class__.__name__}._slot_set_syntax_style: styleName {styleName}")
+        self._set_syntax_style(styleName)
+
     def _supplement_view_menu_(self):
         ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
 

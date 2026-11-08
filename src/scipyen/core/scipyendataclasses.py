@@ -1910,18 +1910,20 @@ class Schedule(ScipyenDataclass):
 
         return self
 
-    def __mul__(self, value:int):
+    def __mul__(self, value: int):
         ret = self.__class__(name=self.name, description=self.description,
                              episodes = self.episodes.__mul__(value))
         ret._adjustBeginFrameAllEpisodes_()
         return ret
 
-    def __imul__(self, value:int):
+    def __imul__(self, value: int):
         self.episodes.__imul__(value)
         self._adjustBeginFrameAllEpisodes_()
         return self
 
-    def __contains__(self, value:Episode):
+    def __contains__(self, value: Episode | str):
+        if isinstance(value, str):
+            return value in (e.name for e in self.episodes)
         return value in self.episodes
 
     @property
@@ -2057,23 +2059,32 @@ class Schedule(ScipyenDataclass):
 
         self._adjustBeginFrameAllEpisodes_()
 
-    def indexOf(self, episodeName: str) -> int:
+    def indexOf(self, episodeName: str, first: bool = True) -> int | list[int]:
         r"""
-            Index of first episode with specified name.
+            Index of episode(s) with name given as `episodeName`.
 
         Returns -1 if no episode with the specified name exists.
 
-        Returns the index of the first episode with the specified name.
+        When `first` is True (default), returns the index of the first episode
+        with the specified name (ignoring duplicates)
 
-        WARNING: duplicates are ignored, so best practice is to make sure that
-        each episode in the schedule has a unique name
+        Otherwise, returns a list of indexes of all episodes with the specified name
+
     """
-        ndx = [k for k in range(len(self.episodes)) if self.episodes[k].name == episodeName]
-        if len(ndx):
-            return ndx[0]
+        if not first:
+            ndx = list(more_itertools.locate(self.episodes, lambda x: x.name == episodeName))
+            if len(ndx) == 0:
+                return -1
+            else:
+                return ndx
 
         else:
-            return -1
+            ndx = [k for k in range(len(self.episodes)) if self.episodes[k].name == episodeName]
+            if len(ndx):
+                return ndx[0]
+
+            else:
+                return -1
 
     def index(self, episode: Episode):
         if not isinstance(episode, self.allowed_contents):

@@ -138,6 +138,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
     sig_requestDataRow = Signal(name="sig_requestDataRow")
+    sig_indexPressed = Signal(QtCore.QModelIndex, name="sig_indexPressed")
 
     def __init__(self, parent: QtWidgets.QMainWindow | None = None,
                  readOnly:bool = True, enforceFloat: bool = False,
@@ -300,41 +301,42 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         for row in range(self._dataModel_.rowCount()):
             for col in range(self._dataModel_.columnCount()):
                 index = self._dataModel_.index(row, col)
-                indexData = index.data(ObjectDataRole) # noqa
+                indexData = index.data(ObjectDataRole)
+
                 if indexData is None:
                     indexData = index.data(QtCore.Qt.EditRole)
 
                 if isinstance(indexData, bool):
                     self.tableView.openPersistentEditor(index)
 
-                if hasattr(self._dataModel_, "_modelDataColumnHeaders_"):
-                    if self._dataModel_._modelDataColumnHeaders_[col].lower() == "edit":
-                        self.tableView.openPersistentEditor(index)
+                if (hasattr(self._dataModel_, "_modelDataColumnHeaders_")
+                    and self._dataModel_._modelDataColumnHeaders_[col].lower() == "edit"):
+                    self.tableView.openPersistentEditor(index)
 
 
         with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
-        # signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.tableView.horizontalHeader(), self.tableView.verticalHeader())))
             if self.isAutoResizeColumns:
                 self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
             if self.isAutoResizeRows:
                 self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
-
     @Slot()
     def _slot_prevSlice(self):
-        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
-            if self.currentSlice > 0:
-                self.currentSlice = self.currentSlice - 1
+        if (isinstance(self._data_, np.ndarray)
+            and self._data_.ndim > 2
+            and self.currentSlice > 0):
+            self.currentSlice = self.currentSlice - 1
 
     @Slot()
     def _slot_nextSlice(self):
-        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
-            if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
-                self.currentSlice = self.currentSlice + 1
+        if (isinstance(self._data_, np.ndarray)
+            and self._data_.ndim > 2
+            and self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 ):
+            self.currentSlice = self.currentSlice + 1
 
     @property
-    def selectedColumnIndex(self) -> typing.Optional[int]:
+    def selectedColumnIndex(self) -> int | None:
         r"""DEPRECATED"""
         # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
         return self._selectedColumnIndex_
@@ -352,7 +354,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         return utilities.unique([ndx.row() for ndx in self.tableView.selectedIndexes()])
 
     @property
-    def selectedRowIndex(self) -> typing.Optional[int]:
+    def selectedRowIndex(self) -> int | None:
         r"""DEPRECATED"""
         return self._selectedRowIndex_
 
@@ -400,27 +402,33 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
     @currentSlice.setter
     def currentSlice(self, val):
-        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
-            if isinstance(val, int):
-                if val >=0 and val < self._data_.ndim:
-                    self._currentSlice_ = val
-                    if self._currentSlice_ == 0:
-                        self.prevSliceToolbutton.setEnabled(False)
-                        self.nextSliceToolButton.setEnabled(True)
+        if (isinstance(self._data_, np.ndarray)
+            and self._data_.ndim > 2
+            and isinstance(val, int)
+            and val >=0
+            and val < self._data_.ndim):
+            self._currentSlice_ = val
+            if self._currentSlice_ == 0:
+                self.prevSliceToolbutton.setEnabled(False)
+                self.nextSliceToolButton.setEnabled(True)
 
-                    elif self._currentSlice_ >= self._data_.shape[self._slicingAxis_] - 1:
-                        self.prevSliceToolbutton.setEnabled(True)
-                        self.nextSliceToolButton.setEnabled(False)
+            elif self._currentSlice_ >= self._data_.shape[self._slicingAxis_] - 1:
+                self.prevSliceToolbutton.setEnabled(True)
+                self.nextSliceToolButton.setEnabled(False)
 
-                    else:
-                        self.prevSliceToolbutton.setEnabled(True)
-                        self.nextSliceToolButton.setEnabled(True)
+            else:
+                self.prevSliceToolbutton.setEnabled(True)
+                self.nextSliceToolButton.setEnabled(True)
 
-                    self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+            self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
 
     def clear(self):
         self._dataModel_ = TabularDataModel(parent=self)
         self.tableView.setModel(self._dataModel_)
+
+    @property
+    def model(self) -> TabularDataModel:
+        return self.tableView.model()
 
     @property
     def enforceFloat(self) -> bool:
@@ -518,6 +526,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
         self.tableView.clicked[QtCore.QModelIndex].connect(self.slot_tableItemClicked)
+        self.tableView.pressed[QtCore.QModelIndex].connect(self.slot_tableItemPressed)
 
 
         self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
@@ -541,32 +550,30 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         self.setEditableToolButton.toggled.connect(self._slot_setEditable)
 
     @Slot(bool)
-    def _slot_setEditable(self, value:bool):
+    def _slot_setEditable(self, value: bool):
         self.readOnly = not value
 
     @Slot(QtCore.QModelIndex)
-    def slot_tableItemClicked(self, index:QtCore.QModelIndex):
+    def slot_tableItemClicked(self, index: QtCore.QModelIndex):
         self.sig_selectionChanged.emit()
+
+    @Slot(QtCore.QModelIndex)
+    def slot_tableItemPressed(self, index: QtCore.QModelIndex):
+        self.sig_indexPressed.emit(index)
 
     @Slot()
     def slot_resizeAllColumnsToContents(self):
-        #print("TableEditorWidget slot_resizeAllColumnsToContents")
-        # signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
             self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @Slot()
     def slot_resizeAllRowsToContents(self):
-        # signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
             self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @Slot(QtCore.QPoint)
     @safewrapper
     def slot_horizontal_header_context_menu_request(self, pos):
-        #print("horizontal header context menu at pos %s" % pos)
-        #print("clicked column %s" % self.tableView.columnAt(pos.x()))
-
         if len(self.selectedColumnIndexes) == 0:
             self.selectedColumnIndex = self.tableView.columnAt(pos.x())
         else:
@@ -1003,13 +1010,13 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
             model = self.tableView.model()
             rowEntity = "row"
             if isinstance(model, TabularDataModel) and model.canAlterRows:
-                if hasattr(model._modelData_, "allowed_contents"):
-                    if isinstance(model._modelData_.allowed_contents, typing.Sequence):
-                        if len(model._modelData_.allowed_contents) == 1:
-                            rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
+                if (hasattr(model._modelData_, "allowed_contents")
+                    and isinstance(model._modelData_.allowed_contents, typing.Sequence)):
+                    if len(model._modelData_.allowed_contents) == 1:
+                        rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
 
-                        elif len(model._modelData_.allowed_contents) > 1:
-                            rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
+                    elif len(model._modelData_.allowed_contents) > 1:
+                        rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
 
                 selectedIndexes = self.tableView.selectedIndexes()
 

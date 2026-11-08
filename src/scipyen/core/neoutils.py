@@ -148,28 +148,28 @@ V. Generic indexing for the neo framework (provisional)
 # file_datetime, rec_datetime where appropriate
 
 #### BEGIN core python modules
-import traceback, datetime, numbers, inspect, warnings, typing, types
+import traceback, datetime, numbers, inspect, warnings, typing, types  # noqa: I001,F401
 from collections import deque
 import collections.abc
 import operator
 from itertools import chain, filterfalse, pairwise
 from functools import partial, reduce, singledispatch
-from copy import copy, deepcopy
+from copy import copy, deepcopy  # noqa: F401
 from enum import (
-    Enum,
-    IntEnum,
+    Enum,  # noqa: F401
+    IntEnum,  # noqa: F401
 )
 from dataclasses import MISSING
 import importlib
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from IPython.lib.pretty import pprint as prp
+from IPython.lib.pretty import pprint as prp  # noqa: F401
 import numpy as np
-import scipy
+import scipy  # noqa: F401
 import quantities as pq
 import neo
-import pandas as pd
+import pandas as pd  # noqa: F401
 
 if neo.__version__ >= "0.13.0":
     from neo.core.objectlist import ObjectList as NeoObjectList
@@ -182,11 +182,11 @@ else:
 
 # NOTE: 2022-12-21 10:48:47
 # use the more relaxed version of intersect_annotations and merge_annotations
-from neo.core.baseneo import MergeError, _reference_name, _container_name
+from neo.core.baseneo import MergeError, _container_name  # noqa: I001
 
-from neo.core.dataobject import DataObject, ArrayDict
+from neo.core.dataobject import ArrayDict
 import matplotlib as mpl
-import pyqtgraph as pg
+# import pyqtgraph as pg
 
 import matplotlib.pyplot as plt
 #### END 3rd party modules
@@ -195,27 +195,27 @@ import matplotlib.pyplot as plt
 
 from .prog import (
     safewrapper,
-    deprecation,
+    # deprecation,
     filter_attr,
-    filterfalse_attr,
-    filter_type,
-    filterfalse_type,
-    iter_attribute,
+    # filterfalse_attr,
+    # filter_type,
+    # filterfalse_type,
+    # iter_attribute,
     signature_as_dict,
     with_doc,
     scipywarn,
-    timefunc,
+    timefunc,  # noqa: F401
 )
 
 
 from .constants import (
-    RELATIVE_TOLERANCE,
-    ABSOLUTE_TOLERANCE,
-    EQUAL_NAN,
+    RELATIVE_TOLERANCE,  # noqa: F401
+    ABSOLUTE_TOLERANCE,  # noqa: F401
+    EQUAL_NAN,  # noqa: F401
 )
 
 import core.scipyen_quantities as scq
-from .scipyen_quantities import (unitsConvertible, checkTimeUnits, unitFamilyName,
+from .scipyen_quantities import (unitsConvertible, checkTimeUnits, unitFamilyName,  # noqa: F401
                                  unitQuantityFromNameOrSymbol)
 from .datasignal import (
     DataSignal,
@@ -225,7 +225,7 @@ from .datazone import (DataZone, Interval)
 
 from .triggerevent import (
     DataMark,
-    MarkType,
+    MarkType,  # noqa: F401
     TriggerEvent,
     TriggerEventType,
 )
@@ -235,14 +235,14 @@ from . import workspacefunctions
 from . import utilities
 from core.utilities import (
     # normalized_index, # don't; it will be overridden by normalized_index in this module
-    name_lookup,
-    GeneralIndexType,
-    elements_types,
-    index_of,
+    # name_lookup,
+    # GeneralIndexType,
+    # elements_types,
+    # index_of,
     isclose,
 )
 
-from core.strutils import (InflectEngine, pluralize, counter_suffix, similar_strings)
+from core.strutils import (InflectEngine, pluralize, counter_suffix, similar_strings)  # noqa: F401
 # from core import pyabfbridge as pab # commented-out, to avoid circular imports!
 
 #### END pict.core modules
@@ -302,7 +302,7 @@ type_to_container_member_name = {
 }
 
 if __debug__:
-    global __debug_count__
+    # global __debug_count__
 
     __debug_count__ = 0
 
@@ -325,7 +325,7 @@ def sweep_duration(data: neo.Segment):
         s.duration
         for s in data.analogsignals
         + data.irregularlysampledsignals
-        + list(st for st in data.spiketrains)
+        + [st for st in data.spiketrains]
     )
 
 
@@ -691,10 +691,11 @@ def merge_array_annotations(a0: ArrayDict, a1: ArrayDict):
     # Warn if keys were omitted
     if omitted_keys_a1 or omitted_keys_a0:
         warnings.warn(
-            "The following array annotations were omitted, because they were only "
-            "present in one of the merged objects: {} from the one that was merged "
-            "into and {} from the one that was merged into the other"
-            "".format(omitted_keys_a0, omitted_keys_a1),
+            "\n".join([
+                "The following array annotations were omitted, because they were only ",
+                f"present in one of the merged objects: {omitted_keys_a0} from the one that was merged ",
+                f"into and {omitted_keys_a1} from the one that was merged into the other",
+                ""]),
             UserWarning,
         )
 
@@ -735,6 +736,8 @@ def make_neo_object(obj, /, **kwargs):
 def _make_neo_object_(obj, /, **kwargs):
     r"""Generic (copy) constructor for neo's Container-like objects.
 
+    These are: neo.Block, neo.Segment, neo.Group
+
     Generates an empty container of the same type as 'obj'; data children need
     to be added manually to the returned Container instance.
 
@@ -762,13 +765,12 @@ def _make_neo_object_(obj, /, **kwargs):
     # `attr_params`: tuples: (name, type or ndim for ndarrays)
     attr_params = obj._necessary_attrs + obj._recommended_attrs
 
-    attr_named_params = dict((p[0], getattr(obj, p[0], None)) for p in attr_params)
+    attr_named_params = {p[0]: deepcopy(getattr(obj, p[0], None)) for p in attr_params}
 
-    sig_named_params = dict(
-        (param_name, deepcopy(getattr(obj, param_name, param_value[0])))
-        for param_name, param_value in signature.named.items()
-        if hasattr(obj, param_name)
-    )
+    sig_named_params = {param_name: deepcopy(getattr(obj, param_name, param_value[0]))
+                        for param_name, param_value in signature.named.items()
+                        if hasattr(obj, param_name)}
+
 
     factory_pos_params = tuple(
         deepcopy(getattr(obj, param_name))
@@ -776,22 +778,22 @@ def _make_neo_object_(obj, /, **kwargs):
         if hasattr(obj, param_name) and isinstance(getattr(obj, param_name), param_type)
     )
 
-    factory_named_params = dict()
+    factory_named_params = {}
     factory_named_params.update(attr_named_params)
     factory_named_params.update(sig_named_params)
 
     # NOTE: 2021-11-23 10:37:19
     # this is the "annotations"
-    sig_kwargs_param = list(signature.varkw.keys())[0]
+    sig_kwargs_param = next(iter(signature.varkw.keys())) # list(signature.varkw.keys())[0]
     factory_kwarg_params = (
         deepcopy(getattr(obj, sig_kwargs_param))
         if hasattr(obj, sig_kwargs_param)
         and isinstance(getattr(obj, sig_kwargs_param, None), dict)
-        else dict()
+        else {}
     )
 
     # finally bring together all of the above
-    factory_params = dict()
+    factory_params = {}
 
     factory_params.update(factory_named_params)
     factory_params.update(factory_kwarg_params)
@@ -807,14 +809,14 @@ def _make_neo_object_(obj, /, **kwargs):
 
 
 @make_neo_object.register(neo.core.spiketrainlist.SpikeTrainList)
-def _make_neo_object_(obj, /, **kwargs):
-    items = [make_neo_obj(st) for st in obj]
+def _make_neo_object_(obj, /, **kwargs): # noqa: F811
+    items = [make_neo_object(st) for st in obj]
     segment = obj.segment
     return neo.core.spiketrainlist.SpikeTrainList(items=items, segment=segment)
 
 
 @make_neo_object.register(neo.core.dataobject.DataObject)
-def _make_neo_object_(obj, /, **kwargs):
+def _make_neo_object_(obj, /, **kwargs): # noqa: F811
     r"""Generic (copy) constructor for objects of types inheriting neo.DataObject.
     Initialization based on half-educated guess, for code refactoring.
 
@@ -861,11 +863,11 @@ def _make_neo_object_(obj, /, **kwargs):
 
     attr_params = obj._necessary_attrs + obj._recommended_attrs
 
-    sig_named_params = dict(
-        (param_name, kwargs.pop(param_name, deepcopy(getattr(obj, param_name, param_value[0]))))
-        for param_name, param_value in signature.named.items()
-        if hasattr(obj, param_name)
-    )
+    sig_named_params = {param_name: kwargs.pop(param_name, deepcopy(getattr(obj, param_name, param_value[0])))
+                        for param_name, param_value in signature.named.items()
+                        if hasattr(obj, param_name)
+                        }
+
 
     factory_pos_params = tuple(
         kwargs.pop(param_name, deepcopy(getattr(obj, param_name, None)))
@@ -873,29 +875,29 @@ def _make_neo_object_(obj, /, **kwargs):
         if hasattr(obj, param_name) and isinstance(getattr(obj, param_name), param_type)
     )
 
-    factory_named_params = dict()
+    factory_named_params = {}
 
     if isinstance(obj, neo.core.basesignal.BaseSignal):
         # NOTE: 2021-11-23 10:36:53
         # only for BaseSignal objects:
         # obj._quantity_attr names the parameter for the actual numeric data
         # going into the signal
-        attr_named_params = dict(
-            (p[0], kwargs.pop(p[0], deepcopy(getattr(obj, p[0], None))))
-            for p in attr_params
-            if p[0] != obj._quantity_attr
-        )
+        attr_named_params = {p[0]: kwargs.pop(p[0], deepcopy(getattr(obj, p[0], None)))
+                            for p in attr_params
+                            if p[0] != obj._quantity_attr
+                            }
+
         factory_named_params[obj._quantity_attr] = obj.magnitude
 
     else:
-        attr_named_params = dict((p[0], deepcopy(getattr(obj, p[0], None))) for p in attr_params)
+        attr_named_params = {p[0]: deepcopy(getattr(obj, p[0], None)) for p in attr_params}
 
     factory_named_params.update(attr_named_params)
     factory_named_params.update(sig_named_params)
 
     # NOTE: 2021-11-23 10:37:19
     # this is the "annotations"
-    sig_kwargs_param = list(signature.varkw.keys())[0]
+    sig_kwargs_param = next(iter(signature.varkw.keys())) # list(signature.varkw.keys())[0]
     factory_kwarg_params = (
         deepcopy(getattr(obj, sig_kwargs_param))
         if hasattr(obj, sig_kwargs_param)
@@ -904,7 +906,7 @@ def _make_neo_object_(obj, /, **kwargs):
     )
 
     # finally bring together all of the above
-    factory_params = dict()
+    factory_params = {}
 
     factory_params.update(factory_named_params)
     factory_params.update(factory_kwarg_params)
@@ -937,7 +939,7 @@ def combine_time_ranges(time_ranges):
 def invert_time_ranges(time_ranges):
     r"""This is neo.AnalogSignal._invert_time_ranges()"""
     i = 0
-    new_ranges = list()
+    new_ranges = []
     while i < len(time_ranges) - 1:
         new_ranges.append((time_ranges[i][1], time_ranges[i + 1][0]))
         i += 1
@@ -947,9 +949,9 @@ def invert_time_ranges(time_ranges):
 
 def fuse_irregular_signals(
     *args,
-    func: typing.Optional[typing.Callable] = np.nanmean,
-    name: typing.Optional[str] = None,
-) -> typing.Union[IrregularlySampledDataSignal, neo.IrregularlySampledSignal]:
+    func: typing.Callable = np.nanmean,
+    name: str | None = None,
+) -> IrregularlySampledDataSignal | neo.IrregularlySampledSignal:
     r"""Fusion of irregularly sampled (data) signals.
 
     Given a sequence of irregularly sampled signals with compatible domains and
@@ -4335,7 +4337,7 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
 
     time_shift = kwargs.pop("time_shift", None)
 
-    for kwarg in kwargs.keys():
+    for kwarg in kwargs:
         if kwarg not in obj._child_containers:
             not_kwargs[kwarg] = kwargs[kwarg]
 
@@ -4391,12 +4393,14 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
         raise
 
     for k, seg in enumerate(new_segments):
-        osn = f" named {seg.name} " if isinstance(seg.name, str) and len(seg.name.strip()) else " "
+        osn = f" {seg.name} " if isinstance(seg.name, str) and len(seg.name.strip()) else " "
         seg.annotate(
             origin=obj.file_origin,
             original_segment=f"Segment [{k}]{osn} of {obj.__class__.__name__} object {getattr(obj, 'name', None)}",
         )
-        # seg.annotations["origin"] = f"Segment {seg.name} [{seg.index}] of {obj.name}"
+        # NOTE: 2026-11-08 14:23:01
+        # assign an appropriate rec_datetime to the new segment
+        seg.rec_datetime = obj.rec_datetime + datetime.timedelta(seconds=float(segment_start(seg).rescale(pq.s).magnitude))
         seg.index = k
         seg.name = f"segment_{k}"
         seg.block = ret
@@ -4494,8 +4498,8 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     However, the data in original is left unchanged.
 
 """
-    import difflib
-    from neo.core.spiketrainlist import SpikeTrainList
+    # import difflib
+    # from neo.core.spiketrainlist import SpikeTrainList
     # print(f"neoutils.copy_with_data_subset[neo.Segment](segment name {obj.name} index {obj.index})")
 
     domain_shift = kwargs.pop("domain_shift", None)
@@ -4510,13 +4514,10 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     # DataSignal, IrregularlySampledDataSignal, DataMark, TriggerEvent,
     # DataZone, Interval, and MarkTrain
 
-    if isinstance(domain_shift, pq.Quantity):
-        if domain_shift.size > 1:
-            scipywarn("Ignoring domain_shift because it is not a scalar")
-            domain_shift = None
+    if isinstance(domain_shift, pq.Quantity) and domain_shift.size > 1:
+        scipywarn("Ignoring domain_shift because it is not a scalar")
+        domain_shift = None
         # if not scq.checkTimeUnits(domain_shift):
-        #     scipywarn("Ignoring domain_shift because it is not a Time quantity")
-        #     domain_shift = None
 
 
 
@@ -4527,6 +4528,7 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     sourceMetaData = {}
 
     name = kwargs.pop("name", obj.name)
+
     if name != obj.name:
         sourceMetaData["name"] = obj.name
 
@@ -4563,17 +4565,13 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     not_kwargs = {}
 
     # see NOTE: 2023-04-13 09:45:19
-    for kw in kwargs.keys():
-        if kw not in data_child_object_names:
-            not_kwargs[kw] = kwargs[kw]
+    for kwarg in kwargs:
+        if kwarg not in data_child_object_names:
+            not_kwargs[kwarg] = kwargs[kwarg]
 
-    for k in not_kwargs.keys():
-        kwargs.pop(k, None)
+    for kwarg in not_kwargs:
+        kwargs.pop(kwarg, None)
 
-    # indexing = dict(
-    #     (_container_name(s), kwargs.pop(_container_name(s), None))
-    #     for s in obj._data_child_objects
-    # )
     indexing = {_container_name(s): kwargs.pop(_container_name(s), None) for s in obj._data_child_objects}
 
     ret = make_neo_object(obj)
@@ -4584,7 +4582,7 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     #
     for container_name, indices in indexing.items():
         # NOTE: 2021-11-23 13:39:15
-        # the conversion to list also takes care of SpikeTrainList object
+        # the conversion to list also takes care of SpikeTrainList objects
         # print(f"neoutils.copy_with_data_subset[neo.Segment] -> _container_name = {container_name}")
         container = list(getattr(obj, container_name))
         try:
@@ -4610,6 +4608,7 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
         for k, d in enumerate(keep_data):
             d.segment = ret
+            # apply domain_shift if given
             if isinstance(domain_shift, pq.Quantity): # and scq.checkTimeUnits(d.times):
                 if hasattr(d, "time_shift") and scq.unitsConvertible(domain_shift, d.times):
                     # NOTE: 2026-11-07 06:53:23

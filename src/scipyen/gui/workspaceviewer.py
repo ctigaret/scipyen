@@ -81,26 +81,26 @@ class WorkspaceViewer(QtWidgets.QTableView):
         # NOTE: 2019-08-10 00:24:01
         # create QDrag objects for each dragged item
         # ignore the DropEvent mimeData in the console ()
-        if event.buttons() & QtCore.Qt.LeftButton:
-            if (event.pos() - self.dragStartPosition).manhattanLength() >= QtWidgets.QApplication.startDragDistance():
-                indexList = [i for i in self.selectedIndexes()
-                             if i.column() == 0]
+        if (event.buttons() & QtCore.Qt.LeftButton
+            and (event.pos() - self.dragStartPosition).manhattanLength() >= QtWidgets.QApplication.startDragDistance()):
+            indexList = [i for i in self.selectedIndexes()
+                            if i.column() == 0]
 
-                if len(indexList) == 0:
-                    return
+            if len(indexList) == 0:
+                return
 
-                if not isinstance(self.mainWindow, ScipyenWindow):
-                    return
+            if not isinstance(self.mainWindow, ScipyenWindow):
+                return
 
-                varNames = [self.mainWindow.workspaceModel.item(
-                    index.row(), 0).text() for index in indexList]
+            varNames = [self.mainWindow.workspaceModel.item(
+                index.row(), 0).text() for index in indexList]
 
-                for varName in varNames:
-                    drag = QtGui.QDrag(self)
-                    mimeData = QtCore.QMimeData()
-                    mimeData.setText(varName)
-                    drag.setMimeData(mimeData)
-                    dropAction = drag.exec(QtCore.Qt.CopyAction) # noqa
+            for varName in varNames:
+                drag = QtGui.QDrag(self)
+                mimeData = QtCore.QMimeData()
+                mimeData.setText(varName)
+                drag.setMimeData(mimeData)
+                dropAction = drag.exec(QtCore.Qt.CopyAction) # noqa
 
     @Slot("QPoint")
     @safewrapper

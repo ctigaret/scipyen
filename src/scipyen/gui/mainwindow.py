@@ -1892,7 +1892,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), lobj.__name__) for lobj, act in v.items())) for k, v in self._ui_plugins_.items())
+        return {k.__name__: {self._crawl_plugin_UI_menu(act): lobj.__name__ for lobj, act in v.items()} for k, v in self._ui_plugins_.items()}
+        # return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), lobj.__name__) for lobj, act in v.items())) for k, v in self._ui_plugins_.items())
 
 #     @property
 #     def externalHDF5Viewer(self) -> str:
@@ -5384,14 +5385,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def slot_variableItemPressed(self, ndx):
         r"""Triggered by single-click of lmb in workspace viewer.
         """
-        self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
-            ndx)
+        self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(ndx)
+
         try:
             obj = self.workspace[self.currentVarItemName]
             if isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
                 self.setCurrentWindow(obj)
-        except:
-            pass
+
+        except:  # noqa: E722
+            traceback.print_exc()
 
     @Slot(QtCore.QModelIndex)
     @safewrapper
@@ -5430,8 +5432,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     # if no handler exists, then view (display) object in console
                     self.console.execute(self.currentVarItemName)
 
-        except:
-            pass
+        except: # noqa: E722
+            traceback.print_exc()
 
     def _getWorkspaceVarItemAndName_(self, index: QtCore.QModelIndex):
         if index.column() == 0:
@@ -6391,45 +6393,51 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
-        if not self._pyinstaller_bundled_:
-            self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython", self)
+        # ### BEGIN TODO 2026-11-08 15:26:02 BUG FIXME
+        # External kernel keeps crashing - disable this for now
 
-            self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        # if not self._pyinstaller_bundled_:
+        #     self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython", self)
+        #
+        #     self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        #
+        #     self.menuConsoles.addAction(self.actionExternalIPython)
+        #
+        #     if has_neuron:
+        #         self.actionExternalNrnIPython = QAction(
+        #             guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython for NEURON", self)
+        #         self.actionExternalNrnIPython.triggered.connect(
+        #             self.slot_launchExternalNeuronIPython)
+        #         self.menuConsoles.addAction(self.actionExternalNrnIPython)
+        #
+        #     self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
+        #     self.menuWith_Running_Kernel.setIcon(guiutils.getIcon("run-build"))
+        #
+        #     self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
+        #
+        #     self.actionRunning_IPython = QAction(
+        #         guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel ...", self)
+        #
+        #     self.actionRunning_IPython.triggered.connect(
+        #         self.slot_launchExternalRunningIPython)
+        #
+        #     self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
+        #
+        #     if has_neuron:
+        #         self.actionRunning_IPython_for_Neuron = QAction(
+        #             guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel and launch NEURON", self)
+        #
+        #         self.actionRunning_IPython_for_Neuron.triggered.connect(
+        #             self.slot_launchExternalRunningIPythonNeuron)
+        #
+        #         self.menuWith_Running_Kernel.addAction(
+        #             self.actionRunning_IPython_for_Neuron)
+        #
+        #     self.menuConsoles.addSeparator()
 
-            self.menuConsoles.addAction(self.actionExternalIPython)
-
-            if has_neuron:
-                self.actionExternalNrnIPython = QAction(
-                    guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython for NEURON", self)
-                self.actionExternalNrnIPython.triggered.connect(
-                    self.slot_launchExternalNeuronIPython)
-                self.menuConsoles.addAction(self.actionExternalNrnIPython)
-
-            self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
-            self.menuWith_Running_Kernel.setIcon(guiutils.getIcon("run-build"))
-
-            self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
-
-            self.actionRunning_IPython = QAction(
-                guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel ...", self)
-
-            self.actionRunning_IPython.triggered.connect(
-                self.slot_launchExternalRunningIPython)
-
-            self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
-
-            if has_neuron:
-                self.actionRunning_IPython_for_Neuron = QAction(
-                    guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel and launch NEURON", self)
-
-                self.actionRunning_IPython_for_Neuron.triggered.connect(
-                    self.slot_launchExternalRunningIPythonNeuron)
-
-                self.menuWith_Running_Kernel.addAction(
-                    self.actionRunning_IPython_for_Neuron)
-
-            self.menuConsoles.addSeparator()
-            self.menuConsoles.addAction(self.actionOpen_System_Terminal)
+        #
+        # ### END   TODO 2026-11-08 15:26:02 BUG FIXME
+        self.menuConsoles.addAction(self.actionOpen_System_Terminal)
 
         self.actionHelp_On_Console.triggered.connect(self._slot_helpOnConsole_)
 
