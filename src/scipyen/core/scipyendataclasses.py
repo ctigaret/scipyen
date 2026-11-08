@@ -1970,6 +1970,11 @@ class Schedule(ScipyenDataclass):
 
             self.episodes.insert(ndx[-1]+1, value) # now, value will be at ndx[-1]+1
             self.episodes[ndx[-1]+1].beginFrame = nFrames[ndx[-1]]
+            # but the beginFrame of subsequent episodes STILL needs adjusting
+            if ndx[-1]+1 < len(self.episodes):
+                nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
+                for k, episode in enumerate(self.episodes[ndx[-1]+2 : ]):
+                    episode.beginFrame += value.nFrames
 
 
         # self._adjustBeginFrameAllEpisodes_() # don't think this is needed anymore
@@ -2003,7 +2008,7 @@ class Schedule(ScipyenDataclass):
                 # for episode in self.episodes[index+1:]:
                     # episode.beginFrame += nFramesBefore
 
-        # self._adjustBeginFrameAllEpisodes_()  # don't think this is needed anymore
+        self._adjustBeginFrameAllEpisodes_()  # don't think this is needed anymore
 
     def pop(self, index:int=-1) -> Episode:
         # adjust the episodes AFTER the one to be removed
