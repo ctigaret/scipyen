@@ -1871,6 +1871,7 @@ class Schedule(ScipyenDataclass):
         return self.episodes.__reversed__()
 
     def __add__(self, other):
+        r"""Implements a + b"""
         if isinstance(other, self.__class__):
             newepisodes = self.episodes.__add__(list(map(deepcopy, other.episodes)))
 
@@ -1942,9 +1943,9 @@ class Schedule(ScipyenDataclass):
 
         self.episodes.append(value)
 
-    def add(self, value: Episode):
+    def addEpisode(self, value: Episode):
         r"""Inserts or appends an episode according to its `begin` value.
-        If `value.begin` is larger than that of any exisitng episode, `value` is
+        If `value.begin` is larger than that of any existing episode, `value` is
         appended; else, is inserted just before the efisrt episode with `begin`
         larger than `value.begin`.
 
@@ -1966,15 +1967,15 @@ class Schedule(ScipyenDataclass):
             self.episodes[0].beginFrame = 0
 
         else:
+            print(f"{self.__class__.__name__}.addEpisode to insert at {ndx[-1]+1}")
             nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
-
             self.episodes.insert(ndx[-1]+1, value) # now, value will be at ndx[-1]+1
             self.episodes[ndx[-1]+1].beginFrame = nFrames[ndx[-1]]
             # but the beginFrame of subsequent episodes STILL needs adjusting
-            if ndx[-1]+1 < len(self.episodes):
+            if ndx[-1]+2 < len(self.episodes):
                 nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
                 for k, episode in enumerate(self.episodes[ndx[-1]+2 : ]):
-                    episode.beginFrame += value.nFrames
+                    episode.beginFrame += (value.nFrames-1 if value.nFrames > 1 else 1)
 
 
         # self._adjustBeginFrameAllEpisodes_() # don't think this is needed anymore
