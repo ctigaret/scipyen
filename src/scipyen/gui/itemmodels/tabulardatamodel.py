@@ -1320,14 +1320,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @singledispatchmethod
     def _makeModelData_(self, data):
-        scipywarn(f"{type(data).__name__} data are not supported yet")
+        scipywarn(f"{type(data).__name__} data are not supported yet (received {data})")
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = 0
         self._modelDataColumns_ = 0
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
-        self._modelDataColumnHeaders_ = dict()
+        self._modelDataColumnHeaders_ = {}
 
     @_makeModelData_.register(types.NoneType)
     def __makeModelData__(self, data: types.NoneType):
@@ -1337,7 +1337,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = 0
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
-        self._modelDataColumnHeaders_ = dict()
+        self._modelDataColumnHeaders_ = {}
 
     @_makeModelData_.register(pd.DataFrame)
     def __makeModelData__(self, data: pd.DataFrame): # noqa
@@ -1346,14 +1346,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = data.shape[1]
 
         if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
-            self._modelDataColumnHeaders_ = dict(
-                tuple(
-                    map(  # noqa: C417
-                        lambda x: (x[0], f"{x[1]}"),
-                        enumerate(data.columns)
-                        )
-                    )
-                )
+            self._modelDataColumnHeaders_ = {kc: col for kc, col in enumerate(data.columns)}
+            # self._modelDataColumnHeaders_ = dict(
+            #     tuple(
+            #         map(  # noqa: C417
+            #             lambda x: (x[0], f"{x[1]}"),
+            #             enumerate(data.columns)
+            #             )
+            #         )
+            #     )
 
         self._canAddRemoveColumns_ = True
         self._canAddRemoveRows_ = True

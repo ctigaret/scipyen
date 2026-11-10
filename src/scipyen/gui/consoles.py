@@ -155,6 +155,8 @@ from core.strutils import str2symbol, counter_suffix
 from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
 
+from core import qtutils
+
 from gui.workspacegui import WorkspaceGuiMixin
 from gui import scipyen_console_styles
 # also imports PYGMENT_STYLES

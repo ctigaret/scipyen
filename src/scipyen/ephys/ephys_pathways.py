@@ -2131,6 +2131,7 @@ class SynapticPathway(ScipyenDataclass):
 
         self._pathwayType_ = pathType
         self.pathType = self._pathwayType_
+        self.schedule.name = f"{self.name}_schedule"
 
     def __hash__(self) -> int:
         return hash(
@@ -2558,7 +2559,7 @@ class RecordingSource(ScipyenDataclass):
             self.pathways.name = self.name
             for ksyn, syn in enumerate(self.syn):
                 # synList = SynapticStimulusChannelList(syn, name = syn.name)
-                name = f"{syn.name}_pathway"
+                name = f"{syn.name}"
                 pathway = SynapticPathway(stimulus = syn,
                                         name = name, adc = self.adc,
                                         dac = self.dac,

@@ -1955,6 +1955,8 @@ class Schedule(ScipyenDataclass):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
 
+        # print(f"\n***\nExecuting {self.__class__.__name__}.addEpisode(…) for object {self.name} ")
+
         if len(self.episodes) == 0:
             self.episodes.append(value)
             self.episodes[0].beginFrame = 0
@@ -1962,22 +1964,27 @@ class Schedule(ScipyenDataclass):
 
         ndx = list(more_itertools.locate(self.episodes, lambda x: x.begin <= value.begin))
 
+        # print(f"In {self.name} schedule: indexes of episodes beginning before {value.begin}: {ndx}")
+
         if len(ndx) == 0:
             self.episodes.insert(0, value)
             self.episodes[0].beginFrame = 0
 
         else:
-            print(f"{self.__class__.__name__}.addEpisode to insert at {ndx[-1]+1}")
+            # print(f"{self.name} to insert at {ndx[-1]+1}")
+            targetNdx = ndx[-1]+1
+            self.episodes.insert(targetNdx, value) # now, value will be at targetNdx
             nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
-            self.episodes.insert(ndx[-1]+1, value) # now, value will be at ndx[-1]+1
-            self.episodes[ndx[-1]+1].beginFrame = nFrames[ndx[-1]]
+            print(f"n**\n nFrames = {nFrames}\n")
+            print(f"{[episode.nFrames for episode in self.episodes]}\n")
+            self.episodes[targetNdx].beginFrame = nFrames[targetNdx-1]
             # but the beginFrame of subsequent episodes STILL needs adjusting
-            if ndx[-1]+2 < len(self.episodes):
-                nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
-                for k, episode in enumerate(self.episodes[ndx[-1]+2 : ]):
-                    episode.beginFrame += (value.nFrames-1 if value.nFrames > 1 else 1)
+            if targetNdx < len(self.episodes):
+                for k in range(targetNdx+1, len(self.episodes)):
+                    # self.episodes[k].beginFrame = nFrames[k-1]
+                    self.episodes[k].beginFrame += value.nFrames
 
-
+        # print("\n***\n")
         # self._adjustBeginFrameAllEpisodes_() # don't think this is needed anymore
 
     def insert(self, index: int, value: Episode):
