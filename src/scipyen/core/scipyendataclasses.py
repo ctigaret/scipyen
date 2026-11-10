@@ -1943,7 +1943,7 @@ class Schedule(ScipyenDataclass):
 
         self.episodes.append(value)
 
-    def addEpisode(self, value: Episode):
+    def addEpisode(self, value: Episode) -> int:
         r"""Inserts or appends an episode according to its `begin` value.
         If `value.begin` is larger than that of any existing episode, `value` is
         appended; else, is inserted just before the efisrt episode with `begin`
@@ -1951,41 +1951,51 @@ class Schedule(ScipyenDataclass):
 
         .. warning::
             Assumes the schedule's episodes are all sorted in increasing order.
+
+        Returns the index (in the grown schedule) where the episode was added.
     """
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
 
-        # print(f"\n***\nExecuting {self.__class__.__name__}.addEpisode(…) for object {self.name} ")
+        print(f"\n***\nCall {self.__class__.__name__}.addEpisode(…) for object {self.name} ")
 
         if len(self.episodes) == 0:
             self.episodes.append(value)
             self.episodes[0].beginFrame = 0
-            return
+            return 0
 
         ndx = list(more_itertools.locate(self.episodes, lambda x: x.begin <= value.begin))
 
-        # print(f"In {self.name} schedule: indexes of episodes beginning before {value.begin}: {ndx}")
+        print(f"\n***\nIn {self.name} schedule: indexes of episodes beginning before {value.begin}: {ndx}")
 
         if len(ndx) == 0:
-            self.episodes.insert(0, value)
-            self.episodes[0].beginFrame = 0
+            targetNdx = 0
+            # self.episodes.insert(0, value)
+            # self.episodes[0].beginFrame = 0
 
         else:
             # print(f"{self.name} to insert at {ndx[-1]+1}")
             targetNdx = ndx[-1]+1
-            self.episodes.insert(targetNdx, value) # now, value will be at targetNdx
-            nFrames = list(itertools.accumulate(episode.nFrames for episode in self.episodes))
-            print(f"n**\n nFrames = {nFrames}\n")
-            print(f"{[episode.nFrames for episode in self.episodes]}\n")
-            self.episodes[targetNdx].beginFrame = nFrames[targetNdx-1]
-            # but the beginFrame of subsequent episodes STILL needs adjusting
-            if targetNdx < len(self.episodes):
-                for k in range(targetNdx+1, len(self.episodes)):
-                    # self.episodes[k].beginFrame = nFrames[k-1]
-                    self.episodes[k].beginFrame += value.nFrames
+
+        print(f"\tWill insert episode at {targetNdx}")
+
+        self.episodes.insert(targetNdx, value) # now, value will be at targetNdx
+        nFrames = [0] + list(itertools.accumulate(episode.nFrames for episode in self.episodes))
+        eFrames = sum(episode.nFrames for episode in self.episodes)
+        print(f"\t episode frames: {[episode.nFrames for episode in self.episodes]}\n")
+        print(f"\t cumsum frames = {nFrames}\n")
+        print(f"\t total schedule frames = {eFrames}")
+        self.episodes[targetNdx].beginFrame = nFrames[targetNdx]
+        # but the beginFrame of subsequent episodes STILL needs adjusting
+        if targetNdx < len(self.episodes):
+            for k in range(targetNdx+1, len(self.episodes)):
+                # self.episodes[k].beginFrame = nFrames[k-1]
+                self.episodes[k].beginFrame += value.nFrames
 
         # print("\n***\n")
         # self._adjustBeginFrameAllEpisodes_() # don't think this is needed anymore
+
+        return targetNdx
 
     def insert(self, index: int, value: Episode):
         if not isinstance(value, self.allowed_contents):
