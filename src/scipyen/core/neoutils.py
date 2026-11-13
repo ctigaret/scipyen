@@ -4633,6 +4633,13 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
     return ret
 
+def getDomainShift(block: neo.Block, start: datetime.datetime | None = None) -> pq.Quantity:
+    if isinstance(start, datetime.datetime):
+        return (block.rec_datetime - start).total_seconds() * pq.s
+
+    return 0 * pq.s
+
+
 # @timefunc
 @with_doc(copy_with_data_subset, use_header=True)
 @safewrapper

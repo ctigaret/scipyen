@@ -400,12 +400,13 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 handler_specs = VTH.get_handler_spec(type(obj))
                 if len(handler_specs):
                     specialViewMenu = cm.addMenu("View with")
-                    for handler_spec in handler_specs:
-                        action = specialViewMenu.addAction(handler_spec[1])
-                        action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-                        action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-                        action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-                        action.triggered.connect(self.slot_autoSelectViewer)
+                    if isinstance(specialViewMenu, QtWidgets.QMenu):
+                        for handler_spec in handler_specs:
+                            action = specialViewMenu.addAction(handler_spec[1])
+                            action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            action.triggered.connect(self.slot_autoSelectViewer)
 
             cm.addSeparator()
             viewInConsoleAction = cm.addAction("Display in console")

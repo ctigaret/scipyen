@@ -9,17 +9,20 @@ import os  # noqa: I001
 # import sys
 import collections
 # import traceback
+import dataclasses
+from dataclasses import (dataclass, MISSING, KW_ONLY)  # noqa: F401
 import datetime
 # import numbers
 import inspect
+import itertools
+import more_itertools
 import typing
+from traitlets import Bunch
 # from copy import deepcopy
 # import difflib
 # import re as _re
 # from enum import Enum, IntEnum
 # from abc import ABC
-import dataclasses
-from dataclasses import (dataclass, MISSING, KW_ONLY)  # noqa: F401
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -101,7 +104,7 @@ from core.utilities import (reverse_mapping_lookup, # noqa
                             normalized_index,
                             unique,
                             GeneralIndexType)
-
+from core.strutils import counter_suffix
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks) # noqa
 from core import scipyen_quantities as scq # noqa
 from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, # noqa
@@ -110,6 +113,8 @@ from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, # noqa
                              checkRescale)
 
 import core.pyabfbridge as pab
+
+from core.traitcontainers import DataBag
 
 from core.deferredmeasures import *
 
@@ -2133,6 +2138,21 @@ class SynapticPathway(ScipyenDataclass):
         self.pathType = self._pathwayType_
         self.schedule.name = f"{self.name}_schedule"
 
+        self._fieldsMonitor_ = DataBag(allow_none = True, mutable_types = True, __parent__ = self)
+        self._fieldsMonitor_.observe(self._fieldChangeCallBack_)
+
+    def _fieldChangeCallBack_(self, change: dict):
+        print(f"{self._-class__.__name__}._fieldChangeCallBack_({change})")
+        if isinstance(change, Bunch):
+            name = change.name
+            change_type = getattr(change, "change_type", change.type)
+        else:
+            name = change["name"]
+            change_type = change["change_type"]
+
+        # if change_type == "modified":
+        #     setattr(self, name, )
+
     def __hash__(self) -> int:
         return hash(
                 (
@@ -2585,6 +2605,8 @@ class RecordingSource(ScipyenDataclass):
                 )
             )
 
+    def makeStimulusLayout(self, protocol: ElectrophysiologyProtocol, name: str) -> PathwaysStimulationLayout:
+        return PathwaysStimulationLayout(self, protocol, name)
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2948,7 +2970,7 @@ class RecordingSource(ScipyenDataclass):
         • self.pathways
 
         """
-        import more_itertools
+        # import more_itertools
         pathways = self.pathways
         if len(pathways) == 0:
             if asDict:
@@ -3791,3 +3813,185 @@ class PathwayTrials(dict):
     @property
     def pathwayNames(self):
         yield from (p.name for p in self)
+
+def splitSweeps(block, pathwaySweepIndex, analogSignals, start):
+    r"""Generator tha deals the trial sweeps (i.e, segments) according to the
+    pathway they are meant to belong.
+    Each segment retains the main ADC only.
+"""
+    yield from (neoutils.copy_with_data_subset(block, segments=segmentIndex,
+        analogsignals=signalIndex, domain_shift=neoutils.getDomainShift(block, domain_start)
+        ).segments for (segmentIndex, signalIndex, domain_start) in zip(pathwaySweepIndex, analogSignals, start))
+
+def splitSweepsInTrials(stimLayout, start, *trials):
+    r"""Intermediate generator to select the main ADC when dealing segments;
+    """
+    # sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
+    pathwayADCNames = [x.name for x in stimLayout.pathwaysADCs]
+    # pathwayIndex = range(len(stimLayout.pathways))
+    pathwaySweepIndex = [stimLayout.getSweepsForPathway(p) for p in stimLayout.pathways]
+
+    yield from [list(splitSweeps(trial, pathwaySweepIndex, pathwayADCNames, start)) for trial in trials]
+
+def dealSweepsInTrials(stimLayout, start, trials):
+    r"""Intermediate generator for splitting trial segments according to pathway-specific sweeps"""
+    yield from tuple(zip(*list(splitSweepsInTrials(stimLayout, start, *trials))))
+
+def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
+    # print(f"dealTrialSweeps: stimLayout.pathways  = {stimLayout.pathways}")
+    # print(f"dealTrialSweeps: start  = {start}")
+    # print(f"dealTrialSweeps: trials  = {len(trials)}")
+    # print(f"dealTrialSweeps: eNames  = {eNames}")
+    segmentPools = [list(itertools.chain.from_iterable(x)) for x in dealSweepsInTrials(stimLayout, start, trials)]
+    # print(f"dealTrialSweeps: segmentPools  = {segmentPools}")
+
+    # for block, pool, eName in zip(pathwayBlocks, segmentPools, eNames):
+    #     for kseg, segment in enumerate(pool):
+    #         # segment.name = f"segment_{kseg}_{eName}"
+    #         segment.annotate(recording_episode_name = eName)
+    #         segment.annotate(index_in_episode = kseg)
+    #         segment.index = len(block.segments)+kseg+1
+    #
+    #     block.segments.extend(pool)
+    #
+    # return pathwayBlocks
+
+    for pool, eName in zip(segmentPools, eNames):
+        for kseg, segment in enumerate(pool):
+            # segment.name = f"segment_{kseg}_{eName}"
+            segment.annotate(recording_episode_name = eName)
+            segment.annotate(index_in_episode = kseg)
+            # segment.index = len(block.segments)+kseg+1
+
+        # block.segments.extend(pool)
+
+
+    ret = {pathway.name: segmentPool for pathway, segmentPool in zip(stimLayout.pathways, segmentPools)}
+
+    # print(f"dealTrialSweeps -> {ret}")
+
+    return ret
+
+def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName) -> PathwayTrials:
+    print(f"\n###\ndealTrialsToPathways:")
+    sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
+
+    episodeNameForPathway = lambda p: (p, counter_suffix(episodeName,
+                                p.schedule.episodeNames,
+                                returns_counter=False))
+
+
+    # pathwayBlocks, blockStarts, episodeNames, framesOffsets = list(zip(*[
+    #     (
+    #         neo.Block(
+    #             name=f"{pathway.name}",
+    #             rec_datetime=sortedTrials[0].rec_datetime
+    #             ),
+    #         pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime,
+    #         eName,
+    #         pathway.schedule.nFrames
+    #     )
+    #     for pathway, eName in (episodeNameForPathway(pathway) for pathway in stimLayout.pathways)
+    # ]))
+
+    blockStarts, episodeNames = list(zip(*[
+        (
+            # pathway.name,
+            pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime,
+            eName,
+            # pathway.schedule.nFrames
+        )
+        for pathway, eName in (episodeNameForPathway(pathway) for pathway in stimLayout.pathways)
+    ]))
+
+    # populate the pathway blocks (extends their segments with
+    # segment data dealt from the trials)
+    # pathwaySegmentPools = self._dealTrialSweeps_(stimLayout, blockStarts,
+    #             sortedTrials, episodeNames)
+    pathwaySegmentPools = dealTrialSweeps(stimLayout, blockStarts,
+                sortedTrials, episodeNames)
+
+    # print(f"\n***\ndealTrialsToPathways")
+    # print(f"\t -> {pathwaySegmentPools.keys()}")
+
+    # blockNames = [block.name for block in pathwayBlocks]
+
+    for kp, pathway in enumerate(stimLayout.pathways):
+        print(f"\n\t kp {kp}, pathway: {pathway}")
+        if pathway not in pathwayTrials or not isinstance(pathwayTrials[pathway], neo.Block):
+            pathwayTrials[pathway] = neo.Block(name = pathway.name)
+
+        # pathwayBlock = pathwayTrials[pathway]
+        pathwayEpisodeSegments = pathwaySegmentPools[pathway.name]
+
+        eName = episodeNames[kp]
+        eType = RecordingEpisodeType.Monitoring # good default; may have to change manually in UI
+        pathSweeps = stimLayout.getSweepsForPathway(pathway)
+
+        for ks, segment in enumerate(pathwayEpisodeSegments):
+            # NOTE: 2026-11-07 21:16:01
+            # I think it is OK here to pass segments by reference as
+            # pathwayBlock is temporary
+            segname = f"{segment.annotations["index_in_episode"]} in episode {segment.annotations["recording_episode_name"]}"
+            segment.name = f"Sweep {segname}"
+            segment.annotate(recording_episode_type = eType)
+            segment.annotate(protocol_sweep = pathSweeps)
+
+        # begin = pathwayBlock.segments[0].rec_datetime
+        # end = pathwayBlock.segments[-1].rec_datetime
+        begin = pathwayEpisodeSegments[0].rec_datetime
+        end = pathwayEpisodeSegments[-1].rec_datetime
+
+        # print(f"\t -> setting up episode {eName} with {len(pathwayBlock.segments)} frames in pathway {pathway.name}")
+        episode = RecordingEpisode(
+                name=eName,
+                begin=begin,
+                end=end,
+                # beginFrame = 0,
+                # beginFrame = framesOffsets[kp],
+                nFrames = len(pathwayEpisodeSegments),
+                protocol = stimLayout.protocol,
+                episodeType = eType,
+                stimLayout = stimLayout,
+                )
+
+        # NOTE: 2026-11-07 22:44:20
+        # this should remove the need to call pathway.schedule.sort()
+        episodeNdx = pathway.schedule.addEpisode(episode)
+
+        # episodeNdx = pathway.schedule.index(episode)
+
+        print(f"\n---\n\tepisode {episode.name} added at index {episodeNdx} in pathway {pathway.name}")
+
+
+        # NOTE: 2026-11-07 22:56:47
+        # now, populate self.data.pathwayTrials neo.Block
+
+        print(f"\n---\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
+
+        if len(pathwayTrials[pathway].segments) == 0:
+            pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
+
+        else:
+            if episodeNdx < len(pathway.schedule.episodes)-1:
+                # NOTE: 2026-11-07 23:17:38
+                # episode was INSERTED somewhere inside the schedule,
+                # possibly at the very beginning
+                #
+                # schedule.add(…) should have adjusted the episode's beginFrame value
+                segmentsBefore = list(pathwayTrials[pathway].segments[0:episode.beginFrame])
+                segmentsAfter  = list(pathwayTrials[pathway].segments[episode.endFrame:])
+                # self.data.pathwayTrials[pathway].segments = segmentsBefore + pathwayBlock.segments + segmentsAfter
+                pathwayTrials[pathway].segments = segmentsBefore + pathwayEpisodeSegments + segmentsAfter
+                # self.data.pathwayTrials[pathway].segments.extend(pathwayBlock.segments)
+                # self.data.pathwayTrials[pathway].segments.extend(segmentsAfter)
+
+            else:
+                # NOTE: 2026-11-07 23:14:22
+                # episode was APPENDED to schedule
+                pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
+
+        # pathwayTrials[pathway] = pathwayBlock
+
+    return pathwayTrials
+
