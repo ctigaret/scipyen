@@ -342,20 +342,6 @@ class DataBag(Bunch):
         ret.verbose = False
         return ret
 
-    # hold_trait_notifications = self._observer__.hold_trait_notifications
-    # @contextlib.contextmanager
-    # def hold_trait_notifications(self):
-    #     r"""Context manager to hold trait change notifications in self.__observer__
-    #     """
-    #     with self.__observer__.hold_trait_notifications() as holder:
-    #         yield holder
-    #     # return self.__observer__.hold_trait_notifications
-    #     # if self.__observer__._cross_validation_lock:
-    #     #     yield
-    #     #     return
-    #     # else:
-    #     #     return self.__observer__.hold_trait_notifications
-
     def __init__(self, *args, **kwargs):
         r"""Constructor for a DataBag.
 
@@ -1118,10 +1104,6 @@ class DataBag(Bunch):
         if isinstance(other, dict):  # this includes DataBag!
             for key, value in other.items():
                 self[key] = value # calls __setitem__
-
-            # with timeblock("DataBag.update"):
-            #     for key, value in other.items():
-            #         self[key] = value
 
     def observe(self, handler, names=All, type="change"):
         self.__observer__.observe(handler, names=names, type=type)

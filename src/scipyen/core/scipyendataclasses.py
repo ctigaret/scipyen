@@ -29,6 +29,8 @@ import h5py
 import treelib # noqa
 import pathlib
 from copy import (deepcopy, copy,) # noqa
+import psygnal
+from psygnal import evented
 
 #### END core python modules
 
@@ -127,12 +129,61 @@ class FileOriginDescriptor:
         else:
             raise TypeError(f"Expecting a str, pathlib.Path object, or a sequence of these; instead, got a {type(value).__name__}")
 
+@evented
 @dataclass
 class ScipyenDataclass:
     r"""Ancestor of Scipyen data classes.
+
+    To subclass:
+
+    1. define a @dataclass-decorated new class that inherits from this class, e.g.
+
+    @dataclass
+    class MyClass(ScipyenDataclass)
+
+    2. if you want to also inherit the evented functionality (i.e. implementation
+    of the Observer pattern for dataclasses, see `psygnal` package), then you
+    must also
+
+    2.1 Override the generic self._fieldChanged_ method defined here
+
+    2.2 If your subclass also defines a __post_init__() method, make sure you
+        call super().__post_init__() inside it, i.e., call this superclass' method
+
+
     """
     name:str = dataclasses.field(default_factory=str)
     description: str = dataclasses.field(default_factory=str)
+
+    def __post_init__(self):
+        self.events.connect(self._fieldChanged_)
+
+    # def _fieldChanged_(self, *args, **kwargs):
+    def _fieldChanged_(self, info: psygnal.EmissionInfo):
+        pass
+        # ### BEGIN 2026-11-13 22:25:56 reminder, DO NOT DELETE
+        #
+        # print(f"{self.__class__.__name__}._fieldChanged_({args}, {kwargs})")
+        # info = args[0]
+        # fieldName = info.signal.name
+        # newVal, oldVal = info.args
+        # # NOTE: 2026-11-13 21:58:50
+        # # receives a single arg: psygnal.EmissionInfo, with:
+        # # signal: _DataclassFieldSignalInstance with name: name of field that changed
+        # # args = (new value, old value)
+        # # path = (.XXX)
+        #
+        # print(f"\n\tfieldName = {fieldName}")
+        # print(f"\tnew value = {newVal}")
+        # print(f"\told value = {oldVal}")
+        # print(f"\tpath = {info.path} with")
+        # for kp, pstep in enumerate(info.path):
+        #     print(f"\t\tpath step {kp} attr = {pstep.attr}")
+        #     print(f"\t\tpath step {kp} index = {pstep.index}")
+        #     print(f"\t\tpath step {kp} key = {pstep.key}")
+        #
+        # ### END   2026-11-13 22:25:56 reminder, DO NOT DELETE
+
 
     def diff(self, other, showValues:bool=False) -> dict | tuple:
         from core.utilities import safe_identity_test

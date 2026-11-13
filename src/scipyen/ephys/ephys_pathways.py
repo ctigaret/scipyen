@@ -17,7 +17,7 @@ import inspect
 import itertools
 import more_itertools
 import typing
-from traitlets import Bunch
+# from traitlets import Bunch, HasTraits
 # from copy import deepcopy
 # import difflib
 # import re as _re
@@ -41,6 +41,8 @@ import h5py
 import pandas as pd # noqa
 from tribool import Tribool
 # import pyabf
+import psygnal
+from psygnal import evented
 
 from scipy import optimize # noqa
 
@@ -113,8 +115,6 @@ from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, # noqa
                              checkRescale)
 
 import core.pyabfbridge as pab
-
-from core.traitcontainers import DataBag
 
 from core.deferredmeasures import *
 
@@ -2060,7 +2060,7 @@ in 'sweeps')
 
 
 
-
+# @evented
 @dataclass
 class SynapticPathway(ScipyenDataclass):
     r"""Logical association of a SynapticStimulusChannel with a recording configuration.
@@ -2110,6 +2110,8 @@ class SynapticPathway(ScipyenDataclass):
     #
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
 
+    # events: typing.ClassVar[psygnal.SignalGroupDescriptor] = SignalGroupDescriptor()
+
     def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null, # noqa: RUF033
                       pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):  # noqa: RUF033
 
@@ -2138,20 +2140,19 @@ class SynapticPathway(ScipyenDataclass):
         self.pathType = self._pathwayType_
         self.schedule.name = f"{self.name}_schedule"
 
-        self._fieldsMonitor_ = DataBag(allow_none = True, mutable_types = True, __parent__ = self)
-        self._fieldsMonitor_.observe(self._fieldChangeCallBack_)
+        super().__post_init__()
 
-    def _fieldChangeCallBack_(self, change: dict):
-        print(f"{self._-class__.__name__}._fieldChangeCallBack_({change})")
-        if isinstance(change, Bunch):
-            name = change.name
-            change_type = getattr(change, "change_type", change.type)
-        else:
-            name = change["name"]
-            change_type = change["change_type"]
+        # self.events.connect(self._fieldChanged_) # inherited from ScipyenDataclass
 
-        # if change_type == "modified":
-        #     setattr(self, name, )
+    def _fieldChanged_(self, info: psygnal.EmissionInfo):
+        if len(info.path) == 1:
+            # discard notification from children dataclass signals
+            fieldName = info.signal.name
+            if fieldName == "name":
+                newVal, oldVal = info.args
+                self.schedule.name = f"{newVal}_schedule"
+                self.stimulus.name = f"{newVal}_stimulus"
+
 
     def __hash__(self) -> int:
         return hash(
@@ -2589,6 +2590,8 @@ class RecordingSource(ScipyenDataclass):
 
         self.pathways.parent=self
         # print(f"\tpathways = {self.pathways}")
+
+        super().__post_init__() # ScipyenDataclass, for events handling
 
     def __hash__(self) -> int:
         return hash(
@@ -3736,8 +3739,8 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
 
     p0name = kwargs.get("path0name", 'path0')
     p1name = kwargs.get("path1name", 'path1')
-    s0name = kwargs.get("path0stimname", f"{p0name}stim")
-    s1name = kwargs.get("path1stimname", f"{p1name}stim")
+    s0name = kwargs.get("path0stimname", f"{p0name}_stimulus")
+    s1name = kwargs.get("path1stimname", f"{p1name}_stimulus")
 
     syn     = SynapticStimulusChannelList(SynapticStimulusChannel(name=s0name, channel=path0stim),
                                           SynapticStimulusChannel(name=s1name, channel=path1stim))
@@ -3872,7 +3875,7 @@ def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
 
     return ret
 
-def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName) -> PathwayTrials:
+def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> PathwayTrials:
     print(f"\n###\ndealTrialsToPathways:")
     sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
 
@@ -3961,13 +3964,13 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName) -> Path
 
         # episodeNdx = pathway.schedule.index(episode)
 
-        print(f"\n---\n\tepisode {episode.name} added at index {episodeNdx} in pathway {pathway.name}")
+        # print(f"\n---\n\tepisode {episode.name} added at index {episodeNdx} in pathway {pathway.name}")
 
 
         # NOTE: 2026-11-07 22:56:47
         # now, populate self.data.pathwayTrials neo.Block
 
-        print(f"\n---\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
+        print(f"\n---\n\tbefore:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
 
         if len(pathwayTrials[pathway].segments) == 0:
             pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
@@ -3992,6 +3995,7 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName) -> Path
                 pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 
         # pathwayTrials[pathway] = pathwayBlock
+        print(f"\n---\n\tafter:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
 
-    return pathwayTrials
+    # return pathwayTrials
 
