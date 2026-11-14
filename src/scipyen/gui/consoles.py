@@ -3580,7 +3580,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         evt.accept()
 
     @safewrapper
-    def dropEvent(self, evt):
+    def dropEvent(self, evt: QtGui.QDropEvent):
         # from textwrap import dedent
         src = evt.source()
         mimeData = evt.mimeData()

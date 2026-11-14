@@ -132,6 +132,7 @@ from ephys.ephys_protocol import ElectrophysiologyProtocol
 # ### BEGIN forward class declarations
 class SynapticPathway: pass
 class PathwaysStimulationLayout: pass
+class PathwayTrials: pass
 class SynapticPathwayList: pass
 class RecordingSource: pass
 # class PathwayTrials: pass
@@ -2149,7 +2150,8 @@ class SynapticPathway(ScipyenDataclass):
             # discard notification from children dataclass signals
             fieldName = info.signal.name
             if fieldName == "name":
-                newVal, oldVal = info.args
+                # newVal, oldVal = info.args
+                newVal = info.args[0]
                 self.schedule.name = f"{newVal}_schedule"
                 self.stimulus.name = f"{newVal}_stimulus"
 
@@ -2610,6 +2612,10 @@ class RecordingSource(ScipyenDataclass):
 
     def makeStimulusLayout(self, protocol: ElectrophysiologyProtocol, name: str) -> PathwaysStimulationLayout:
         return PathwaysStimulationLayout(self, protocol, name)
+
+    def makePathwayTrials(self) -> PathwayTrials:
+        return PathwayTrials({pathway: neo.Block(name=pathway.name) for pathway in self.pathways})
+
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -3876,7 +3882,7 @@ def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
     return ret
 
 def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> PathwayTrials:
-    print(f"\n###\ndealTrialsToPathways:")
+    # print(f"\n###\ndealTrialsToPathways:")
     sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
 
     episodeNameForPathway = lambda p: (p, counter_suffix(episodeName,
@@ -3920,12 +3926,14 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> Pa
     # blockNames = [block.name for block in pathwayBlocks]
 
     for kp, pathway in enumerate(stimLayout.pathways):
-        print(f"\n\t kp {kp}, pathway: {pathway}")
+        # print(f"\n\t kp {kp}, pathway: {pathway}")
         if pathway not in pathwayTrials or not isinstance(pathwayTrials[pathway], neo.Block):
+            # print(f"\t\tadding {pathway.name} to pathwayTrials")
             pathwayTrials[pathway] = neo.Block(name = pathway.name)
 
         # pathwayBlock = pathwayTrials[pathway]
         pathwayEpisodeSegments = pathwaySegmentPools[pathway.name]
+        # print(f"\tto add {len(pathwayEpisodeSegments)} segments to Block {pathwayTrials[pathway].name}")
 
         eName = episodeNames[kp]
         eType = RecordingEpisodeType.Monitoring # good default; may have to change manually in UI
@@ -3964,30 +3972,38 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> Pa
 
         # episodeNdx = pathway.schedule.index(episode)
 
-        # print(f"\n---\n\tepisode {episode.name} added at index {episodeNdx} in pathway {pathway.name}")
+        # print(f"\n---\n\tepisode {episode.name} with {episode.nFrames} frames, beginFrame {episode.beginFrame} and endFrame {episode.endFrame} added at index {episodeNdx} in pathway {pathway.name}")
 
 
         # NOTE: 2026-11-07 22:56:47
         # now, populate self.data.pathwayTrials neo.Block
 
-        print(f"\n---\n\tbefore:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
+        # print(f"\n---\n\tbefore:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
 
         if len(pathwayTrials[pathway].segments) == 0:
+            # print(f"\n\textending empty block with {len(pathwayEpisodeSegments)} segments")
             pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 
         else:
+            # print(f"\n\tepisode index: {episodeNdx}")
+            # print(f"\t\t{episodeNdx < len(pathway.schedule.episodes)-1}")
             if episodeNdx < len(pathway.schedule.episodes)-1:
                 # NOTE: 2026-11-07 23:17:38
                 # episode was INSERTED somewhere inside the schedule,
                 # possibly at the very beginning
                 #
                 # schedule.add(…) should have adjusted the episode's beginFrame value
-                segmentsBefore = list(pathwayTrials[pathway].segments[0:episode.beginFrame])
-                segmentsAfter  = list(pathwayTrials[pathway].segments[episode.endFrame:])
-                # self.data.pathwayTrials[pathway].segments = segmentsBefore + pathwayBlock.segments + segmentsAfter
-                pathwayTrials[pathway].segments = segmentsBefore + pathwayEpisodeSegments + segmentsAfter
+                # precedingSegments = list(pathwayTrials[pathway].segments[0:episode.beginFrame])
+                # print(f"\t\t->{len(precedingSegments)} segments preceding")
+                # succeedingSegments  = list(pathwayTrials[pathway].segments[episode.beginFrame:])
+                # print(f"\t\t->{len(succeedingSegments)} segments succeeding")
+                # # self.data.pathwayTrials[pathway].segments = precedingSegments + pathwayBlock.segments + succeedingSegments
+                # newSegments = precedingSegments + pathwayEpisodeSegments + succeedingSegments
+                # print(f"\t\t->{len(newSegments)} new segment")
+                # pathwayTrials[pathway].segments = newSegments
+                pathwayTrials[pathway].segments = pathwayTrials[pathway].segments[0:episode.beginFrame] + pathwayEpisodeSegments + pathwayTrials[pathway].segments[episode.beginFrame:]
                 # self.data.pathwayTrials[pathway].segments.extend(pathwayBlock.segments)
-                # self.data.pathwayTrials[pathway].segments.extend(segmentsAfter)
+                # self.data.pathwayTrials[pathway].segments.extend(succeedingSegments)
 
             else:
                 # NOTE: 2026-11-07 23:14:22
@@ -3995,7 +4011,7 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> Pa
                 pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 
         # pathwayTrials[pathway] = pathwayBlock
-        print(f"\n---\n\tafter:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
+        # print(f"\n---\n\tafter:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
 
     # return pathwayTrials
 

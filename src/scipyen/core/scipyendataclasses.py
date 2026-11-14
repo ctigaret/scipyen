@@ -2008,7 +2008,7 @@ class Schedule(ScipyenDataclass):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
 
-        print(f"\n***\nCall {self.__class__.__name__}.addEpisode(…) for object {self.name} ")
+        # print(f"\n***\nCall {self.__class__.__name__}.addEpisode(…) for object {self.name} ")
 
         if len(self.episodes) == 0:
             self.episodes.append(value)
@@ -2017,7 +2017,7 @@ class Schedule(ScipyenDataclass):
 
         ndx = list(more_itertools.locate(self.episodes, lambda x: x.begin <= value.begin))
 
-        print(f"\n***\nIn {self.name} schedule: indexes of episodes beginning before {value.begin}: {ndx}")
+        # print(f"\n***\nIn {self.name} schedule: indexes of episodes beginning before {value.begin}: {ndx}")
 
         if len(ndx) == 0:
             targetNdx = 0
@@ -2028,14 +2028,14 @@ class Schedule(ScipyenDataclass):
             # print(f"{self.name} to insert at {ndx[-1]+1}")
             targetNdx = ndx[-1]+1
 
-        print(f"\tWill insert episode at {targetNdx}")
+        # print(f"\tWill insert episode at {targetNdx}")
 
         self.episodes.insert(targetNdx, value) # now, value will be at targetNdx
         nFrames = [0] + list(itertools.accumulate(episode.nFrames for episode in self.episodes))
         eFrames = sum(episode.nFrames for episode in self.episodes)
-        print(f"\t episode frames: {[episode.nFrames for episode in self.episodes]}\n")
-        print(f"\t cumsum frames = {nFrames}\n")
-        print(f"\t total schedule frames = {eFrames}")
+        # print(f"\t episode frames: {[episode.nFrames for episode in self.episodes]}\n")
+        # print(f"\t cumsum frames = {nFrames}\n")
+        # print(f"\t total schedule frames = {eFrames}")
         self.episodes[targetNdx].beginFrame = nFrames[targetNdx]
         # but the beginFrame of subsequent episodes STILL needs adjusting
         if targetNdx < len(self.episodes):

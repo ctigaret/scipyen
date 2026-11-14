@@ -7,7 +7,7 @@ r"""Main window for the Scipyen application
 
 """
 #
-# TODO enable drag&drop from history to outside of the Scipyen (e.g.
+# TODO enable drag&drop from history to outside of the Scipyen main window (e.g.
 # a text editor, desktop file manager etc)
 
 
@@ -6099,7 +6099,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # wscol = list(map(lambda c: self.workspaceModel.headerData(c, QtCore.Qt.Horizontal),
         #                  range(self.workspaceModel.columnCount()))).index("Workspace")
 
-        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier):
             varnames = [f'"{i.text()}"' for i in items if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
             # varnames = list(map(lambda i: f'"{i.text()}"', filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
 
@@ -6625,18 +6626,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         #
         self.workspaceView.mainWindow = self
         self.workspaceView.setShowGrid(False)
+        # self.workspaceView.installEventFilter(self)
 
-        # ### BEGIN
-        # NOTE: 2025-06-24 22:03:52
+        # ### BEGIN NOTE: 2025-06-24 22:03:52
+        #
         # Next two lines are called AFTER workspaceModel initialization, which is AFTER
         # self._init_QtConsole_, which now is AFTER self._configureUI_()
         # furthermore, workspaceView.selectionModel() REQUIRES the presence of a
         # item model for the workspaceView
-        # ### END
+        #
+        # ### END   NOTE: 2025-06-24 22:03:52
+
         # NOTE 2021-07-28 14:26:09
-        # avoid editing by db-click
+        # avoid editing by double-click
         self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
         self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
+
         # NOTE: 2021-07-28 14:41:38
         # taken care of by selectionChanged?
         self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
@@ -6653,6 +6658,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.workspaceView.setSortingEnabled(True)
         self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.workspaceView.horizontalHeader().setStretchLastSection(False)
+
         # TODO 2024-07-21 23:30:05
         # make this configurable (and locale-dependent?)
         self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
@@ -7685,9 +7691,39 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     self._scriptManager_.clear()
 
     @safewrapper
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent):
         event.acceptProposedAction()
         event.accept()
+
+    # NOTE: 2026-11-14 16:39:45 TODO
+    # Revisit this, DO NOT DELETE
+    # def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+    #     # NOTE: 2026-11-14 15:33:31
+    #     # `obj` is the QObject that has THIS event filter installed, i.e., the
+    #     # object for which the event is destined
+    #     # NOTE:
+    #     # • can accept or ignore the event
+    #     # • MUST return a bool -> determines whether the event is further processes:
+    #     #   ∘ True  if further processing is DENIED  (i.e., filter IS applied)
+    #     #   ∘ False if further processing is ALLOWED (i.e., filter Is NOT applied)
+    #     if (not isinstance(event, (QtGui.QPaintEvent, QtGui.QFocusEvent,
+    #                                QtGui.QMoveEvent, QtGui.QResizeEvent, QtGui.QEnterEvent,
+    #                                QtGui.QStatusTipEvent, QtCore.QTimerEvent, QtGui.QHideEvent,
+    #                                QtGui.QInputMethodQueryEvent))
+    #         and event.type() not in (QtCore.QEvent.PolishRequest, QtCore.QEvent.MetaCall,
+    #                             QtCore.QEvent.UpdateLater, QtCore.QEvent.Timer,
+    #                             QtCore.QEvent.LayoutRequest, QtCore.QEvent.Show,
+    #                             QtCore.QEvent.ShowToParent, QtCore.QEvent.Leave,
+    #                             QtCore.QEvent.WindowActivate, QtCore.QEvent.WindowDeactivate)):
+    #         print(f"{self.__class__.__name__}.eventFilter({obj}: {type(obj)}, {event}: {type(event)})")
+    #
+    #     if isinstance(event, QtCore.QChildEvent):
+    #         if event.type() == QtCore.QEvent.ChildRemoved:
+    #             event.ignore()
+    #             return True
+    #
+    #     return False
+
 
     @safewrapper
     def dropEvent(self, event):
