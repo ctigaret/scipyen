@@ -17,7 +17,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+    QSpacerItem, QSpinBox, QTabWidget, QVBoxLayout,
+    QWidget)
 
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
 from gui.widgets.tableeditorwidget import TableEditorWidget
@@ -41,7 +42,7 @@ class Ui_RecordingSourceWidget(object):
 
         self.createTwoPathwaysSourcePushButton = QPushButton(RecordingSourceWidget)
         self.createTwoPathwaysSourcePushButton.setObjectName(u"createTwoPathwaysSourcePushButton")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.createTwoPathwaysSourcePushButton.sizePolicy().hasHeightForWidth())
@@ -50,6 +51,10 @@ class Ui_RecordingSourceWidget(object):
         self.createTwoPathwaysSourcePushButton.setIcon(icon1)
 
         self.newSourcesLayout.addWidget(self.createTwoPathwaysSourcePushButton)
+
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.newSourcesLayout.addItem(self.horizontalSpacer)
 
 
         self.verticalLayout_2.addLayout(self.newSourcesLayout)
@@ -72,8 +77,11 @@ class Ui_RecordingSourceWidget(object):
 
         self.adcSpinBox = QSpinBox(RecordingSourceWidget)
         self.adcSpinBox.setObjectName(u"adcSpinBox")
-        sizePolicy.setHeightForWidth(self.adcSpinBox.sizePolicy().hasHeightForWidth())
-        self.adcSpinBox.setSizePolicy(sizePolicy)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.adcSpinBox.sizePolicy().hasHeightForWidth())
+        self.adcSpinBox.setSizePolicy(sizePolicy1)
 
         self.horizontalLayout.addWidget(self.adcSpinBox)
 
@@ -84,8 +92,8 @@ class Ui_RecordingSourceWidget(object):
 
         self.dacSpinBox = QSpinBox(RecordingSourceWidget)
         self.dacSpinBox.setObjectName(u"dacSpinBox")
-        sizePolicy.setHeightForWidth(self.dacSpinBox.sizePolicy().hasHeightForWidth())
-        self.dacSpinBox.setSizePolicy(sizePolicy)
+        sizePolicy1.setHeightForWidth(self.dacSpinBox.sizePolicy().hasHeightForWidth())
+        self.dacSpinBox.setSizePolicy(sizePolicy1)
 
         self.horizontalLayout.addWidget(self.dacSpinBox)
 
@@ -101,8 +109,8 @@ class Ui_RecordingSourceWidget(object):
 
         self.electrodeModeComboBox = QComboBox(RecordingSourceWidget)
         self.electrodeModeComboBox.setObjectName(u"electrodeModeComboBox")
-        sizePolicy.setHeightForWidth(self.electrodeModeComboBox.sizePolicy().hasHeightForWidth())
-        self.electrodeModeComboBox.setSizePolicy(sizePolicy)
+        sizePolicy1.setHeightForWidth(self.electrodeModeComboBox.sizePolicy().hasHeightForWidth())
+        self.electrodeModeComboBox.setSizePolicy(sizePolicy1)
         self.electrodeModeComboBox.setFrame(True)
 
         self.horizontalLayout_2.addWidget(self.electrodeModeComboBox)
@@ -143,11 +151,11 @@ class Ui_RecordingSourceWidget(object):
         self.gridLayout.setObjectName(u"gridLayout")
         self.stimulusListTable = TableEditorWidget(self.stimulusChannelsTab)
         self.stimulusListTable.setObjectName(u"stimulusListTable")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.stimulusListTable.sizePolicy().hasHeightForWidth())
-        self.stimulusListTable.setSizePolicy(sizePolicy1)
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.stimulusListTable.sizePolicy().hasHeightForWidth())
+        self.stimulusListTable.setSizePolicy(sizePolicy2)
 
         self.gridLayout.addWidget(self.stimulusListTable, 0, 0, 1, 1)
 
@@ -158,11 +166,11 @@ class Ui_RecordingSourceWidget(object):
         self.gridLayout_3.setObjectName(u"gridLayout_3")
         self.synapticPathwaysTable = TableEditorWidget(self.synapticPathwaysTab)
         self.synapticPathwaysTable.setObjectName(u"synapticPathwaysTable")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.synapticPathwaysTable.sizePolicy().hasHeightForWidth())
-        self.synapticPathwaysTable.setSizePolicy(sizePolicy2)
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
+        sizePolicy3.setHorizontalStretch(0)
+        sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.synapticPathwaysTable.sizePolicy().hasHeightForWidth())
+        self.synapticPathwaysTable.setSizePolicy(sizePolicy3)
 
         self.gridLayout_3.addWidget(self.synapticPathwaysTable, 0, 0, 1, 1)
 
@@ -200,7 +208,7 @@ class Ui_RecordingSourceWidget(object):
 #if QT_CONFIG(whatsthis)
         self.createTwoPathwaysSourcePushButton.setWhatsThis(QCoreApplication.translate("RecordingSourceWidget", u"Create a two-pathway source directly", None))
 #endif // QT_CONFIG(whatsthis)
-        self.createTwoPathwaysSourcePushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New Two-Pathways Source", None))
+        self.createTwoPathwaysSourcePushButton.setText(QCoreApplication.translate("RecordingSourceWidget", u"New Two Pathways Source", None))
         self.label_2.setText(QCoreApplication.translate("RecordingSourceWidget", u"ADC:", None))
         self.label_3.setText(QCoreApplication.translate("RecordingSourceWidget", u"DAC:", None))
 #if QT_CONFIG(tooltip)

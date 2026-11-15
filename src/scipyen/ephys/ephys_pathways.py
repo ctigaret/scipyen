@@ -2111,7 +2111,11 @@ class SynapticPathway(ScipyenDataclass):
     #
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
 
-    # events: typing.ClassVar[psygnal.SignalGroupDescriptor] = SignalGroupDescriptor()
+    pathwayScheduleEpisodeChanged: typing.ClassVar[
+        psygnal.Signal
+        ] = psygnal.Signal(
+            typing.Self, Schedule, Episode, str, object, object
+            )
 
     def __post_init__(self, electrode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null, # noqa: RUF033
                       pathType: SynapticPathwayType | int | str = SynapticPathwayType.Null):  # noqa: RUF033
@@ -2140,21 +2144,25 @@ class SynapticPathway(ScipyenDataclass):
         self._pathwayType_ = pathType
         self.pathType = self._pathwayType_
         self.schedule.name = f"{self.name}_schedule"
+        self.schedule.episodeChangedInSchedule.connect(self.onScheduleEpisodeChange)
+        # self.schedule.parent = self
 
         super().__post_init__()
 
-        # self.events.connect(self._fieldChanged_) # inherited from ScipyenDataclass
-
-    def _fieldChanged_(self, info: psygnal.EmissionInfo):
+    def fieldEvent(self, info: psygnal.EmissionInfo):
         if len(info.path) == 1:
-            # discard notification from children dataclass signals
             fieldName = info.signal.name
             if fieldName == "name":
-                # newVal, oldVal = info.args
                 newVal = info.args[0]
                 self.schedule.name = f"{newVal}_schedule"
                 self.stimulus.name = f"{newVal}_stimulus"
 
+        # else:
+        #     scipywarn(f"{self.__class__.__name__}.fieldEvent -> {info}\n\t-> IMPLEMENT ME!!!")
+
+    def onScheduleEpisodeChange(self, schedule, episode, episodeAttribute, newVal, oldVal):
+        # print(f"{self.__class__.__name__}.onScheduleEpisodeChange({schedule}, {episode})")
+        self.pathwayScheduleEpisodeChanged.emit(self, schedule, episode, episodeAttribute, newVal, oldVal)
 
     def __hash__(self) -> int:
         return hash(
@@ -2566,9 +2574,6 @@ class RecordingSource(ScipyenDataclass):
     electrodeMode: dataclasses.InitVar[ephys.ElectrodeMode | int | str] = ephys.ElectrodeMode.Null
 
     def __post_init__(self, electrodeMode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null):
-        # print(f"{self.__class__.__name__}.__post_init__")
-        # print(f"\tpathways = {self.pathways} with {len(self.pathways)} pathways")
-        # pathways = list()
         if isinstance(electrodeMode, (int, str)):
             if electrodeMode not in ephys.ElectrodeMode:
                 raise ValueError(f"Invalid electrode mode {electrodeMode}")
@@ -2590,7 +2595,7 @@ class RecordingSource(ScipyenDataclass):
                 # print(f"\tcreated synaptic pathway {pathway}")
                 self.pathways.append(pathway)
 
-        self.pathways.parent=self
+        # self.pathways.parent=self
         # print(f"\tpathways = {self.pathways}")
 
         super().__post_init__() # ScipyenDataclass, for events handling
@@ -3775,14 +3780,21 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
     ret.pathways[1].name = p1name
     return ret
 
+# class PathwayTrials(psygnal.EventedDict): # NOTE: 2026-11-14 23:31:50 use this to EMIT signals when contents change
 class PathwayTrials(dict):
     r"""Mapping of pathway name: str ↦ electrophysiology data: neo.Block"""
+    valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(typing.Self)
+    pathwayChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(SynapticPathway)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if len(self):
             assert all(isinstance(k, SynapticPathway) for k in self), "PathwayTrials accepts only SynapticPathway objects as keys"
             assert all(isinstance(v, neo.Block) for v in self.values()), "PathwayTrials accepts only neo.Block objects as values"
+
+        for pathway in self:
+            pathway.pathwayScheduleEpisodeChanged.connect(self.onPathwayScheduleEpisodeChange)
 
     def __getitem__(self, key: SynapticPathway | str) -> neo.Block:
         if isinstance(key, SynapticPathway):
@@ -3823,6 +3835,28 @@ class PathwayTrials(dict):
     def pathwayNames(self):
         yield from (p.name for p in self)
 
+    def onPathwayScheduleEpisodeChange(self, pathway, schedule, episode,
+                                       episodeAttr, newVal, oldVal):
+        if pathway not in self:
+            scipywarn(f"{pathway.name} does not exist in this {self.__class__.__name__} object")
+            return
+
+        if len(self[pathway].segments) == 0:
+            scipywarn(f"No segments associated with {pathway.name}")
+            return
+
+        if episode.endFrame < len(self[pathway].segments):
+            # raise RuntimeError("episode extends beyond the segments")
+            # print(f"{self.__class__.__name__}.onPathwayScheduleEpisodeChange: episodeAtr = {episodeAttr}, oldVal {oldVal} -> newVal {newVal}")
+            if episodeAttr == "name":
+                for segment in self[pathway].segments[episode.beginFrame:episode.endFrame+1]:
+                    if oldVal in segment.name:
+                        segment.name = segment.name.replace(oldVal, newVal)
+
+                # self.valueChanged.emit(self)
+                self.pathwayChanged.emit(pathway)
+
+
 def splitSweeps(block, pathwaySweepIndex, analogSignals, start):
     r"""Generator tha deals the trial sweeps (i.e, segments) according to the
     pathway they are meant to belong.
@@ -3835,9 +3869,7 @@ def splitSweeps(block, pathwaySweepIndex, analogSignals, start):
 def splitSweepsInTrials(stimLayout, start, *trials):
     r"""Intermediate generator to select the main ADC when dealing segments;
     """
-    # sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
     pathwayADCNames = [x.name for x in stimLayout.pathwaysADCs]
-    # pathwayIndex = range(len(stimLayout.pathways))
     pathwaySweepIndex = [stimLayout.getSweepsForPathway(p) for p in stimLayout.pathways]
 
     yield from [list(splitSweeps(trial, pathwaySweepIndex, pathwayADCNames, start)) for trial in trials]
@@ -3847,93 +3879,64 @@ def dealSweepsInTrials(stimLayout, start, trials):
     yield from tuple(zip(*list(splitSweepsInTrials(stimLayout, start, *trials))))
 
 def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
-    # print(f"dealTrialSweeps: stimLayout.pathways  = {stimLayout.pathways}")
-    # print(f"dealTrialSweeps: start  = {start}")
-    # print(f"dealTrialSweeps: trials  = {len(trials)}")
-    # print(f"dealTrialSweeps: eNames  = {eNames}")
     segmentPools = [list(itertools.chain.from_iterable(x)) for x in dealSweepsInTrials(stimLayout, start, trials)]
-    # print(f"dealTrialSweeps: segmentPools  = {segmentPools}")
-
-    # for block, pool, eName in zip(pathwayBlocks, segmentPools, eNames):
-    #     for kseg, segment in enumerate(pool):
-    #         # segment.name = f"segment_{kseg}_{eName}"
-    #         segment.annotate(recording_episode_name = eName)
-    #         segment.annotate(index_in_episode = kseg)
-    #         segment.index = len(block.segments)+kseg+1
-    #
-    #     block.segments.extend(pool)
-    #
-    # return pathwayBlocks
 
     for pool, eName in zip(segmentPools, eNames):
         for kseg, segment in enumerate(pool):
-            # segment.name = f"segment_{kseg}_{eName}"
             segment.annotate(recording_episode_name = eName)
             segment.annotate(index_in_episode = kseg)
-            # segment.index = len(block.segments)+kseg+1
-
-        # block.segments.extend(pool)
 
 
-    ret = {pathway.name: segmentPool for pathway, segmentPool in zip(stimLayout.pathways, segmentPools)}
+    return {pathway.name: segmentPool for pathway, segmentPool in zip(stimLayout.pathways, segmentPools)}
 
-    # print(f"dealTrialSweeps -> {ret}")
-
-    return ret
-
-def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> PathwayTrials:
-    # print(f"\n###\ndealTrialsToPathways:")
+def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
+                         changeExistingEpisodes: tuple[bool]):
     sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
 
-    episodeNameForPathway = lambda p: (p, counter_suffix(episodeName,
+    # episodeNameForPathway = lambda p, name: (p, counter_suffix(name,
+    #                             p.schedule.episodeNames,
+    #                             returns_counter=False))
+    episodeNameForPathway = lambda p, name: counter_suffix(name,
                                 p.schedule.episodeNames,
-                                returns_counter=False))
+                                returns_counter=False)
 
+    if isinstance(episodeNames, str):
+        episodeNames = [episodeNames] * len(stimLayout.pathways)
 
-    # pathwayBlocks, blockStarts, episodeNames, framesOffsets = list(zip(*[
+    elif (not isinstance(episodeNames, typing.Sequence)
+          or len(episodeNames) != len(changeExistingEpisodes)
+          or len(episodeNames) != len(stimLayout.pathways)
+          or not all(isinstance(x, str) and len(x.strip()) for x in episodeNames)
+          ):
+        raise ValueError("When a sequence, `episodeName` must have as many non-empty strings as there are pathway in the stimulation layout `stimLayout`")
+
+    for k in range(len(episodeNames)):
+        if not changeExistingEpisodes[k]:
+            episodeNames[k] = episodeNameForPathway(stimLayout.pathways[k], episodeNames[k])
+
+    blockStarts = [
+        pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime
+        for pathway in stimLayout.pathways
+        ]
+
+    # blockStarts, episodeNames = list(zip(*[
     #     (
-    #         neo.Block(
-    #             name=f"{pathway.name}",
-    #             rec_datetime=sortedTrials[0].rec_datetime
-    #             ),
     #         pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime,
     #         eName,
-    #         pathway.schedule.nFrames
     #     )
     #     for pathway, eName in (episodeNameForPathway(pathway) for pathway in stimLayout.pathways)
     # ]))
 
-    blockStarts, episodeNames = list(zip(*[
-        (
-            # pathway.name,
-            pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime,
-            eName,
-            # pathway.schedule.nFrames
-        )
-        for pathway, eName in (episodeNameForPathway(pathway) for pathway in stimLayout.pathways)
-    ]))
-
     # populate the pathway blocks (extends their segments with
     # segment data dealt from the trials)
-    # pathwaySegmentPools = self._dealTrialSweeps_(stimLayout, blockStarts,
-    #             sortedTrials, episodeNames)
     pathwaySegmentPools = dealTrialSweeps(stimLayout, blockStarts,
                 sortedTrials, episodeNames)
 
-    # print(f"\n***\ndealTrialsToPathways")
-    # print(f"\t -> {pathwaySegmentPools.keys()}")
-
-    # blockNames = [block.name for block in pathwayBlocks]
-
     for kp, pathway in enumerate(stimLayout.pathways):
-        # print(f"\n\t kp {kp}, pathway: {pathway}")
         if pathway not in pathwayTrials or not isinstance(pathwayTrials[pathway], neo.Block):
-            # print(f"\t\tadding {pathway.name} to pathwayTrials")
             pathwayTrials[pathway] = neo.Block(name = pathway.name)
 
-        # pathwayBlock = pathwayTrials[pathway]
         pathwayEpisodeSegments = pathwaySegmentPools[pathway.name]
-        # print(f"\tto add {len(pathwayEpisodeSegments)} segments to Block {pathwayTrials[pathway].name}")
 
         eName = episodeNames[kp]
         eType = RecordingEpisodeType.Monitoring # good default; may have to change manually in UI
@@ -3948,70 +3951,78 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeName):# -> Pa
             segment.annotate(recording_episode_type = eType)
             segment.annotate(protocol_sweep = pathSweeps)
 
-        # begin = pathwayBlock.segments[0].rec_datetime
-        # end = pathwayBlock.segments[-1].rec_datetime
         begin = pathwayEpisodeSegments[0].rec_datetime
         end = pathwayEpisodeSegments[-1].rec_datetime
 
-        # print(f"\t -> setting up episode {eName} with {len(pathwayBlock.segments)} frames in pathway {pathway.name}")
-        episode = RecordingEpisode(
-                name=eName,
-                begin=begin,
-                end=end,
-                # beginFrame = 0,
-                # beginFrame = framesOffsets[kp],
-                nFrames = len(pathwayEpisodeSegments),
-                protocol = stimLayout.protocol,
-                episodeType = eType,
-                stimLayout = stimLayout,
-                )
+        if changeExistingEpisodes[kp] and eName in pathway.schedule:
+            episode = pathway.schedule[eName]
+            assert len(episode) == 1, f"Duplicate episodes names found ({eName})"
+            episode = episode[0]
 
-        # NOTE: 2026-11-07 22:44:20
-        # this should remove the need to call pathway.schedule.sort()
-        episodeNdx = pathway.schedule.addEpisode(episode)
+            # print(f"\t-> found episode {episode}")
 
-        # episodeNdx = pathway.schedule.index(episode)
+            episodeNdx = pathway.schedule.index(episode)
+            nExtraFrames = len(pathwayEpisodeSegments)
 
-        # print(f"\n---\n\tepisode {episode.name} with {episode.nFrames} frames, beginFrame {episode.beginFrame} and endFrame {episode.endFrame} added at index {episodeNdx} in pathway {pathway.name}")
-
-
-        # NOTE: 2026-11-07 22:56:47
-        # now, populate self.data.pathwayTrials neo.Block
-
-        # print(f"\n---\n\tbefore:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
-
-        if len(pathwayTrials[pathway].segments) == 0:
-            # print(f"\n\textending empty block with {len(pathwayEpisodeSegments)} segments")
-            pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
-
-        else:
-            # print(f"\n\tepisode index: {episodeNdx}")
-            # print(f"\t\t{episodeNdx < len(pathway.schedule.episodes)-1}")
-            if episodeNdx < len(pathway.schedule.episodes)-1:
-                # NOTE: 2026-11-07 23:17:38
-                # episode was INSERTED somewhere inside the schedule,
-                # possibly at the very beginning
-                #
-                # schedule.add(…) should have adjusted the episode's beginFrame value
-                # precedingSegments = list(pathwayTrials[pathway].segments[0:episode.beginFrame])
-                # print(f"\t\t->{len(precedingSegments)} segments preceding")
-                # succeedingSegments  = list(pathwayTrials[pathway].segments[episode.beginFrame:])
-                # print(f"\t\t->{len(succeedingSegments)} segments succeeding")
-                # # self.data.pathwayTrials[pathway].segments = precedingSegments + pathwayBlock.segments + succeedingSegments
-                # newSegments = precedingSegments + pathwayEpisodeSegments + succeedingSegments
-                # print(f"\t\t->{len(newSegments)} new segment")
-                # pathwayTrials[pathway].segments = newSegments
-                pathwayTrials[pathway].segments = pathwayTrials[pathway].segments[0:episode.beginFrame] + pathwayEpisodeSegments + pathwayTrials[pathway].segments[episode.beginFrame:]
-                # self.data.pathwayTrials[pathway].segments.extend(pathwayBlock.segments)
-                # self.data.pathwayTrials[pathway].segments.extend(succeedingSegments)
-
-            else:
-                # NOTE: 2026-11-07 23:14:22
-                # episode was APPENDED to schedule
+            if len(pathwayTrials[pathway].segments) == 0:
+                episode.nFrames = nExtraFrames
                 pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 
-        # pathwayTrials[pathway] = pathwayBlock
-        # print(f"\n---\n\tafter:\n\tpathway block for {pathway.name} has {len(pathwayTrials[pathway].segments)} sweeps")
+            else:
+                originalEpisodeSegmentsInPathway = pathwayTrials[pathway].segments[episode.beginFrame:episode.beginFrame+episode.nFrames]
+                precedingSegments = pathwayTrials[pathway].segments[0:episode.beginFrame]
+                succeedingSegments = pathwayTrials[pathway].segments[episode.beginFrame+episode.nFrames:]
+                newEpisodeSegmentsInPathway = neoutils.timeSortedSegments(
+                    originalEpisodeSegmentsInPathway + pathwayEpisodeSegments
+                    )
 
-    # return pathwayTrials
+                for ks, segment in enumerate(newEpisodeSegmentsInPathway):
+                    segment.name = f"Sweep {ks} in episode {episode.name}"
+
+                pathwayTrials[pathway].segments = precedingSegments + newEpisodeSegmentsInPathway + succeedingSegments
+
+                episode.nFrames += nExtraFrames
+
+                pathway.schedule[episodeNdx] = episode
+
+                for eNdx in range(episodeNdx+1, len(pathway.schedule)):
+                    pathway.schedule[eNdx].beginFrame += nExtraFrames
+
+        else:
+            assert eName not in pathway.schedule, f"An episode named {eName} already exists"
+
+            episode = RecordingEpisode(
+                    name=eName,
+                    begin=begin,
+                    end=end,
+                    nFrames = len(pathwayEpisodeSegments),
+                    protocol = stimLayout.protocol,
+                    episodeType = eType,
+                    stimLayout = stimLayout,
+                    )
+
+            episode.fieldEvents.connect(pathway.schedule.fieldEvent)
+
+            # NOTE: 2026-11-07 22:44:20
+            # this should remove the need to call pathway.schedule.sort()
+            episodeNdx = pathway.schedule.addEpisode(episode)
+
+            # NOTE: 2026-11-07 22:56:47
+            # now, populate pathwayTrials neo.Block with the segments corresponding
+            # to the episode
+            if len(pathwayTrials[pathway].segments) == 0:
+                pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
+
+            else:
+                if episodeNdx < len(pathway.schedule.episodes)-1:
+                    # NOTE: 2026-11-07 23:17:38
+                    # episode was INSERTED somewhere inside the schedule,
+                    # possibly at the very beginning
+                    #
+                    pathwayTrials[pathway].segments = pathwayTrials[pathway].segments[0:episode.beginFrame] + pathwayEpisodeSegments + pathwayTrials[pathway].segments[episode.beginFrame:]
+
+                else:
+                    # NOTE: 2026-11-07 23:14:22
+                    # episode was APPENDED to schedule
+                    pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 

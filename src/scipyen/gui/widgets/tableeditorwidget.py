@@ -139,6 +139,8 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
     sig_requestDataRow = Signal(name="sig_requestDataRow")
     sig_indexPressed = Signal(QtCore.QModelIndex, name="sig_indexPressed")
+    sig_rowActivated = Signal(int, name="sig_rowActivated")
+    sig_columActivated = Signal(int, name="sig_columnActivated")
 
     def __init__(self, parent: QtWidgets.QMainWindow | None = None,
                  readOnly:bool = True, enforceFloat: bool = False,
@@ -527,6 +529,8 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
         self.tableView.clicked[QtCore.QModelIndex].connect(self.slot_tableItemClicked)
         self.tableView.pressed[QtCore.QModelIndex].connect(self.slot_tableItemPressed)
+        self.tableView.verticalHeader().sectionClicked[int].connect(self.slot_tableRowActivated)
+        self.tableView.horizontalHeader().sectionClicked[int].connect(self.slot_tableColumnActivated)
 
 
         self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
@@ -560,6 +564,14 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     @Slot(QtCore.QModelIndex)
     def slot_tableItemPressed(self, index: QtCore.QModelIndex):
         self.sig_indexPressed.emit(index)
+
+    @Slot(int)
+    def slot_tableRowActivated(self, section: int):
+        self.sig_rowActivated.emit(section)
+
+    @Slot(int)
+    def slot_tableColumnActivated(self, section: int):
+        self.sig_columnActivated.emit(section)
 
     @Slot()
     def slot_resizeAllColumnsToContents(self):

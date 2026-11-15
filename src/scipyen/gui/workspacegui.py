@@ -364,9 +364,13 @@ class GuiMessages:
         return QtWidgets.QMessageBox.information(parent, title, text)
 
     @safewrapper
-    def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
+    def questionMessage(self, title, text,
+                        buttons = QtWidgets.QMessageBox.StandardButtons(
+                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+                            ),
+                        default = QtWidgets.QMessageBox.No):
         # QtWidgets.QApplication.beep()
-        return QtWidgets.QMessageBox.question(self, title, text, defaultButton=default)
+        return QtWidgets.QMessageBox.question(self, title, text, buttons=buttons, defaultButton=default)
 
     @staticmethod
     def questionMessage_static(parent: QtWidgets.QWidget | None = None,

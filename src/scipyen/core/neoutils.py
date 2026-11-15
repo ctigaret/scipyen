@@ -321,15 +321,38 @@ def copy_to_segment(obj: neo.core.dataobject.DataObject, new_seg: neo.Segment):
 
 
 def sweep_duration(data: neo.Segment):
-    return max(
-        s.duration
-        for s in data.analogsignals
-        + data.irregularlysampledsignals
-        + [st for st in data.spiketrains]
-    )
+    analog = None if len(data.analogsignals) == 0 else max(s.duration for s in data.analogsignals)
+    irregs = None if len(data.irregularlysampledsignals) == 0 else max(s.duration for s in data.irregularlysampledsignals)
+    spikes = None if len(data.spiketrains) == 0 else max(s.duration for s in data.spiketrains)
+
+    if len(data.events == 0):
+        events = None
+    else:
+        evstart = min(min(s.times) for s in data.events)
+        evstop = max(max(s.times) for s in data.events)
+        events = evstop - evstart
+
+    if len(data.epochs) == 0:
+        epochs = None
+
+    else:
+        epochs = max(sum(s.durations) for s in data.epochs)
+
+    values = [x for x in (analog, irregs, spikes, events, epochs) if x is not None]
+
+    if len(values):
+        return max(values)
 
 
-def segment_start(data: neo.Segment):
+    # return max(
+    #     s.duration
+    #     for s in data.analogsignals
+    #     + data.irregularlysampledsignals
+    #     + [st for st in data.spiketrains]
+    # )
+
+
+def segment_start(data: neo.Segment) -> pq.Quantity | None:
     r"""Returns the minimum of t_start for all signals and spiketrains in a segment.
 
     Avoids any events and epochs that fall outside the signals' time domain.
@@ -342,11 +365,34 @@ def segment_start(data: neo.Segment):
     See also segment_stop
     """
 
-    return min(
-        [s.t_start for s in data.analogsignals]
-        + [s.t_start for s in data.spiketrains]
-        + [min(s.times) for s in data.irregularlysampledsignals]
-    )
+    analogsStart = None if len(data.analogsignals) == 0 else min([s.t_start for s in data.analogsignals])
+    irregularsStart = None if len(data.irregularlysampledsignals) == 0 else min([s.times for s in data.irregularlysampledsignals])
+    spikesStart = None if len(data.spiketrains) == 0 else min([s.t_start for s in data.spiketrains])
+    eventsStart = None
+    if len(data.events):
+        events = [e for e in data.events if e.times.size > 0]
+        if len(events):
+            eventsStart =  min([min(s.times) for s in events])
+
+    epochsStart =  None
+    if len(data.epochs):
+        epochs = [e for e in data.epochs if e.times.size > 0]
+        if len(epochs):
+            epochsStart = min([min(s.times) for s in epochs])
+
+    starts = [x for x in (analogsStart, irregularsStart, eventsStart, epochsStart, spikesStart) if x is not None]
+
+    if len(starts):
+        return min(starts)
+
+
+    # return min(
+    #     [s.t_start for s in data.analogsignals]
+    #     + [s.t_start for s in data.spiketrains]
+    #     + [min(s.times) for s in data.events]
+    #     + [min(s.times) for s in data.epochs]
+    #     + [min(s.times) for s in data.irregularlysampledsignals]
+    # )
 
 
 def segment_stop(data: neo.Segment):
@@ -362,14 +408,35 @@ def segment_stop(data: neo.Segment):
     See also segment_stop
     """
 
-    return max(
-        [s.t_stop for s in data.analogsignals]
-        + [s.t_stop for s in data.spiketrains]
-        + [max(s.times) for s in data.irregularlysampledsignals]
-    )
+    analogsStop = None if len(data.analogsignals) == 0 else max([s.t_stop for s in data.analogsignals])
+    irregularsStop = None if len(data.irregularlysampledsignals) == 0 else max([max(s.times) for s in data.irregularlysampledsignals])
+    spikesStop = None if len(data.spiketrains) == 0 else max([s.t_stop for s in data.spiketrains])
+
+    eventsStop = None
+    if len(data.events):
+        events = [e for e in data.events if e.times.size > 0]
+        if len(events):
+            eventsStop = max([max(s.times) for s in events])
+
+    epochsStop = None
+    if len(data.epochs):
+        epochs = [e for e in data.epochs if e.times.size > 0]
+        if len(epochs):
+            epochsStop = max([max(s.times) for s in epochs])
+
+    stops = [x for x in (analogsStop, irregularsStop, eventsStop, epochsStop, spikesStop) if x is not None]
+
+    if len(stops):
+        return max(stops)
+
+    # return max(
+    #     [s.t_stop for s in data.analogsignals]
+    #     + [s.t_stop for s in data.spiketrains]
+    #     + [max(s.times) for s in data.irregularlysampledsignals]
+    # )
 
 
-def block_duration(x: neo.Block):
+def block_duration(x: neo.Block) -> pq.Quantity | None:
     r"""Returns the duration of a neo.Block.
     This is the time interval between the start time of the first and the last
     sweep in the trial, plus the duration of the last sweep.
@@ -380,11 +447,43 @@ def block_duration(x: neo.Block):
     NOTE 2: Remember: a "trial" is represented as a neo.Block object; each trial
     "sweep" is represented as a neo.Segment object.
     """
-    return (
-        segment_start(x.segments[-1])
-        - segment_start(x.segments[0])
-        + sweep_duration(x.segments[-1])
-    )
+    start = segment_start(x.segments[0])
+    stop = segment_start(x.segments[-1])
+    duration = sweep_duration(x.segments[-1])
+    if any(x is None for x in (start, stop, duration)):
+        return
+
+    return (stop - start + duration)
+
+def segment_rec_datetime(segment: neo.Segment):
+    r"""Retrieve the Segment's rec_datetime.
+
+Use this in the most general case as it covers the case where a neo.Segment has
+no value assigned to its `rec_datetime` attribute (by default this is None).
+
+Returns a datetime.datetime value, which can be:
+
+* the `segment.rec_datetime` if `segment.rec_datetime` is not None
+
+* a value calculated by adding:
+
+    * the rec_datetime of the `segment.block` attribute, if this is not None, else datetime.datetime.now()
+
+    * the minimum t_start of all the signal data in the segment (in seconds)
+
+.. note::
+
+    `rec_datetime` is an attribute of neo.Segment, but it is not necessarily assigned a value.
+"""
+    if isinstance(segment.rec_datetime, datetime.datetime):
+        return segment.rec_datetime
+
+    if isinstance(segment.block, neo.Block) and isinstance(segment.block.rec_datetime, dateime.datetime):
+        ret = segment.block.rec_datetime
+    else:
+        ret = datetime.datetime.now()
+
+    return ret + datetime.timedelta(seconds=float(segment_start(segment).rescale(pq.s).magnitude))
 
 @singledispatch
 def get_codomain_name(obj):
@@ -2892,6 +2991,10 @@ def get_sample_at_time(data, t, channel=None):
     if isinstance(ndx, int):
         return data[ndx, :]
 
+def timeSortedSegments(segments: list | NeoObjectList, ascending:bool = True) -> list | NeoObjectList:
+    r"""Sorts the segments in the sequence according to their `rec_datetime`"""
+    return type(segments)(sorted(segments, key = lambda x: segment_rec_datetime(x),
+                                 reverse = not ascending))
 
 def get_workspace_neo_blocks(
     *args,

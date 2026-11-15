@@ -58,6 +58,8 @@ from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, # noqa
 
 #### END pict.core.modules
 
+class ScipyenDataclass: pass # forward declaration
+
 class DoseDescriptor:
     def __set_name__(self, obj:object, name:str):
         if len(name.strip()) == 0:
@@ -129,7 +131,7 @@ class FileOriginDescriptor:
         else:
             raise TypeError(f"Expecting a str, pathlib.Path object, or a sequence of these; instead, got a {type(value).__name__}")
 
-@evented
+# @evented(ebents_namespace="fieldEvents")
 @dataclass
 class ScipyenDataclass:
     r"""Ancestor of Scipyen data classes.
@@ -145,7 +147,7 @@ class ScipyenDataclass:
     of the Observer pattern for dataclasses, see `psygnal` package), then you
     must also
 
-    2.1 Override the generic self._fieldChanged_ method defined here
+    2.1 Override the generic self.fieldEvent method defined here
 
     2.2 If your subclass also defines a __post_init__() method, make sure you
         call super().__post_init__() inside it, i.e., call this superclass' method
@@ -154,33 +156,34 @@ class ScipyenDataclass:
     """
     name:str = dataclasses.field(default_factory=str)
     description: str = dataclasses.field(default_factory=str)
+    fieldEvents: typing.ClassVar[psygnal.SignalGroupDescriptor] = psygnal.SignalGroupDescriptor(connect_child_events=True)
+
+    # _:KW_ONLY
+    # parent: ScipyenDataclass | None = dataclasses.field(default = None)
+
 
     def __post_init__(self):
-        self.events.connect(self._fieldChanged_)
+        self.fieldEvents.connect(self.fieldEvent)
 
-    # def _fieldChanged_(self, *args, **kwargs):
-    def _fieldChanged_(self, info: psygnal.EmissionInfo):
+    # def fieldEvent(self, *args, **kwargs):
+    def fieldEvent(self, info: psygnal.EmissionInfo):
         pass
         # ### BEGIN 2026-11-13 22:25:56 reminder, DO NOT DELETE
         #
-        # print(f"{self.__class__.__name__}._fieldChanged_({args}, {kwargs})")
-        # info = args[0]
-        # fieldName = info.signal.name
-        # newVal, oldVal = info.args
-        # # NOTE: 2026-11-13 21:58:50
-        # # receives a single arg: psygnal.EmissionInfo, with:
-        # # signal: _DataclassFieldSignalInstance with name: name of field that changed
-        # # args = (new value, old value)
-        # # path = (.XXX)
+        # print(f"{self.__class__.__name__}.fieldEvent({args}, {kwargs})")
         #
-        # print(f"\n\tfieldName = {fieldName}")
-        # print(f"\tnew value = {newVal}")
-        # print(f"\told value = {oldVal}")
-        # print(f"\tpath = {info.path} with")
-        # for kp, pstep in enumerate(info.path):
-        #     print(f"\t\tpath step {kp} attr = {pstep.attr}")
-        #     print(f"\t\tpath step {kp} index = {pstep.index}")
-        #     print(f"\t\tpath step {kp} key = {pstep.key}")
+        # -> NOTE: this below is valid only for "evented" dataclasses !
+        # receives a single arg: psygnal.EmissionInfo `info` with:
+        # • info.signal = emitted signal
+        # • info.signal.name =  name of field that changed (i.e. got a new value)
+        # • info.signal.instance = _DataclassFieldSignalInstance
+        # • info.signal.instance.instance = the object that emitted the signal
+        # • info.args: tuple (newVal, oldVal)
+        # • info.path: tuple of "path steps" (psygnal.PathStep) where
+        #   each pstep has:
+        #   ∘ pstep.attr        name of attribute (for dataclasses) or None
+        #   ∘ pstep.index       index (for sequence containers) or None
+        #   ∘ pstep.key         key (for mapping containers) or None
         #
         # ### END   2026-11-13 22:25:56 reminder, DO NOT DELETE
 
@@ -1637,6 +1640,10 @@ class Episode(ScipyenDataclass):
     nFrames: int = 0
     procedure: Procedure = dataclasses.field(default_factory = Procedure)
 
+    # def fieldEvent(self, info: psygnal.EmissionInfo):
+    #     print(f"{self.__class__.__name__}.fieldEvent({info})")
+
+
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
@@ -1689,8 +1696,21 @@ class Schedule(ScipyenDataclass):
     # name:str = ""
     _:KW_ONLY
     episodes: typing.Sequence[Episode] = dataclasses.field(default_factory = list)
-
     allowed_contents: typing.ClassVar = (Episode, )
+    episodeChangedInSchedule: typing.ClassVar[
+        psygnal.Signal
+        ] = psygnal.Signal(
+            typing.Self, Episode, str, object, object
+            )
+
+    def fieldEvent(self, info: psygnal.EmissionInfo):
+        # print(f"{self.__class__.__name__}.fieldEvent({info})")
+        # print(f"{self.__class__.__name__}.fieldEvent(…)")
+        # print(f"\tsignal emitter: {info.signal.instance.instance}")
+        newVal, oldVal = info.args
+        # attribute = info.signal.name
+        if isinstance(info.signal.instance.instance, Episode):
+            self.episodeChangedInSchedule.emit(self, info.signal.instance.instance, info.signal.name, newVal, oldVal)
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -2162,7 +2182,7 @@ class Schedule(ScipyenDataclass):
 
     def index(self, episode: Episode):
         if not isinstance(episode, self.allowed_contents):
-            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
+            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects; instead got a {type(episode)}")
 
         if episode not in self.episodes:
             raise ValueError(f"The specified {self.allowed_contents[0].__name__} object is not contained in this {self.__class__.__name__}")
