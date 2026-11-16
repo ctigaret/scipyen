@@ -7,7 +7,7 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, types, warnings
+import traceback, re, itertools, functools, time, typing, types, warnings # noqa: I001, F401
 import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
 import enum
 import collections, collections.abc, dataclasses
@@ -15,17 +15,17 @@ import numbers
 from numbers import Number # noqa
 from sys import (getsizeof, stderr)
 from copy import (copy, deepcopy,) # noqa
-from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
+from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction, # noqa: I001
                      isgeneratorfunction, iscoroutinefunction,
-                     iscoroutine, isawaitable, isasyncgenfunction,
+                     iscoroutine, isawaitable, isasyncgenfunction, # noqa: I001
                      isasyncgen, istraceback, isframe, 
                      isabstract, ismethoddescriptor, isdatadescriptor,
                      isgetsetdescriptor, ismemberdescriptor,
                      signature,
                      )
-from functools import (partial, partialmethod, reduce, singledispatch) # noqa
+from functools import (partial, partialmethod, reduce, singledispatch) # noqa: I001
 from itertools import chain
-from collections import deque, OrderedDict # noqa
+from collections import deque, OrderedDict # noqa: I001
 from dataclasses import MISSING
 import numpy as np
 import pandas as pd
@@ -35,7 +35,7 @@ import PIL
 from PIL.Image import Image as PILImage
 from IPython.display import Image as IPImage
 import neo
-from neo.core.dataobject import DataObject as NeoDataObject # noqa
+from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 
 __has_graphviz__:bool = False
@@ -52,23 +52,23 @@ if neo.__version__ >= '0.13.0':
 
 else:
     NeoObjectList = list # alias for backward compatibility :(
-from core.vigra_patches import vigra # noqa
-import pyqtgraph  # noqa # for their own eq operator
-import matplotlib as mpl # noqa
-from tribool import Tribool # noqa
+from core.vigra_patches import vigra
+import pyqtgraph   # for their own eq operator
+import matplotlib as mpl
+from tribool import Tribool
 #import language_tool_python
 
-import qtpy # noqa
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
-    from PySide6.QtCore import (Signal, Slot, Property,) # noqa
+    # import PySide6
+    from PySide6 import Shiboken
+    from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -77,8 +77,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
         
-    from qtpy import sip # noqa
-    # from qtpy.uic import loadUiType # noqa
+    from qtpy import sip
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -124,10 +123,10 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 "ID", "Icon"]
 
-GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
+GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]  # noqa: UP007
 r"""Generic index type, used with normalized_indexed and similar functions"""
 
-class SafeComparator(object):
+class SafeComparator:
     # NOTE: 2021-07-28 13:42:07
     # pg.eq does NOT work with numpy arrays and pandas objects!
     # operator.eq DOES work with numpy array and pandas objects!
@@ -3299,7 +3298,8 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
         #Qt objects (maybe)
             
     # icon = QtGui.QIcon.fromTheme("object")
-    icon = getIcon("object", "object-group")
+    # icon = getIcon("object", "object-group")
+    icon = getIcon("code-variable", "object-group")
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -3315,10 +3315,19 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     fqual = f"module: {module_name}\nlibrary: {module_library}"
     # ttip = ".".join([module_name, typename])
     ttip = f"{typename}"
-    
+
+    if (isinstance(obj, (typing.Sequence, typing.Mapping, collections.deque, neo.core.baseneo.BaseNeo,
+                        NeoDataObject, NeoContainer))
+        and not isinstance(obj, (str, bytes, bytearray, np.ndarray))
+        ) or dataclasses.is_dataclass(obj):
+        icon = getIcon("object", "object-group")
+
     if isinstance(obj, (QtWidgets.QWidget, mpl.figure.Figure)):
-        icon = getIcon("window")
-        # icon = QtGui.QIcon.fromTheme("window")
+        if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+            icon = getIcon("window")
+        else:
+            icon = getIcon("text-field-framed", "window")
+
         if isinstance(obj, QtWidgets.QWidget):
             if qtutils.isQObjectAlive(obj):
                 ttip = "\n".join([f"{obj.windowTitle()}", ttip])
@@ -3328,15 +3337,15 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     # if typename == "module":
     #     icon = QtGui.QIcon.fromTheme("class-or-package")
     
-    wspace_name = "Namespace: %s" % namespace
+    wspace_name = f"Namespace: {namespace}"
     
-    result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
+    result["Name"] = {"display": f"{objname}", "tooltip": "\n".join([ttip, wspace_name])}
     
     tt = abbreviated_type_names.get(typename, typename)
     
     
     if tt in signal_types and hasattr(obj, "dimensionality"):
-        tt += " (%s)" % obj.dimensionality
+        tt += f" (obj.dimensionality)"
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
@@ -5136,6 +5145,7 @@ def render_sympy(expr:typing.Union[sympy.Expr, sympy.Basic], backend:str="auto",
     from io import BytesIO
     from IPython.lib import latextools
     from core.strutils import render_latex
+    # import guiutils
     from gui.guiutils import (getScipyenConsoleShell, isDarkGui)
     
     if not isinstance(expr, (sympy.Expr, sympy.Basic)):
@@ -5203,7 +5213,7 @@ def render_sympy(expr:typing.Union[sympy.Expr, sympy.Basic], backend:str="auto",
             parse = functools.partial(sympy.latex, mode=mode, itex=itex, **kwargs)
             
     elif parser.lower() == "shell":
-        shell = guiutils.getScipyenConsoleShell()
+        shell = getScipyenConsoleShell()
         parse = functools.partial(_shell_parse_, shell)
         
     else:

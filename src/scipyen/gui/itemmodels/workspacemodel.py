@@ -1465,8 +1465,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return self.genRowFromPropDict(obj_props)
 
     def genRowFromPropDict(self, obj_props: dict,
-                           background: typing.Optional[QtGui.QBrush] = None,
-                           foreground: typing.Optional[QtGui.QBrush] = None) -> typing.List[QtGui.QStandardItem]:
+                           background: QtGui.QBrush | None = None,
+                           foreground: QtGui.QBrush | None = None) -> typing.List[QtGui.QStandardItem]:
         r"""Returns a row of QStandardItems
         """
         # print(f"genRowFromPropDict obj_props = {obj_props}")

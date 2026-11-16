@@ -4411,6 +4411,22 @@ def copy_with_data_subset(obj, **kwargs):
     events:
         as above, for Event objects
 
+    signalFilter:
+        Callable or Sequence of Callables, or None (default).
+
+        The Callable applies a digital filter to the analog signals in `obj`; it
+        it must accept a single parameter (analog signal-like) and return an analog
+        signal-like object (the filtered signal).
+
+        When `analogsignals` indexing specifies more than one signal, the `signalFilter`
+        will be applied to **all** selected signals.
+
+        Alterntively, you can supply here a sequence of Callables (with the same
+        constraints as above), which **must** have as many elements as the number
+        of analog signals specified in the `analogsignals` indexing parameter.
+
+
+
     """
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
@@ -4428,7 +4444,6 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     rec_datetime = obj.rec_datetime
     file_origin = obj.file_origin
     description = obj.description
-
     annotations = obj.annotations
 
     # NOTE: 2023-04-13 09:45:19
@@ -4437,6 +4452,8 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     # so we cache them here, to reinstate them later when copying the child
     # (see NOTE: 2023-04-13 09:45:26)
     not_kwargs = {}
+
+    signalFilter = kwargs.pop("signalFilter", None)
 
     time_shift = kwargs.pop("time_shift", None)
 
@@ -4487,6 +4504,7 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     # the Segment)
     kwargs.update(not_kwargs)
     kwargs["time_shift"] = time_shift
+    kwargs["signalFilter"] = signalFilter
 
     try:
         new_segments = [copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx]

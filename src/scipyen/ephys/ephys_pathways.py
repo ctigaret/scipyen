@@ -42,7 +42,7 @@ import pandas as pd # noqa
 from tribool import Tribool
 # import pyabf
 import psygnal
-from psygnal import evented
+# from psygnal import evented
 
 from scipy import optimize # noqa
 
@@ -1128,7 +1128,7 @@ class AuxiliaryOutput(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity: h5py.Dataset, attrs: dict | None = None, cache: dict = {}):
+    def fromHDF5(cls, entity: h5py.Dataset, attrs: dict | None = None, cache: dict = {}):  # noqa: B006
         from iolib import h5io
 
         if entity in cache:
@@ -1356,7 +1356,7 @@ class AuxiliaryOutputList(NeoObjectList):
         return self._index(*args)
 
 
-def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
+def auxoutput(name: str, channel: int | None =None, digttl: bool | None = None) -> AuxiliaryOutput:
     r"""Constructs a run-of-the-mill AuxiliaryOutput"""
     if channel is None:
         channel = 0
@@ -1660,7 +1660,9 @@ in 'sweeps')
         if temporalOrder:
             for sweep in stimulusLayout: # noqa
                 pps = sorted(stimulusLayout[sweep],
-                            key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers))))
+                            key = lambda sPC: min(tr.times[0] for tr in sPC.triggers))
+                            # key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers)))
+                            # )
 
                 stimulusLayout[sweep] = pps
 
@@ -1857,14 +1859,18 @@ in 'sweeps')
 
             epochs = self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
 
-            if isinstance(epochs, (pab.ABFEpoch, neo.Epoch)):
-                result[sweep] = epochs
-
-            elif (isinstance(epochs, list)
+            if (isinstance(epochs, (pab.ABFEpoch, neo.Epoch))
+                or (isinstance(epochs, list)
                   and len(epochs)
                   and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs)
-                  ):
+                  )):
                 result[sweep] = epochs
+
+            # elif (isinstance(epochs, list)
+            #       and len(epochs)
+            #       and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs)
+            #       ):
+            #     result[sweep] = epochs
 
         return result
 
@@ -1900,13 +1906,8 @@ in 'sweeps')
 
 
     def getBaselineEpoch(self, pathway: SynapticPathway,
-                        sweep: typing.Optional[int] = None,
-                        asNeoEpoch: bool = False) -> typing.Optional[
-                                            typing.Union[pab.ABFEpoch,
-                                                        neo.Epoch,
-                                                        dict[int, pab.ABFEpoch],
-                                                        dict[int, neo.Epoch]]
-                                            ]:
+                        sweep: int | None = None,
+                        asNeoEpoch: bool = False) -> pab.ABFEpoch | neo.Epoch | dict[int, pab.ABFEpoch] | dict[int, neo.Epoch] | None:
         r"""Returns the epoch used for measuring the signal baseline.
 
         .. |nbsp| unicode:: 0xA0
@@ -1926,17 +1927,8 @@ in 'sweeps')
                                      True, sweep, asNeoEpoch)
 
     def getStimulationEpochs(self, pathway: SynapticPathway,
-                             sweep: typing.Optional[int] = None,
-                             asNeoEpoch: bool = False) -> typing.Optional[
-                                                typing.Union[
-                                                    pab.ABFEpoch,
-                                                    neo.Epoch,
-                                                    list[pab.ABFEpoch],
-                                                    list[neo.Epoch],
-                                                    dict[int, pab.ABFEpoch],
-                                                    dict[int, neo.Epoch],
-                                                    dict[int, list[neo.Epoch]]]
-                                                ]:
+                             sweep: int | None = None,
+                             asNeoEpoch: bool = False) -> pab.ABFEpoch | neo.Epoch | list[pab.ABFEpoch] | list[neo.Epoch] | dict[int, pab.ABFEpoch] | dict[int, neo.Epoch] | dict[int, list[neo.Epoch]] | None:
         r"""Returns the epoch(s) where the pathway is stimulated during the given sweep.
 
         .. |nbsp| unicode:: 0xA0
@@ -2222,7 +2214,7 @@ class SynapticPathway(ScipyenDataclass):
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
 
-        a_val = lambda a: getFieldOrProperty(self, a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(self, a)}'" if a == 'name' else getFieldOrProperty(self, a) # noqa
+        a_val = lambda a: getFieldOrProperty(self, a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(self, a)}'" if a == 'name' else getFieldOrProperty(self, a)
 
         sub_fields = []
 
@@ -2295,8 +2287,7 @@ class SynapticPathway(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None, cache:dict = {}):
-
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None, cache:dict = {}):  # noqa: B006
         from iolib import h5io
         if entity in cache:
             return cache[entity]
@@ -2448,7 +2439,8 @@ class SynapticPathwayList(NeoObjectList): # noqa
 
         if len(self._items):
             s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            s.extend([f"{kp}: {p}" for kp, p in enumerate(self._items)])
+            # s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
 
         return "\n".join(s)
 
@@ -2573,7 +2565,7 @@ class RecordingSource(ScipyenDataclass):
     pathways: SynapticPathwayList       = dataclasses.field(default_factory = SynapticPathwayList)
     electrodeMode: dataclasses.InitVar[ephys.ElectrodeMode | int | str] = ephys.ElectrodeMode.Null
 
-    def __post_init__(self, electrodeMode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null):
+    def __post_init__(self, electrodeMode: ephys.ElectrodeMode | int | str = ephys.ElectrodeMode.Null):  # noqa: RUF033
         if isinstance(electrodeMode, (int, str)):
             if electrodeMode not in ephys.ElectrodeMode:
                 raise ValueError(f"Invalid electrode mode {electrodeMode}")
@@ -2929,7 +2921,7 @@ class RecordingSource(ScipyenDataclass):
 
         return result
 
-    def getPathwaysByStimulationType(self, digital: bool | Tribool = Tribool(),
+    def getPathwaysByStimulationType(self, digital: bool | Tribool = Tribool(),  # noqa: B008
                                      asDict: bool = False) -> tuple | dict[str, tuple]:
         r"""Groups the synaptic pathways in this recording source by their means of activation.
 
@@ -3047,7 +3039,7 @@ class RecordingSource(ScipyenDataclass):
         """
         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
 
-        adc = protocol.getADC(self.adc)
+        # adc = protocol.getADC(self.adc)
         dac = protocol.getDAC(self.dac)
 
         activeDAC  = protocol.getDAC()
@@ -3102,7 +3094,7 @@ class RecordingSource(ScipyenDataclass):
         """
         protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
         if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
-            return dict()
+            return {}
 
         uniquePathways = unique(protocol_dac_stim_pathways + protocol_dig_stim_pathways, idcheck=True)
 
@@ -3123,11 +3115,10 @@ class RecordingSource(ScipyenDataclass):
 
 class RecordingSourceList(NeoObjectList):
     allowed_contents = (RecordingSource, )
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
+    def __init__(self, *items, name: str | None = None, parent: object = None):
 
         self.name = "" if not isinstance(name, str) else name
-        self._items = list()
+        self._items = []
 
         if len(items):
             if len(items) == 1 and isinstance(items[0], typing.Iterable):
@@ -3135,7 +3126,8 @@ class RecordingSourceList(NeoObjectList):
 
             if any(
                 not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                or not any(type(i).__name__ in n for n in (t.__name__ for t in self.allowed_contents)) # list(map(lambda t: t.__name__, self.allowed_contents)))
+                # or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
                 for i in items):
                 raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
@@ -3151,7 +3143,7 @@ class RecordingSourceList(NeoObjectList):
         return self._parent
 
     @parent.setter
-    def parent(self, obj:typing.Optional[ScipyenDataclass] = None):
+    def parent(self, obj: ScipyenDataclass | None = None):
         if isinstance(obj, ScipyenDataclass):
             self._parent = obj
         else:
@@ -3226,7 +3218,8 @@ class RecordingSourceList(NeoObjectList):
 
         if len(self._items):
             s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            s.extend([f"{ki}: {i}" for ki, i in enumerate(self._items)])
+            # s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
 
         return "\n".join(s)
 
@@ -3341,7 +3334,7 @@ class RecordingSourceList(NeoObjectList):
     def index(self, *args):
         return self._index(*args)
 
-def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
+def infer_schedule(*args, name: str | None = None) -> RecordingSchedule:
     r"""WARNING: Based on the naming of the trials (neo.Block objects).
 
     The names of the blocks must follow the format: aaa_<bbb_>*<xxxx>
@@ -3378,13 +3371,16 @@ def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule
     trials_seq , ordered_trials = trials_sequence_info(*args, return_sorted=True)
     # this below: tuple (running index of trial, trial basename, trial suffix index)
     # unique based on trial basename
-    episode_names_ndx = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
-                           key = lambda v: v[1])
+    episode_names_ndx = unique([(kx, *(strutils.get_int_sfx(x))) for kx, x in enumerate(trials_seq.name)])
+    # episode_names_ndx = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
+    #                        key = lambda v: v[1])
 
-    trials_ndx = list(map(lambda n: list(trials_seq.index[list(map(lambda x: n[1] in x, trials_seq.name))]), episode_names_ndx))
+    trials_ndx = [[trials_seq.index[[n[1] in x for x in trials_seq.name]]] for n in episode_names_ndx]
+    # trials_ndx = list(map(lambda n: list(trials_seq.index[list(map(lambda x: n[1] in x, trials_seq.name))]), episode_names_ndx))
 
-    episodes = list(map(lambda x: RecordingEpisode(name=x[0][1], blocks = [ordered_trials[k] for k in x[1]]),
-                        zip(episode_names_ndx, trials_ndx)))
+    episodes = [RecordingEpisode(name = x[0][1], blocks = [ordered_trials[k] for k in x[1]]) for x in zip(episode_names_ndx, trials_ndx)]
+    # episodes = list(map(lambda x: RecordingEpisode(name=x[0][1], blocks = [ordered_trials[k] for k in x[1]]),
+    #                     zip(episode_names_ndx, trials_ndx)))
 
     schedule = RecordingSchedule(episodes=episodes)
 
@@ -3408,12 +3404,12 @@ def parseEpochs(pathway: SynapticPathway, protocol: pab.ABFProtocol,
 
     # TODO 2026-04-27 21:53:38
     # to return {epoch_number: (epoch, ABFEpochRole)}
-    hoDACActive = protocol.activeDACChannel not in (0,1)
-    isMainDAC = pathway.dac == protocol.activeDAC.physicalIndex
+    # hoDACActive = protocol.activeDACChannel not in (0,1)
+    # isMainDAC = pathway.dac == protocol.activeDAC.physicalIndex
 
     dac = protocol.getDAC(pathway.dac)
 
-    digTriggerEpochs = list()
+    digTriggerEpochs = []
 
     suggestFirst = True # normally I'd choose the first suitable epoch, unless
                         # all suitable epochs come AFTER some other perturbance
@@ -3442,65 +3438,66 @@ def parseEpochs(pathway: SynapticPathway, protocol: pab.ABFProtocol,
 
     # NOTE: 2026-05-01 21:57:34
     # use a list instead of tuple so that Role can be changed in GUI
-    epochsDict = dict(map(lambda e: (e.number, [e, classifyEpoch(e)]), dac.epochs))
+    epochsDict = {e.number: [e, classifyEpoch(e)] for e in dac.epochs} # dict(map(lambda e: (e.number, [e, classifyEpoch(e)]), dac.epochs))
     # epochsDict = dict(map(lambda e: (e.number, (e, classifyEpoch(e))), dac.epochs))
 
     flatEpochs = list(filter(isFlatEpoch, dac.epochs))
 
-    if len(flatEpochs):
-        if len(digTriggerEpochs):
-            triggerStarts, triggerStops = tuple(
-                                                zip(
-                                                    *tuple(
-                                                            map(
-                                                                lambda e: protocol.getEpochStartStop(e, dac, sweep),
-                                                                digTriggerEpochs
-                                                                )
-                                                        )
-                                                    )
-                                                )
-            firstTriggerStart = min(triggerStarts)
+    if len(flatEpochs) and len(digTriggerEpochs):
+        triggerStarts, triggerStops = tuple(zip(*tuple(protocol.getEpochStartStop(e, dac, sweep) for e in digTriggerEpochs)))
+        # triggerStarts, triggerStops = tuple(
+        #                                     zip(
+        #                                         *tuple(
+        #                                                 map(
+        #                                                     lambda e: protocol.getEpochStartStop(e, dac, sweep),
+        #                                                     digTriggerEpochs
+        #                                                     )
+        #                                             )
+        #                                         )
+        #                                     )
+        firstTriggerStart = min(triggerStarts)
 
-            # by definition, ABF epochs are non-overlapping so I'm OK going by
-            # epoch start times only
+        # by definition, ABF epochs are non-overlapping so I'm OK going by
+        # epoch start times only
 
-            # these would be flat epochs PRECEDING the earliest DIG TTL epoch
-            maybeSuitable = list(filter(lambda e: protocol.getEpochStart(e, dac, sweep) < firstTriggerStart,
+        # these would be flat epochs PRECEDING the earliest DIG TTL epoch
+        maybeSuitable = list(filter(lambda e: protocol.getEpochStart(e, dac, sweep) < firstTriggerStart,
+                                    flatEpochs))
+
+        if len(maybeSuitable) == 0:
+            # no flat epoch BEFORE the first DIG TTL one
+            # => pick up one that comes later enough after the last DIG TTL epoch
+            # in order to allow for the recording to settle (if there is any such epoch)
+            lastTriggerStop = max(triggerStops)
+
+            # these would be flat epochs SUCCEEDING the latest DIG TTL epoch
+            maybeSuitable = list(filter(lambda e: protocol.getEpochStartStop(e, dac, sweep)[1] > lastTriggerStop,
                                         flatEpochs))
 
-            if len(maybeSuitable) == 0:
-                # no flat epoch BEFORE the first DIG TTL one
-                # => pick up one that comes later enough after the last DIG TTL epoch
-                # in order to allow for the recording to settle (if there is any such epoch)
-                lastTriggerStop = max(triggerStops)
+            suggestFirst = False # I'd want the very last of the above
 
-                # these would be flat epochs SUCCEEDING the latest DIG TTL epoch
-                maybeSuitable = list(filter(lambda e: protocol.getEpochStartStop(e, dac, sweep)[1] > lastTriggerStop,
-                                            flatEpochs))
+        if len(maybeSuitable):
+            contig = np.ediff1d([e.number for e in maybeSuitable], to_begin=0)
+            # contig = np.ediff1d(list(map(lambda e: e.number, maybeSuitable)),
+            #                     to_begin=0)
 
-                suggestFirst = False # I'd want the very last of the above
+            ndx = np.where(contig > 1)[0]
 
-            if len(maybeSuitable):
-                contig = np.ediff1d(list(map(lambda e: e.number, maybeSuitable)),
-                                    to_begin=0)
+            if ndx.size == 0:
+                # all are contiguous
+                dcEpoch = maybeSuitable[0] if suggestFirst else maybeSuitable[-1]
 
-                ndx = np.where(contig > 1)[0]
+            else:
+                if ndx.size > 1:
+                    ndx = int(ndx.min()) - 1 if suggestFirst else int(ndx.max())
+                else :
+                    ndx = int(ndx[0]) - 1
 
-                if ndx.size == 0:
-                    # all are contiguous
-                    dcEpoch = maybeSuitable[0] if suggestFirst else maybeSuitable[-1]
+                dcEpoch = maybeSuitable[ndx]
 
-                else:
-                    if ndx.size > 1:
-                        ndx = int(ndx.min()) - 1 if suggestFirst else int(ndx.max())
-                    else :
-                        ndx = int(ndx[0]) - 1
-
-                    dcEpoch = maybeSuitable[ndx]
-
-                for eNumber, (epoch, epochRole) in epochsDict.items():
-                    if epochRole == pab.ABFEpochRole.BaselineRole and epoch is not dcEpoch:
-                        epochsDict[eNumber][1] = pab.ABFEpochRole.UnspecifiedRole
+            for eNumber, (epoch, epochRole) in epochsDict.items():
+                if epochRole == pab.ABFEpochRole.BaselineRole and epoch is not dcEpoch:
+                    epochsDict[eNumber][1] = pab.ABFEpochRole.UnspecifiedRole
 
     return epochsDict
 
@@ -3557,8 +3554,10 @@ def getPathwayStimulationSequence(pathway: SynapticPathway,
     # NOTE: 2026-05-04 08:58:36 DO NOT DELETE
     # this function, while at module level, is used by PathwaysStimulationLayout
 
-    assert pathway.adc in tuple(map(lambda d: d.physicalIndex, protocol.ADCs)), f"The pathway's ADC index not {pathway.adc} used in this protocol"
-    assert pathway.dac in tuple(map(lambda d: d.physicalIndex, protocol.DACs)), f"The pathway's DAC index not {pathway.dac} used in this protocol"
+    assert pathway.adc in (d.physicalIndex for d in protocol.ADCs), f"The pathway's ADC index not {pathway.adc} used in this protocol"
+    assert pathway.dac in (d.physicalIndex for d in protocol.DACs), f"The pathway's DAC index not {pathway.dac} used in this protocol"
+    # assert pathway.adc in tuple(map(lambda d: d.physicalIndex, protocol.ADCs)), f"The pathway's ADC index not {pathway.adc} used in this protocol"
+    # assert pathway.dac in tuple(map(lambda d: d.physicalIndex, protocol.DACs)), f"The pathway's DAC index not {pathway.dac} used in this protocol"
     assert protocol.acquisitionMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Expecting a protocol with episodic stimulation acquisition mode; isntead got ({protocol.acquisitionMode})"
 
     clampMode = protocol.getClampMode(pathway.adc, pathway.dac)
@@ -3567,15 +3566,15 @@ def getPathwayStimulationSequence(pathway: SynapticPathway,
     # • which digital stimulus pattern is used (main or alternate)
     # • which epochs emit DIG output that stimulates the pathway
 
-    digEpochs = protocol.epochsWithDigitalOutput
+    # digEpochs = protocol.epochsWithDigitalOutput
 
     triggerLabel = "EPSC" if clampMode == ephys.ClampMode.VoltageClamp else "EPSP" if clampMode == ephys.ClampMode.CurrentClamp else "fEPSP"
 
     hoDACActive = protocol.activeDACChannel not in (0,1)
 
-    isMainDAC = pathway.dac == protocol.activeDAC.physicalIndex
+    # isMainDAC = pathway.dac == protocol.activeDAC.physicalIndex
 
-    stimulation_sequence = dict() # mapping of sweep_index ↦ list of epoch_number(s)
+    stimulation_sequence = {} # mapping of sweep_index ↦ list of epoch_number(s)
 
     if pathway.stimulus.dig:
         protocolSEDs = protocol.getActiveDigitalChannels()
@@ -3623,7 +3622,7 @@ def getPathwayStimulationSequence(pathway: SynapticPathway,
                         triggers = [triggers]
 
                     elif not isinstance(triggers, typing.Sequence) or not all(isinstance(t, TriggerEvent) for t in triggers):
-                        triggers = list()
+                        triggers = []
 
                     if len(triggers): # skip empty triggers list
                         if concatenateEvents and len(triggers) > 1:
@@ -3845,41 +3844,41 @@ class PathwayTrials(dict):
             scipywarn(f"No segments associated with {pathway.name}")
             return
 
-        if episode.endFrame < len(self[pathway].segments):
-            # raise RuntimeError("episode extends beyond the segments")
-            # print(f"{self.__class__.__name__}.onPathwayScheduleEpisodeChange: episodeAtr = {episodeAttr}, oldVal {oldVal} -> newVal {newVal}")
-            if episodeAttr == "name":
-                for segment in self[pathway].segments[episode.beginFrame:episode.endFrame+1]:
-                    if oldVal in segment.name:
-                        segment.name = segment.name.replace(oldVal, newVal)
+        if episode.endFrame < len(self[pathway].segments) and episodeAttr == "name":
+            for segment in self[pathway].segments[episode.beginFrame:episode.endFrame+1]:
+                if oldVal in segment.name:
+                    segment.name = segment.name.replace(oldVal, newVal)
 
-                # self.valueChanged.emit(self)
-                self.pathwayChanged.emit(pathway)
+            # self.valueChanged.emit(self)
+            self.pathwayChanged.emit(pathway)
 
 
-def splitSweeps(block, pathwaySweepIndex, analogSignals, start):
+def splitSweeps(block, pathwaySweepIndex, analogSignals, start, signalFilter = None):
     r"""Generator tha deals the trial sweeps (i.e, segments) according to the
     pathway they are meant to belong.
-    Each segment retains the main ADC only.
+    Each segment retains signal with indexes specified in the
+    `analogSignals` parameter.
 """
     yield from (neoutils.copy_with_data_subset(block, segments=segmentIndex,
-        analogsignals=signalIndex, domain_shift=neoutils.getDomainShift(block, domain_start)
-        ).segments for (segmentIndex, signalIndex, domain_start) in zip(pathwaySweepIndex, analogSignals, start))
+        analogsignals=signalIndex, domain_shift=neoutils.getDomainShift(block, domain_start),
+        signalFilter=signalFilter).segments for (segmentIndex, signalIndex, domain_start) in zip(pathwaySweepIndex, analogSignals, start))
 
-def splitSweepsInTrials(stimLayout, start, *trials):
-    r"""Intermediate generator to select the main ADC when dealing segments;
+def splitSweepsInTrials(stimLayout, start, *trials, signalFilter=None):
+    r"""Intermediate generator to select the main ADC when dealing segments.
+
+    The 'main' ADC is the one specified in the stimulus layout parameter `stimLayout`
     """
     pathwayADCNames = [x.name for x in stimLayout.pathwaysADCs]
     pathwaySweepIndex = [stimLayout.getSweepsForPathway(p) for p in stimLayout.pathways]
 
-    yield from [list(splitSweeps(trial, pathwaySweepIndex, pathwayADCNames, start)) for trial in trials]
+    yield from [list(splitSweeps(trial, pathwaySweepIndex, pathwayADCNames, start, signalFilter)) for trial in trials]
 
-def dealSweepsInTrials(stimLayout, start, trials):
+def dealSweepsInTrials(stimLayout, start, trials, signalFilter = None):
     r"""Intermediate generator for splitting trial segments according to pathway-specific sweeps"""
     yield from tuple(zip(*list(splitSweepsInTrials(stimLayout, start, *trials))))
 
-def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
-    segmentPools = [list(itertools.chain.from_iterable(x)) for x in dealSweepsInTrials(stimLayout, start, trials)]
+def dealTrialSweeps(stimLayout, start, trials, eNames, signalFilter = None) -> dict:
+    segmentPools = [list(itertools.chain.from_iterable(x)) for x in dealSweepsInTrials(stimLayout, start, trials, signalFilter)]
 
     for pool, eName in zip(segmentPools, eNames):
         for kseg, segment in enumerate(pool):
@@ -3890,12 +3889,10 @@ def dealTrialSweeps(stimLayout, start, trials, eNames) -> dict:
     return {pathway.name: segmentPool for pathway, segmentPool in zip(stimLayout.pathways, segmentPools)}
 
 def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
-                         changeExistingEpisodes: tuple[bool]):
+                         changeExistingEpisodes: tuple[bool], /,
+                         signalFilter: typing.Callable | None = None):
     sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
 
-    # episodeNameForPathway = lambda p, name: (p, counter_suffix(name,
-    #                             p.schedule.episodeNames,
-    #                             returns_counter=False))
     episodeNameForPathway = lambda p, name: counter_suffix(name,
                                 p.schedule.episodeNames,
                                 returns_counter=False)
@@ -3919,18 +3916,11 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
         for pathway in stimLayout.pathways
         ]
 
-    # blockStarts, episodeNames = list(zip(*[
-    #     (
-    #         pathway.schedule[0].begin if len(pathway.schedule) else sortedTrials[0].rec_datetime,
-    #         eName,
-    #     )
-    #     for pathway, eName in (episodeNameForPathway(pathway) for pathway in stimLayout.pathways)
-    # ]))
 
     # populate the pathway blocks (extends their segments with
     # segment data dealt from the trials)
     pathwaySegmentPools = dealTrialSweeps(stimLayout, blockStarts,
-                sortedTrials, episodeNames)
+                sortedTrials, episodeNames, signalFilter)
 
     for kp, pathway in enumerate(stimLayout.pathways):
         if pathway not in pathwayTrials or not isinstance(pathwayTrials[pathway], neo.Block):
@@ -3946,7 +3936,7 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
             # NOTE: 2026-11-07 21:16:01
             # I think it is OK here to pass segments by reference as
             # pathwayBlock is temporary
-            segname = f"{segment.annotations["index_in_episode"]} in episode {segment.annotations["recording_episode_name"]}"
+            segname = f"{segment.annotations['index_in_episode']} in episode {segment.annotations['recording_episode_name']}"
             segment.name = f"Sweep {segname}"
             segment.annotate(recording_episode_type = eType)
             segment.annotate(protocol_sweep = pathSweeps)

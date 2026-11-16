@@ -836,9 +836,7 @@ class ArrayEditorWidget(QtWidgets.QFrame):
     def value(self):
         return self._value_
 
-    def setValue(self, value: typing.Optional[
-                        typing.Union[np.ndarray, typing.Sequence, typing.Set]
-                        ] = None):
+    def setValue(self, value: np.ndarray | typing.Sequence | typing.Set | None = None):
         if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
             or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
             self._value_ = value
@@ -867,29 +865,26 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     By default, the 'minimum' property is set to -math.inf.
 
     """
-    sig_valueChanged:Signal = Signal(object, name="sig_valueChanged")
+    sig_valueChanged: Signal = Signal(object, name="sig_valueChanged")
 
-    _default_units_:pq.Quantity         =  pq.dimensionless
-    _default_internal_maximum_:float    =  sys.float_info.max
-    _default_internal_minimum_:float    = -sys.float_info.max
+    _default_units_:            pq.Quantity =  pq.dimensionless
+    _default_internal_maximum_: float       =  sys.float_info.max
+    _default_internal_minimum_: float       = -sys.float_info.max
 
-    _default_singleStep_:int = 1
+    _default_singleStep_:       int         = 1
     _default_stepType_: QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
-    _default_decimals_: int = np.get_printoptions()["precision"]
+    _default_decimals_:         int         = np.get_printoptions()["precision"]
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
-                 units: typing.Optional[typing.Union[pq.Quantity,
-                                                     float, int, complex,
-                                                     np.integer, np.floating,
-                                                     np.complexfloating]] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 units: pq.Quantity | float | int | complex | np.integer | np.floating | np.complexfloating | None = None,
                  # /,
-                 singleStep: typing.Optional[float] = None,
-                 stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
-                 decimals: typing.Optional[int] = None,
-                 minimum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
-                 maximum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
-                 unitsFamily: typing.Optional[str] = None,
-                 fixUnitFamily: typing.Optional[typing.Union[str, bool]] = None,
+                 singleStep: float | None = None,
+                 stepType: QtWidgets.QAbstractSpinBox.StepType | None = None,
+                 decimals: int | None = None,
+                 minimum: pq.Quantity | float | None = None,
+                 maximum: pq.Quantity | float | None = None,
+                 unitsFamily: str | None = None,
+                 fixUnitFamily: str | bool | None = None,
                  rescaleWithUnitsChange: bool = False,
                  keepDimensionless: bool = False,
                  disableUnitChange: bool = False,
