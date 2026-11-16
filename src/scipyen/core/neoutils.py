@@ -4624,6 +4624,18 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
     # print(f"neoutils.copy_with_data_subset[neo.Segment](segment name {obj.name} index {obj.index})")
 
     domain_shift = kwargs.pop("domain_shift", None)
+    signalFilter = kwargs.pop("signalFilter", None)
+
+    # print(f"_copy_with_data_subset_<segment>: signalFilter = {signalFilter}")
+
+    if signalFilter is not None and not isinstance(signalFilter, (typing.Callable, typing.Sequence)):
+        raise TypeError(f"Invalid 'signalFilter' parameter: {signalFilter}")
+
+    if isinstance(signalFilter, typing.Sequence):
+        assert all(isinstance(sigflt, typing.Callable) for sigflt in signalFilter), f"Invalid 'signalFilter' parameter: {signalFilter}"
+        if len(signalFilter) == 1:
+            signalFilter = signalFilter[0]
+
 
     # NOTE: 2026-11-07 06:45:29
     # neo objects supporting domain_shift are:
@@ -4683,12 +4695,12 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
 
-    not_kwargs = {}
-
     # see NOTE: 2023-04-13 09:45:19
-    for kwarg in kwargs:
-        if kwarg not in data_child_object_names:
-            not_kwargs[kwarg] = kwargs[kwarg]
+    not_kwargs = {key: value for key, value in kwargs.items() if key not in data_child_object_names}
+
+    # for kwarg in kwargs:
+    #     if kwarg not in data_child_object_names:
+    #         not_kwargs[kwarg] = kwargs[kwarg]
 
     for kwarg in not_kwargs:
         kwargs.pop(kwarg, None)
@@ -4718,18 +4730,60 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
 
         # print(f"\t -> _container_name = {container_name}, indices {indices} => keep_ndx = {keep_ndx}")
 
+        # NOTE: 2026-11-16 18:00:19
+        # make deep copy of contained children;
+        # for analogsignals ONLY, apply signalFilter if specified
         if isinstance(keep_ndx, (typing.Sequence, range)):
-            keep_data = [make_neo_object(container[k]) for k in keep_ndx]  # copy c'tor
+            if container_name == "analogsignals" and isinstance(signalFilter, (typing.Callable, typing.Sequence)):
+                # filter signals, if signalFilter is supplied
+                #
+                nSignals = len(keep_ndx)
+
+                if isinstance(signalFilter, typing.Callable):
+                    keep_data = [signalFilter(make_neo_object(container[k])) for k in keep_ndx]  # copy c'tor
+
+                elif isinstance(signalFilter, typing.Sequence):
+                    assert len(signalFilter) == nSignals, f"Mismatch between number of signal filters ({len(signalFilter)}) and number of retained signals ({nSignals})"
+                    keep_data = [signalFilter[k](make_neo_object(container[k])) for k in keep_ndx]  # copy c'tor
+
+            else:
+                keep_data = [make_neo_object(container[k]) for k in keep_ndx]  # copy c'tor
 
         elif isinstance(keep_ndx, slice):
-            keep_data = [make_neo_object(container[k]) for k in keep_ndx.indices(len(container))]  # copy c'tor
+            if container_name == "analogsignals" and isinstance(signalFilter, (typing.Callable, typing.Sequence)):
+                # filter signals, if signalFilter is supplied
+                #
+                ndxx = range(*keep_ndx.indices(len(container)))
+                nSignals = len(ndxx)
+
+                if isinstance(signalFilter, typing.Callable):
+                    keep_data = [signalFilter(make_neo_object(container[k])) for k in keep_ndx]  # copy c'tor
+
+                elif isinstance(signalFilter, typing.Sequence):
+                    assert len(signalFilter) == nSignals, f"Mismatch between number of signal filters ({len(signalFilter)}) and number of retained signals ({nSignals})"
+                    keep_data = [signalFilter[k](make_neo_object(container[k])) for k in keep_ndx]  # copy c'tor
+
+            else:
+                keep_data = [make_neo_object(container[k]) for k in ndxx]  # copy c'tor
 
         elif isinstance(keep_ndx, int):
-            keep_data = [make_neo_object(container[keep_ndx])]
+            if container_name == "analogsignals" and isinstance(signalFilter, (typing.Callable, typing.Sequence)):
+                # filter signals, if signalFilter is supplied
+                #
+                if isinstance(signalFilter, typing.Callable):
+                    keep_data = [signalFilter(make_neo_object(container[keep_ndx]))]
+
+                elif isinstance(signalFilter, typing.Sequence):
+                    scipywarn("A sequence of signal filters was supplied but just one signal is retained; will use the first filter in the sequence")
+                    keep_data = [signalFilter[0](make_neo_object(container[keep_ndx]))]
+
+            else:
+                keep_data = [make_neo_object(container[keep_ndx])]
 
         for k, d in enumerate(keep_data):
             d.segment = ret
-            # apply domain_shift if given
+            # apply domain_shift, if given
+            #
             if isinstance(domain_shift, pq.Quantity): # and scq.checkTimeUnits(d.times):
                 if hasattr(d, "time_shift") and scq.unitsConvertible(domain_shift, d.times):
                     # NOTE: 2026-11-07 06:53:23

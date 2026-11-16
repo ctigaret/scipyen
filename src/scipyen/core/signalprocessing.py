@@ -954,22 +954,21 @@ def state_levels(x: np.ndarray, **kwargs):
 
 def remove_stim_artifacts(x: np.ndarray, wp: float, ws: float, gp: float, gs: float,
                           fs: typing.Optional[float | pq.Quantity] = None):
-    r"""Removes stimulus artifacts usin a Butterworth filter"""
+    r"""Removes stimulus artifacts using a Butterworth filter"""
     if isinstance(x, (neo.AnalogSignal, DataSignal)):
         if not isinstance(fs, pq.Quantity):
             fs = float(x.sampling_rate)
 
-    elif isinstance(x, np.ndarray):
-        if not isinstance(fs, float):
-            raise TypeError("'f' must be supplied for ordinary numy arrays")
+    elif isinstance(x, np.ndarray) and not isinstance(fs, float):
+        raise TypeError("'fs' must be supplied for ordinary numy arrays")
 
     bord, wn = scipy.signal.buttord(wp, ws, gp, gs, fs=fs)
-    btr = scipy.signal.butter(bord, wn, "low", fs = fs)
+    # btr = scipy.signal.butter(bord, wn, "low", fs = fs)
     # btrsos = scipy.signal.tf2sos(*btr)
     btrsos = scipy.signal.butter(bord, wn, "low", output="sos", fs = fs)
 
     if isinstance(x, (neo.AnalogSignal, DataSignal)):
-        ret = sosfilter(x, btrsos)
+        ret = sosfilter(x, btrsos, filterArgs={"butter": {"N": bord, "Wn": wn, "btype": "low", "output": "sos", "fs": fs}})
         klass = x.__class__
         ret = klass(ret, units = x.units, t_start = x.t_start,
                             sampling_rate = x.sampling_rate,
@@ -983,22 +982,21 @@ def remove_stim_artifacts(x: np.ndarray, wp: float, ws: float, gp: float, gs: fl
 
     return ret
 
-def remove_hum(x: np.ndarray, notch_freq: typing.Union[float, int, pq.Quantity] = 50 * pq.Hz,
+def remove_hum(x: np.ndarray, notch_freq: float | int | pq.Quantity = 50 * pq.Hz,
                quality: float | int = 30,
-               fs: typing.Optional[typing.Union[float, int, pq.Quantity]] = None,) -> np.ndarray:
+               fs: float | int |pq.Quantity | None = None,) -> np.ndarray:
     r"""Removes 'hum' (power grid noise)"""
     if isinstance(x, (neo.AnalogSignal, DataSignal)):
         if not isinstance(fs, pq.Quantity):
             fs = float(x.sampling_rate)
 
-    elif isinstance(x, np.ndarray):
-        if not isinstance(fs, float):
-            raise TypeError("'f' must be supplied for ordinary numpy arrays")
+    elif isinstance(x, np.ndarray) and not isinstance(fs, float):
+        raise TypeError("'fs' must be supplied for ordinary numpy arrays")
 
     notch = scipy.signal.iirnotch(notch_freq, quality, fs=fs)
     notchsos = scipy.signal.tf2sos(*notch)
     if isinstance(x, (neo.AnalogSignal, DataSignal)):
-        ret = sosfilter(x, notchsos)
+        ret = sosfilter(x, notchsos, filterArgs = {"iirnotch": {"w0": notch_freq, "Q": quality, "fs": fs}})
         klass = x.__class__
         ret = klass(ret, units = x.units, t_start = x.t_start,
                             sampling_rate = x.sampling_rate,
@@ -1545,11 +1543,11 @@ def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
     return ret
 
 
-def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray,
-              name: typing.Optional[str] = None):
+def sosfilter(sig: pq.Quantity | np.ndarray, kernel: np.ndarray, filterArgs: dict,
+              name: str | None = None):
     r"""Filters the signal using a cascading Second Order Sections (SOS) filter.
 
-Uses scipy.signal.sosfilter with ``axis`` set to 0 (zero) and no initil conditions.
+Uses scipy.signal.sosfilter with ``axis`` set to 0 (zero) and NO initial conditions.
 
 See scipy documentation for details.
 
@@ -1574,6 +1572,8 @@ Parameters:
         else:
             sfx = "filtered"
 
+        fltAnnot = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel, "filterArgs": filterArgs}
+
         # if isinstance(sig_name, str) and len(sig_name.strip()):
         #     sig_name = f"{sig_name}_{sfx}"
         # else:
@@ -1586,7 +1586,7 @@ Parameters:
             sampling_rate=sig.sampling_rate,
             name=sig_name,
             description=f"{sig.description} filtered",
-            filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel}
+            # filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel}
         )
 
     else:

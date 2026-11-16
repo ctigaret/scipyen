@@ -3852,13 +3852,13 @@ class PathwayTrials(dict):
             # self.valueChanged.emit(self)
             self.pathwayChanged.emit(pathway)
 
-
 def splitSweeps(block, pathwaySweepIndex, analogSignals, start, signalFilter = None):
     r"""Generator tha deals the trial sweeps (i.e, segments) according to the
     pathway they are meant to belong.
     Each segment retains signal with indexes specified in the
     `analogSignals` parameter.
 """
+    # print(f"splitSweeps: signalFilter = {signalFilter}")
     yield from (neoutils.copy_with_data_subset(block, segments=segmentIndex,
         analogsignals=signalIndex, domain_shift=neoutils.getDomainShift(block, domain_start),
         signalFilter=signalFilter).segments for (segmentIndex, signalIndex, domain_start) in zip(pathwaySweepIndex, analogSignals, start))
@@ -3868,16 +3868,19 @@ def splitSweepsInTrials(stimLayout, start, *trials, signalFilter=None):
 
     The 'main' ADC is the one specified in the stimulus layout parameter `stimLayout`
     """
+    # print(f"splitSweepsInTrials: signalFilter = {signalFilter}")
     pathwayADCNames = [x.name for x in stimLayout.pathwaysADCs]
     pathwaySweepIndex = [stimLayout.getSweepsForPathway(p) for p in stimLayout.pathways]
 
     yield from [list(splitSweeps(trial, pathwaySweepIndex, pathwayADCNames, start, signalFilter)) for trial in trials]
 
 def dealSweepsInTrials(stimLayout, start, trials, signalFilter = None):
+    # print(f"dealSweepsInTrials: signalFilter = {signalFilter}")
     r"""Intermediate generator for splitting trial segments according to pathway-specific sweeps"""
-    yield from tuple(zip(*list(splitSweepsInTrials(stimLayout, start, *trials))))
+    yield from tuple(zip(*list(splitSweepsInTrials(stimLayout, start, *trials, signalFilter = signalFilter))))
 
 def dealTrialSweeps(stimLayout, start, trials, eNames, signalFilter = None) -> dict:
+    # print(f"dealTrialSweeps: signalFilter = {signalFilter}")
     segmentPools = [list(itertools.chain.from_iterable(x)) for x in dealSweepsInTrials(stimLayout, start, trials, signalFilter)]
 
     for pool, eName in zip(segmentPools, eNames):
@@ -3891,6 +3894,7 @@ def dealTrialSweeps(stimLayout, start, trials, eNames, signalFilter = None) -> d
 def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
                          changeExistingEpisodes: tuple[bool], /,
                          signalFilter: typing.Callable | None = None):
+    # print(f"dealTrialsToPathways: signalFilter = {signalFilter}")
     sortedTrials = sorted(trials, key = lambda x: x.rec_datetime)
 
     episodeNameForPathway = lambda p, name: counter_suffix(name,
