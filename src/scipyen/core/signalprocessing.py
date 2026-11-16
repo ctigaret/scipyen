@@ -1572,7 +1572,6 @@ Parameters:
         else:
             sfx = "filtered"
 
-        fltAnnot = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel, "filterArgs": filterArgs}
 
         # if isinstance(sig_name, str) and len(sig_name.strip()):
         #     sig_name = f"{sig_name}_{sfx}"
@@ -1586,7 +1585,7 @@ Parameters:
             sampling_rate=sig.sampling_rate,
             name=sig_name,
             description=f"{sig.description} filtered",
-            # filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel}
+            filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel, "filterArgs": filterArgs}
         )
 
     else:

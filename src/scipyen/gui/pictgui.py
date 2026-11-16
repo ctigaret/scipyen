@@ -496,6 +496,7 @@ class WorkerThread(QtCore.QThread):
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
+
         except Exception:  # noqa: BLE001
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
