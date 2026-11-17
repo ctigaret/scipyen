@@ -56,6 +56,12 @@ import gui.pictgui as pgui
 
 SESSION_TYPE = os.getenv("XDG_SESSION_TYPE")
 
+DEFAULT_QUESTION_BUTTONS = QtWidgets.QMessageBox.StandardButtons(
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+                        )
+
+
+
 class DirectoryFileWatcher(QtCore.QObject):
     r"""Signal dispatcher between a file system directory monitor and an observer.
     Binds signals emitted by the monitor to bound methods (callbacks) in the
@@ -364,10 +370,7 @@ class GuiMessages:
         return QtWidgets.QMessageBox.information(parent, title, text)
 
     @safewrapper
-    def questionMessage(self, title, text,
-                        buttons = QtWidgets.QMessageBox.StandardButtons(
-                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
-                            ),
+    def questionMessage(self, title, text, buttons = DEFAULT_QUESTION_BUTTONS,
                         default = QtWidgets.QMessageBox.No):
         # QtWidgets.QApplication.beep()
         return QtWidgets.QMessageBox.question(self, title, text, buttons=buttons, defaultButton=default)

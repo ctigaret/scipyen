@@ -1572,12 +1572,6 @@ Parameters:
         else:
             sfx = "filtered"
 
-
-        # if isinstance(sig_name, str) and len(sig_name.strip()):
-        #     sig_name = f"{sig_name}_{sfx}"
-        # else:
-        #     sig_name = sfx
-
         ret = klass(
             ret,
             units=sig.units,
@@ -1593,6 +1587,28 @@ Parameters:
 
     return ret
 
+def filterChain(sig, filterFns: typing.Sequence):
+    r"""Chain of filters.
+    The result from the first filter function in `filterFns` is passed to the next one and so on
+    Returns the final result.
+
+    :filterFns: Callables taking one argument (the 'signal') and returning a filtered signal
+
+    These can be partial functions where all parameters except the first one are "fixed".
+
+"""
+    if not isinstance(filterFns, typing.Sequence):
+        raise TypeError(f"Expecting a sequence of callables; instead, got a {type(filterFns).__name__}")
+
+    if len(filterFns) == 0:
+        return sig
+
+    assert all(isinstance(fn, typing.Callable) for fn in filterFns), "Expecting a sequence of callables"
+
+    for fn in filterFns:
+        sig = fn(sig)
+
+    return sig
 
 def estimate_dc(x_, bins:typing.Optional[int] = None, bw:typing.Optional[float]=None,
                     adcres:typing.Optional[float]=None, adcrange:typing.Optional[float]=None,
