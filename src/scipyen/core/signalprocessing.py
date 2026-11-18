@@ -8,6 +8,7 @@ please use the "ephys" module.
 """
 
 import typing, numbers, functools, warnings, traceback
+import datetime
 from functools import singledispatch
 
 #### BEGIN 3rd party modules
@@ -28,6 +29,7 @@ from core.datasignal import DataSignal, IrregularlySampledDataSignal
 # from . import prog as prog
 from core.prog import safewrapper, with_doc
 from core import datatypes
+from core.strutils import counter_suffix
 
 # from plots.plots import plot_wavelet
 #### END scipyen core modules
@@ -1543,13 +1545,15 @@ def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
     return ret
 
 
-def sosfilter(sig: pq.Quantity | np.ndarray, kernel: np.ndarray, filterArgs: dict,
-              name: str | None = None):
+def sosfilter(sig: pq.Quantity | np.ndarray, kernel: np.ndarray,
+              avoidRefilter: bool = True,
+              filterArgs: dict | None = None, name: str | None = None,
+              ):
     r"""Filters the signal using a cascading Second Order Sections (SOS) filter.
 
 Uses scipy.signal.sosfilter with ``axis`` set to 0 (zero) and NO initial conditions.
 
-See scipy documentation for details.
+See scipy documentation for details of `scipy.signal.sosfilter`.
 
 Parameters:
 -----------
@@ -1558,29 +1562,75 @@ Parameters:
 
 :kernel: Array of second-order filter coefficients
 
+:avoidRefilter: Flag to indicate if we allow filtergin the signal with the same filter specs
+
+    CAUTION: This only works for signal-like objects of the types defined in the `neo` package
+    (or inheriting from these). A filtered signal is "annotated" with a dictionary
+    that mentions the filter name, kernel-generating function and its parameters.
+
+    When avoidRefilter is True (the default) this function will check the signal's
+    annotations and return the original signal if `name` and `filterArgs` supplied here
+    are found in the original signal annotations.
+
+    WARNING: This mechanism does NOT work tor plain numpy arrays, and it can be
+    easily circumvented for signal-like objects.
+
+:filterArgs: optional dictionary mapping the function name (in scipy.signal) used to generate
+    the sos filter kernel, to a dictionary of parameter names ↦ values used to
+    generate the kernel
+
 :name: optional, a memorable name for the implemented filter, for information only
     (e.g. "de-hum", etc).
 """
+    if not isinstance(filterArgs, dict):
+        filterArgs = {}
+
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        filterName = name if isinstance(name, str) and len(name.strip()) else "unknown"
+
+        filtered = sig.annotations.get("filtered", None)
+
+        if isinstance(filtered, dict):
+            filterNames = list(filtered.keys())
+            if filterName in filterNames:
+                if avoidRefilter:
+                    # NOTE: 2026-11-18 10:06:36
+                    # if signal was already filtered with this filter specs and
+                    # re-filtering is to be avoided, return the original
+                    # WARNING: this is a very indirect way to flag a signal as being
+                    # filtered, and NOT fool-proof!
+                    return sig
+
+                filterName = counter_suffix(filterName, filterNames)
+
+            filtered[filterName] = {"sos": kernel, "filterArgs": filterArgs, "filter_datetime": datetime.datetime.now()}
+
+        else:
+            filtered = {filterName: {"sos": kernel, "filterArgs": filterArgs, "filter_datetime": datetime.datetime.now()}}
+
         ret = scipy.signal.sosfiltfilt(kernel, sig.magnitude, axis=0)
 
         klass = sig.__class__
         sig_name = sig.name
 
-        if isinstance(name, str) and len(name.strip()):
-            sfx = name
-        else:
-            sfx = "filtered"
+        # if isinstance(name, str) and len(name.strip()):
+        #     sfx = name
+        # else:
+        #     sfx = "filtered"
 
         ret = klass(
             ret,
-            units=sig.units,
-            t_start=sig.t_start,
-            sampling_rate=sig.sampling_rate,
-            name=sig_name,
-            description=f"{sig.description} filtered",
-            filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel, "filterArgs": filterArgs}
+            units = sig.units,
+            t_start = sig.t_start,
+            sampling_rate = sig.sampling_rate,
+            name = sig_name,
+            description = sig.description,
         )
+
+        # propagate annotations from the original signal
+        ret.annotate(**sig.annotations)
+        # now, update the annotations with the new "filtered" dict
+        ret.annotate(filtered = filtered)
 
     else:
         ret = scipy.signal.sosfiltfilt(kernel, sig, axis=0)

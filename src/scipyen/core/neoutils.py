@@ -4735,10 +4735,10 @@ def _copy_with_data_subset_(obj: neo.Segment, **kwargs):  # noqa: F811
         # for analogsignals ONLY, apply signalFilter if specified
         if isinstance(keep_ndx, (typing.Sequence, range)):
             if container_name == "analogsignals" and isinstance(signalFilter, (typing.Callable, typing.Sequence)):
-                # filter signals, if signalFilter is supplied
-                #
                 nSignals = len(keep_ndx)
 
+                # filter signals, if signalFilter is supplied.
+                #
                 if isinstance(signalFilter, typing.Callable):
                     keep_data = [signalFilter(make_neo_object(container[k])) for k in keep_ndx]  # copy c'tor
 

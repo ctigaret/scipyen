@@ -8,6 +8,7 @@ solution by Giovanni Bajo
 """
 import sys, os, typing # noqa
 import datetime
+from tribool import Tribool
 # import contextlib
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -178,4 +179,10 @@ def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
     timeStamp = d.toSecsSinceEpoch()
     return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
+
+def triboolFromQt(state: QtCore.Qt.CheckState) -> Tribool:
+    return Tribool(True) if state == QtCore.Qt.Checked else Tribool(False) if state == QtCore.Qt.Unchecked else Tribool()
+
+def tribool2Qt(val: Tribool) -> QtCore.Qt.CheckState:
+    return QtCore.Qt.Checked if val.value is True else QtCore.Qt.Unchecked if val.value is False else QtCore.Qt.PartiallyChecked
 
