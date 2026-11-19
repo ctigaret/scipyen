@@ -1630,7 +1630,11 @@ class Episode(ScipyenDataclass):
         `beginFrame`, `nFrames`, and `procedure`.
 
         In addition, the `description` attribute (a str) has an informative role
-        without affecting the identity of an Episode
+        without affecting the identity of an Episode.
+
+        Finally, the `measurements` attribute is a dictionary containing deferred
+        measeurement objects than are supposed to be used on some biological
+        variable signal (definition is loose by design, here)
     """
     name: str = dataclasses.field(default="episode")
     _: KW_ONLY
@@ -1639,6 +1643,9 @@ class Episode(ScipyenDataclass):
     beginFrame: int = 0
     nFrames: int = 0
     procedure: Procedure = dataclasses.field(default_factory = Procedure)
+    measurements: dict = dataclasses.field(default_factory = dict)
+
+
 
     # def fieldEvent(self, info: psygnal.EmissionInfo):
     #     print(f"{self.__class__.__name__}.fieldEvent({info})")

@@ -190,6 +190,8 @@ class RecordingEpisode(Episode):
 
     • episodeType: RecordingEpisodeType
 
+    • stimLayout: pathway stimulation layout for this episode
+
     """
     _: KW_ONLY
     protocol: ElectrophysiologyProtocol | None = None
@@ -4020,3 +4022,9 @@ def dealTrialsToPathways(pathwayTrials, stimLayout, trials, episodeNames,
                     # episode was APPENDED to schedule
                     pathwayTrials[pathway].segments.extend(pathwayEpisodeSegments)
 
+# class PathwayEpisode: pass
+#
+# PathwayEpisode = collections.namedtuple("PathwayEpisode", ["pathway", "episode"],
+#                                         defaults = [SynapticPathway(), RecordingEpisode()],
+#                                         module = sys.modules[__name__])
+# PathwayEpisode.__doc__ = "Convenient named tuple class to store "
