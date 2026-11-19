@@ -133,7 +133,7 @@ class FileOriginDescriptor:
 
 # @evented(ebents_namespace="fieldEvents")
 @dataclass
-class ScipyenDataclass:
+class ScipyenDataclass:  # noqa: F811
     r"""Ancestor of Scipyen data classes.
 
     To subclass:
@@ -156,7 +156,9 @@ class ScipyenDataclass:
     """
     name:str = dataclasses.field(default_factory=str)
     description: str = dataclasses.field(default_factory=str)
-    fieldEvents: typing.ClassVar[psygnal.SignalGroupDescriptor] = psygnal.SignalGroupDescriptor(connect_child_events=True)
+    # NOTE: 2026-11-19 19:33:27
+    # use `cache_on_instance=False` below, to allow pickling
+    fieldEvents: typing.ClassVar[psygnal.SignalGroupDescriptor] = psygnal.SignalGroupDescriptor(connect_child_events=True, cache_on_instance=False)
 
     # _:KW_ONLY
     # parent: ScipyenDataclass | None = dataclasses.field(default = None)
@@ -164,6 +166,12 @@ class ScipyenDataclass:
 
     def __post_init__(self):
         self.fieldEvents.connect(self.fieldEvent)
+
+#     def __reduce__(self):
+#         return _newScipyenDataclass, (
+#             self.__class__,
+#
+#             )
 
     # def fieldEvent(self, *args, **kwargs):
     def fieldEvent(self, info: psygnal.EmissionInfo):

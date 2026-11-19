@@ -4455,7 +4455,7 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
 
     signalFilter = kwargs.pop("signalFilter", None)
 
-    time_shift = kwargs.pop("time_shift", None)
+    domain_shift = kwargs.pop("domain_shift", None)
 
     for kwarg in kwargs:
         if kwarg not in obj._child_containers:
@@ -4503,8 +4503,9 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
     # as they may be useful for copy_with_data_subset on the child (in this case,
     # the Segment)
     kwargs.update(not_kwargs)
-    kwargs["time_shift"] = time_shift
+    kwargs["domain_shift"] = domain_shift
     kwargs["signalFilter"] = signalFilter
+    segment_starts = [segment_start(obj.segments[k]) for k in keep_segs_ndx]
 
     try:
         new_segments = [copy_with_data_subset(obj.segments[k], **kwargs) for k in keep_segs_ndx]
@@ -4521,7 +4522,13 @@ def _copy_with_data_subset_(obj: neo.Block, **kwargs):
         )
         # NOTE: 2026-11-08 14:23:01
         # assign an appropriate rec_datetime to the new segment
-        seg.rec_datetime = obj.rec_datetime + datetime.timedelta(seconds=float(segment_start(seg).rescale(pq.s).magnitude))
+        # s_start = segment_start(seg)
+        s_start = segment_starts[k]
+        # print(f"segment {k}: start {s_start}")
+        seg.rec_datetime = obj.rec_datetime + datetime.timedelta(seconds=float(s_start.rescale(pq.s).magnitude))
+        # NOTE: DEBUG:
+        # t_delta = seg.rec_datetime - obj.rec_datetime
+        # print(f"{(t_delta.seconds + t_delta.microseconds*1e-6) * pq.s}")
         seg.index = k
         seg.name = f"segment_{k}"
         seg.block = ret
@@ -5222,7 +5229,7 @@ def concatenate_blocks(*args, **kwargs):
         # data subset
         # bring domain_shoft back into kwargs, only if it s a scalar quantity
         if isinstance(domain_shift, pq.Quantity) and domain_shift.size > 1:
-            domain_shift = none
+            domain_shift = None
         kwargs["domain_shift"] = domain_shift
         return copy_with_data_subset(blocks, **kwargs)
 
@@ -5277,9 +5284,18 @@ def concatenate_blocks(*args, **kwargs):
             # use the time shift code executed in copy_with_data_subset(…) function.!!
 
             if not isinstance(domain_shift, pq.Quantity):
-                deltaSeconds = (
-                    block.rec_datetime - firstBlockDatetime
-                ).total_seconds() * pq.s
+                # deltaSeconds = (
+                #     block.rec_datetime - firstBlockDatetime
+                # ).total_seconds() * pq.s
+                tDelta = block.rec_datetime - firstBlockDatetime
+
+                # deltaSeconds = (
+                #     block.rec_datetime - firstBlockDatetime
+                # ).seconds() * pq.s
+
+                deltaSeconds = (tDelta.seconds + tDelta.microseconds*1e-6)*pq.s
+
+                # print(f"block {k}: delta minutes = {deltaSeconds.rescale(pq.min)}")
 
                 kw["domain_shift"] = deltaSeconds
 
@@ -5292,6 +5308,7 @@ def concatenate_blocks(*args, **kwargs):
 
             try:
                 block_src_copy = copy_with_data_subset(block, **kw)
+
             except:
                 print(
                     f"*****\nCannot copy block {k} (named: {getattr(block, 'name', None)}) with data subset\n*****\n"

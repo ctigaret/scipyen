@@ -388,6 +388,31 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     #         self.executing.emit(source)
 
 
+    def dragMoveEvent(self, e):
+        if isinstance(e.mimeData(), QtGui.QStandardItem):
+            cursor = self._control.cursorForPosition(e.pos())
+            if self._in_buffer(cursor.position()):
+                e.setDropAction(QtCore.Qt.CopyAction)
+                self._control.setTextCursor(cursor)
+            else:
+                e.setDropAction(QtCore.Qt.IgnoreAction)
+            e.accept()
+
+        else:
+            super().dragMoveEvent(e)
+
+#         if e.mimeData().hasUrls():
+#             pass
+#
+#         elif e.mimeData().hasText():
+#             cursor = self._control.cursorForPosition(e.pos())
+#             if self._in_buffer(cursor.position()):
+#                 e.setDropAction(QtCore.Qt.CopyAction)
+#                 self._control.setTextCursor(cursor)
+#             else:
+#                 e.setDropAction(QtCore.Qt.IgnoreAction)
+#             e.accept()
+
     def _flush_pending_stream(self):
         r""" Flush out pending text into the widget.
         NOTE: 2022-03-14 21:47:39 CMT
@@ -3704,62 +3729,62 @@ class ScipyenConsoleWidget(ConsoleWidget):
                     cursorOutsideBuffer = True
                 else:
                     cursorOutsideBuffer = False
-        except:
-            pass
+        except:  # noqa: E722
+            traceback.print_exc()
 
         return (overlaps, cursorOutsideBuffer, startpos, endpos)
 
 
-    def eventFilter(self, obj, event) -> bool:
-        # # NOTE: 2026-08-17 22:06:08
-        # # disallow typing in text above prompt line after clicking in the window
-        # # it is very annyoing!
-        # # however, allow selecting text from above the input buffer, so I make
-        # # this contingent on the _control not having a non-empty text selection
-        # #
-        # # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
-        # # regardless of the python binding (it happens with either PyQt or PySide)
-        # #
-        # if (
-        #     (__has_PyQt6__ or __has_PySide6__)
-        #     and isinstance(event, QtGui.QMouseEvent)
-        #     and event.type() == QtCore.QEvent.MouseButtonRelease
-        #     ):
-        #     cursor = self._control.textCursor()
-        #     endpos = cursor.selectionEnd()
-        #     startpos = cursor.selectionStart()
-        #
-        #     if any(v < self._prompt_pos for v in (startpos, endpos)):
-        #         self._control.setReadOnly(True)
-        #         if startpos == endpos and not self._in_buffer(endpos):
-        #             self._control.ensureCursorVisible()
-        #
-        #     else:
-        #         self._control.setReadOnly(False)
-
-        if isinstance(event, QtGui.QMouseEvent) or event.type() == QtCore.QEvent.KeyPress:
-            overlaps, cursorOutsideBuffer, startpos, endpos = self._checkTextCursorInCommandBuffer_()
-
-            if (__has_PyQt6__ or __has_PySide6__):
-                if (isinstance(event, QtGui.QMouseEvent)
-                    and event.type() == QtCore.QEvent.MouseButtonRelease):
-                    self._control.setReadOnly(overlaps)
-                    if cursorOutsideBuffer:
-                        self._control.ensureCursorVisible()
-
-                    return super().eventFilter(obj, event)
-
-                elif event.type() == QtCore.QEvent.KeyPress:
-                    key = event.key()
-                    if not (self._control_key_down(event.modifiers())
-                            or key in self._ctrl_down_remap):
-
-                        if cursorOutsideBuffer or not all(self._in_buffer(pos) for pos in (startpos, endpos)):
-                            self._keep_cursor_in_buffer()
-
-                        self._control.setReadOnly(False)
-
-        return super().eventFilter(obj, event)
+    # def eventFilter(self, obj, event) -> bool:
+    #     # # NOTE: 2026-08-17 22:06:08
+    #     # # disallow typing in text above prompt line after clicking in the window
+    #     # # it is very annyoing!
+    #     # # however, allow selecting text from above the input buffer, so I make
+    #     # # this contingent on the _control not having a non-empty text selection
+    #     # #
+    #     # # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
+    #     # # regardless of the python binding (it happens with either PyQt or PySide)
+    #     # #
+    #     # if (
+    #     #     (__has_PyQt6__ or __has_PySide6__)
+    #     #     and isinstance(event, QtGui.QMouseEvent)
+    #     #     and event.type() == QtCore.QEvent.MouseButtonRelease
+    #     #     ):
+    #     #     cursor = self._control.textCursor()
+    #     #     endpos = cursor.selectionEnd()
+    #     #     startpos = cursor.selectionStart()
+    #     #
+    #     #     if any(v < self._prompt_pos for v in (startpos, endpos)):
+    #     #         self._control.setReadOnly(True)
+    #     #         if startpos == endpos and not self._in_buffer(endpos):
+    #     #             self._control.ensureCursorVisible()
+    #     #
+    #     #     else:
+    #     #         self._control.setReadOnly(False)
+    #
+    #     if isinstance(event, QtGui.QMouseEvent) or event.type() == QtCore.QEvent.KeyPress:
+    #         overlaps, cursorOutsideBuffer, startpos, endpos = self._checkTextCursorInCommandBuffer_()
+    #
+    #         if (__has_PyQt6__ or __has_PySide6__):
+    #             if (isinstance(event, QtGui.QMouseEvent)
+    #                 and event.type() == QtCore.QEvent.MouseButtonRelease):
+    #                 self._control.setReadOnly(overlaps)
+    #                 if cursorOutsideBuffer:
+    #                     self._control.ensureCursorVisible()
+    #
+    #                 return super().eventFilter(obj, event)
+    #
+    #             elif event.type() == QtCore.QEvent.KeyPress:
+    #                 key = event.key()
+    #                 if not (self._control_key_down(event.modifiers())
+    #                         or key in self._ctrl_down_remap):
+    #
+    #                     if cursorOutsideBuffer or not all(self._in_buffer(pos) for pos in (startpos, endpos)):
+    #                         self._keep_cursor_in_buffer()
+    #
+    #                     self._control.setReadOnly(False)
+    #
+    #     return super().eventFilter(obj, event)
 
 
     @safewrapper
