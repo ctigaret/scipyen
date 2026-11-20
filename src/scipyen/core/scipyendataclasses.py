@@ -60,6 +60,11 @@ from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, # noqa
 
 class ScipyenDataclass: pass # forward declaration
 
+def __newScipyenDataclass__(klass, fieldValues: tuple):
+    fieldNames = (f.name for f in dataclasses.fields(klass))
+    kw = {fieldName: fieldValue for fieldName, fieldValue in zip(fieldNames, fieldValues)}
+    return klass(**kw)
+
 class DoseDescriptor:
     def __set_name__(self, obj:object, name:str):
         if len(name.strip()) == 0:
@@ -167,11 +172,13 @@ class ScipyenDataclass:  # noqa: F811
     def __post_init__(self):
         self.fieldEvents.connect(self.fieldEvent)
 
-#     def __reduce__(self):
-#         return _newScipyenDataclass, (
-#             self.__class__,
-#
-#             )
+    def __reduce__(self):
+        fieldNames = (f.name for f in dataclasses.fields(self))
+        fieldValues = tuple(getattr(self, name) for name in fieldNames)
+        return __newScipyenDataclass__, (
+            self.__class__,
+            fieldValues
+            )
 
     # def fieldEvent(self, *args, **kwargs):
     def fieldEvent(self, info: psygnal.EmissionInfo):
