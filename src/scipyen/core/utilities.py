@@ -1100,9 +1100,108 @@ def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
         
     return tuple()
 
+def approxEq(x, y, atol: float = 1e-05, rtol: float = 1e-08, equal_nan: bool=True, equal_na: bool=True):
+    if type(x) != type(y):
+        yield False
+
+    if isinstance(x, (int, str, bool, np.integer)):
+        yield x==y
+
+    elif isinstance(x, (bytes, bytearray)):
+        yield len(x)==len(y) and x==y
+
+    elif isinstance(x, (complex, np.complexfloating)):
+        yield np.isclose(x, y, atol=atol, rtol=rtol, equal_nan = equal_nan)
+
+    elif isinstance(x, type(pd.NA)):
+        yield isinstance(y, type(pd.NA)) if equal_na else False
+
+    elif isinstance(x, (float, np.floating)):
+        if np.isnan(x):
+            yield np.isnan(y) if equal_nan else False
+
+        yield np.isclose(x, y, atol, rtol)
+
+    elif isinstance(x, np.ndarray):
+        if x.shape != y.shape:
+            yield False
+
+        if x.dtype != y.dtype:
+            yield False
+
+        if isinstance(x, pq.Quantity):
+            yield scq.unitsConvertible(x, y) and np.all(np.isclose(x.rescale(y.units).magnitude,  x_value.magnitude, atol=atol, rtol=rtol, equal_nan=equal_nan))
+        else:
+            yield np.all(np.isclose(x_value, y_value, atol=atol, rtol=rtol, equal_nan=equal_nan))
+
+    elif isinstance(x, typing.Sequence):
+        if len(x) != len(y):
+            yield False
+
+        else:
+            ids = (id(x), id(y))
+            x_reduced = tuple(x_ for x_ in x_value if id(x_) not in ids)
+            y_reduced = tuple(y_ for y_ in y_value if id(y_) not in ids)
+            if len(x_reduced) != len(y_reduced):
+                yield False
+
+            yield all(approxEq(x_, y_, atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) for x_, y_ in zip(x_reduced, y_reduced))
+
+    elif isinstance(x, (pd.Series, pd.Index)):
+        if x.name != y.name:
+            yield False
+
+        if x.shape != y.shape:
+            yield False
+
+        if x.dtype != y.dtype:
+            yield False
+
+        if isinstance(x, pd.Series) and (not approxEq(x.index, y.index, atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) or not (x.dtype == y.dtype)):
+            yield False
+
+        yield approxEq(np.array(x), np.array(y), atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na)
+
+    elif isinstance(x, pd.DataFrame):
+        if x.shape != y.shape:
+            yield False
+
+        if not approxEq(x.index, y.index, atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) or not np.all(x.columns == y.columns):
+            yield False
+
+        yield all(approxEq(x.iloc[:,k], y.iloc[:,k], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) for k in range(len(x.columns)))
+
+    elif isinstance(x, dict):
+        if len(x) != len(y):
+            yield False
+
+        if all(key in y for key in x):
+            yield all(approxEq(x[key], y[key], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) for key in x)
+
+        else:
+            yield False
+
+    else:
+        properties = inspect.getmembers_static(x, lambda p: isinstance(p, property))
+        yield all(memberApproxEq(x, y, p[0], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) for p in properties)
+
+
+def memberApproxEq(x, y, attribute: str, atol: float = 1e-05, rtol: float = 1e-08, equal_nan:bool = True, equal_na: bool=True) -> bool:
+    x_value = getattr(x, attribute)
+    y_value = getattr(y, attribute)
+    ids = (id(x), id(y))
+
+    if type(y_value) == type(y_value) and isinstance(x_value, typing.Sequence):
+        x_reduced = tuple(x_ for x_ in x_value if id(x_) not in ids)
+        y_reduced = tuple(y_ for y_ in y_value if id(y_) not in ids)
+        yield from approxEq(x_reduced, y_reduced, atol, rtol)
+
+    yield from approxEq(x_value, y_value, atol, rtol)
+
+
 # @safewrapper
 def safe_identity_test(x:object, y:object, idcheck:bool=True,
-                       equal_na:bool=True, equal_nan:bool=True) -> bool:
+                       equal_na:bool=True, equal_nan:bool=True,) -> bool:
     r"""Test that symbols in x and y refer to identical Python objects.
     
     # TODO: 2024-12-19 17:15:27 FIXME:

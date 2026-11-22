@@ -10028,3 +10028,4 @@ These are neo.Epoch, datazone.DataZone, datazone.Interval, pyabfbridge.ABFEpoch
         t0, t1 = min(epoch), max(epoch)
 
     return (t0, t1)
+

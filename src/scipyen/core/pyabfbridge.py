@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -488,24 +487,24 @@ import pandas as pd
 import quantities as pq
 import neo
 from dataclasses import MISSING
-from collections import namedtuple # noqa
+from collections import namedtuple
 from tribool import Tribool
 
 from core import scipyen_quantities as scq
-from core import datatypes, strutils, utilities # noqa
+from core import datatypes, strutils, utilities
 from core.typeenum import TypeEnum
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType) # noqa
-from core.triggerprotocols import TriggerProtocol # noqa
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType) # noqa: F401
+# from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
 from core.datazone import Interval
 from ephys.ephys_protocol import ElectrophysiologyProtocol
 import pyabf
-from pyabf.abf1.headerV1 import HeaderV1 # noqa
-from pyabf.abf2.headerV2 import HeaderV2 # noqa
-from pyabf.abf2.section import Section # noqa
-from pyabf.abfReader import AbfReader # noqa
-from pyabf.stimulus import (findStimulusWaveformFile, # noqa
-                            stimulusWaveformFromFile) # noqa
+# from pyabf.abf1.headerV1 import HeaderV1
+# from pyabf.abf2.headerV2 import HeaderV2
+# from pyabf.abf2.section import Section
+# from pyabf.abfReader import AbfReader
+# from pyabf.stimulus import (findStimulusWaveformFile,
+#                             stimulusWaveformFromFile)
 
 from iolib import h5io
 import h5py
@@ -777,17 +776,20 @@ class ABFEpoch:
         self._dacNum_ = dacNum
 
     def __hash__(self) -> int:
+        from core import prog
         return hash(
-            (
-                self._epochNumber_,
-                self._epochType_,
-                self._level_,
-                self._levelDelta_,
-                self._duration_,
-                self._durationDelta_,
-                self._pulsePeriod_,
-                self._pulseWidth_,
-                self._dacNum_
+            (self.__class__,
+             tuple(prog.hashable_proxy(val) for val in
+                   (self._epochNumber_,
+                    self._epochType_,
+                    self._level_,
+                    self._levelDelta_,
+                    self._duration_,
+                    self._durationDelta_,
+                    self._pulsePeriod_,
+                    self._pulseWidth_,
+                    self._dacNum_)
+                )
             )
             )
 
@@ -886,7 +888,6 @@ class ABFEpoch:
 
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         return all(getattr(self, p[0])==getattr(other, p[0]) for p in properties)
-
         # return all(np.all( utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])) ) for p in properties)
 
     def is_identical_except_digital(self, other):
@@ -1068,9 +1069,11 @@ class ABFEpoch:
 
 class ABFProtocol(ElectrophysiologyProtocol):
     r"""Instance of an ABF protocol (for Clampex v ≥ 10).
+
     Particularities:
         • When "Alternative Waveforms" is enabled, only TWO DACs (DAC 0 and DAC 1)
         will emit analog waveforms on alternative sweeps
+
     """
     # BUG: 2024-10-27 09:47:18 - probably related to Clampex 11.0, to check if it
     # still occurs in Clampex 11.4.3
@@ -1092,20 +1095,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
     # TODO 2024-07-19 13:19:40 FIXME URGENTLY
     # implement code related to pyabf stimulusFilefolder & stimulusWaveformFromFile
     #
-    from ephys.ephys import ClampMode
-    from core.neoutils import getAcquisitionInfo
+    from ephys.ephys import ClampMode  # noqa: I001
+    # from core.neoutils import getAcquisitionInfo
 
-    def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
-                 **kwargs):
+    def __init__(self, obj: pyabf.ABF | neo.Block | None = None, **kwargs):
         from core.neoutils import getAcquisitionInfo
         super().__init__()
+
+        self._mismatches_ = {}
 
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
             if abfVer !=2:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
-
-            assert obj._headerV2.lActualEpisodes == obj._protocolSection.lEpisodesPerRun, f"Mismatch between lActualEpisodes ({obj._headerV2.lActualEpisodes}) and lEpisodesPerRun ({obj._protocolSection.lEpisodesPerRun})"
 
             # ### BEGIN ADC inputs information
             # NOTE: further info in self._inputs_
@@ -1145,8 +1147,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._hasAltDigOutState_ = bool(obj._protocolSection.nAlternateDigitalOutputState)
             self._digTrainActiveHi_ = bool(obj._protocolSection.nDigitalTrainActiveLogic)
             self._digHolding_ = obj._protocolSection.nDigitalHolding
-            digHolds = list(map(bool, obj._epochSection.nEpochDigitalOutput)) # 3,2,1,0,7,6,5,4
-            self._digHoldingValue_ = list(reversed(digHolds[0:4])) + list(reversed(digHolds[4:]))
+            digHolds = tuple(map(bool, obj._epochSection.nEpochDigitalOutput)) # 3,2,1,0,7,6,5,4
+            self._digHoldingValue_ = tuple(reversed(digHolds[0:4])) + tuple(reversed(digHolds[4:]))
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
 
             # NOTE: 2024-10-24 22:02:03 WARNING new API
@@ -1156,9 +1158,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             #
             # ### END   digital outputs information
 
-            # NOTE: 2024-03-08 22:32:29
-            # this below returns a tuple - not what we want
             self._acquisitionMode_ = ABFAcquisitionMode(obj.nOperationMode)
+            # self._nActualSweeps_ = obj._headerV2.lActualEpisodes
             self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
             self._nRuns_   = obj._protocolSection.lRunsPerTrial
             self._nTrials_ = obj._protocolSection.lNumberOfTrials
@@ -1175,18 +1176,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._sourceId_ = id(obj)
             self._fileOrigin_ = obj.abfFilePath
 
-            self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
-            self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
+            # self._inputs_ =  [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+            # self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
+            self._inputs_ =  tuple(ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_))
+            self._outputs_ = tuple(ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_))
 
-            # BUG: 2026-05-20 19:30:02 FIXME/TODO
-            self._sweep_start_times_ = dict(map(lambda k: (k,0), range(self._nSweeps_)))
+            self._sweep_start_times_ = {}
+            # self._sweep_start_times_ = {k:0 for k in range(self._nSweeps_)}
+            # self._sweep_start_times_ = dict(map(lambda k: (k,0), range(self._nSweeps_)))
 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             info_dict = getAcquisitionInfo(obj)
 
-            if info_dict["lActualEpisodes"] != info_dict["protocol"]["lEpisodesPerRun"]:
-                scipywarn(f"In {obj.name}: Mismatch between lActualEpisodes ({info_dict['lActualEpisodes']}) and lEpisodesPerRun ({info_dict['protocol']['lEpisodesPerRun']})")
+            # if info_dict["lActualEpisodes"] != info_dict["protocol"]["lEpisodesPerRun"]:
+            #     scipywarn(f"In {obj.name}: Mismatch between `lActualEpisodes` in the block's acquisition info header ({info_dict['lActualEpisodes']}) and `lEpisodesPerRun` in the acquisition info protocol section ({info_dict['protocol']['lEpisodesPerRun']})")
 
             # ### BEGIN ADC inputs information
             # NOTE: further info in self._inputs_
@@ -1218,17 +1222,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digHolds = info_dict["sections"]["EpochSection"].get("nEpochDigitalOutput", None) # 3,2,1,0,7,6,5,4
 
             if isinstance(digHolds, list) and len(digHolds) == self._nDACChannels_:
-                digHolds = list(map(bool, digHolds))
+                digHolds = tuple(map(bool, digHolds))
+
                 if self._nDACChannels_ == 8:
-                    digHolds = list(reversed(digHolds[:4])) + list(reversed(digHolds[4:]))
+                    digHolds = tuple(reversed(digHolds[:4])) + tuple(reversed(digHolds[4:]))
 
                 else:
-                    digHolds = list(reversed(digHolds))
+                    digHolds = tuple(reversed(digHolds))
 
                 self._digHoldingValue_ = digHolds
 
             else:
-                self._digHoldingValue_ = [False] * self._nDACChannels_
+                self._digHoldingValue_ = (False, ) * self._nDACChannels_
 
             self._digUseLastEpochHolding_ = bool(info_dict["protocol"]["nDigitalInterEpisode"])
 
@@ -1241,6 +1246,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
             # NOTE: 2024-03-08 22:33:34 see NOTE: 2024-03-08 22:32:29
             self._acquisitionMode_ = ABFAcquisitionMode(info_dict["protocol"]["nOperationMode"])
+            # self._nActualSweeps_ = info_dict["lActualEpisodes"]
             self._nSweeps_ = info_dict["protocol"]["lEpisodesPerRun"]
             self._nRuns_   = info_dict["protocol"]["lRunsPerTrial"]
             self._nTrials_ = info_dict["protocol"]["lNumberOfTrials"]
@@ -1261,8 +1267,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._sourceId_ = id(obj)
             self._fileOrigin_ = obj.file_origin
 
-            self._inputs_ = [ABFInputConfiguration(obj, k) for k in range(self._nADCChannels_)]
-            self._outputs_ = [ABFOutputConfiguration(obj, k) for k in range(self._nDACChannels_)]
+            self._inputs_ = tuple(ABFInputConfiguration(obj, k) for k in range(self._nADCChannels_))
+            self._outputs_ = tuple(ABFOutputConfiguration(obj, k) for k in range(self._nDACChannels_))
 
             self._sweep_start_times_ = info_dict['t_starts']
 
@@ -1270,10 +1276,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if len(kwargs) == 0:
                 raise TypeError(f"A source pyabf.ABF or neo.Block object was not specified; instead, got {type(obj).__name__}; in addition, no other parameters were given, therefore cannot initialize a {self.__class__.__name__} object")
 
-            adcChannels = kwargs.get("inputs", list())
-            dacChannels = kwargs.get("outputs", list())
-            self._nADCChannels_ = len(adcChannels)
-            self._nDACChannels_ = len(dacChannels)
+            # adcChannels = kwargs.get("inputs", ())
+            # dacChannels = kwargs.get("outputs", ())
+            self._inputs_ = tuple(i for i in kwargs.get("inputs", ()) if isinstance(i, ABFInputConfiguration))
+            self._outputs_ = tuple(i for i in kwargs.get("outputs", ()) if isinstance(i, ABFOutputConfiguration))
+
+            self._nADCChannels_ = len(self._inputs_)
+            self._nDACChannels_ = len(self._outputs_)
             self._activeDACChannel_ = kwargs.get("activeDACChannel", 0)
             self._hasAltDacOutState_ = kwargs.get("hasAltDacOutState", False)
 
@@ -1283,7 +1292,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._hasAltDigOutState_ = kwargs.get("hasAltDigOutState", False)
             self._digTrainActiveHi_ = kwargs.get("digTrainActiveHi", True)
             self._digHolding_ = kwargs.get("digHolding", 0)
-            self._digHoldingValue_ = kwargs.get("digHoldingValue", list())
+            self._digHoldingValue_ = kwargs.get("digHoldingValue", ())
             self._digUseLastEpochHolding_ = kwargs.get("digUseLastEpochHolding", False)
             acqMode = kwargs.get("acquisitionMode", ABFAcquisitionMode.episodic_stimulation)
             if isinstance(acqMode, int) and acqMode in ABFAcquisitionMode.values():
@@ -1294,11 +1303,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 self._acquisitionMode_ = ABFAcquisitionMode.episodic_stimulation
 
             self._nSweeps_ = kwargs.get("nSweeps", 0)
+            self._nActualSweeps_ = kwargs.get("nActualSweeps", self._nSweeps_)
             self._nRuns_ = kwargs.get("nRuns", 0)
             self._nTrials_ = kwargs.get("nTrials", 0)
             self._nTotalDataPoints_ = kwargs.get("nTotalDataPoints", 0)
             self._nDataPointsPerSweep_ = kwargs.get("nDataPointsPerSweep", 0)
-            self._epochsDigitalPatterns_ = kwargs.get("epochsDigitalPatterns", dict())
+            self._epochsDigitalPatterns_ = kwargs.get("epochsDigitalPatterns", {})
             self._samplingRate_ = kwargs.get("samplingRate", 0* pq.Hz)
             self._sweepInterval_ = kwargs.get("sweepInterval", 0*pq.s)
             averaging = kwargs.get("averaging", ABFAveragingMode.cumulative)
@@ -1314,11 +1324,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._sourceId_ = kwargs.get("sourceID", MISSING)
             self._fileOrigin_ = kwargs.get("fileOrigin", MISSING)
 
-            self._inputs_ = [i for i in kwargs.get("inputs", list()) if isinstance(i, ABFInputConfiguration)]
-            self._outputs_ = [i for i in kwargs.get("outputs", list()) if isinstance(i, ABFOutputConfiguration)]
-
             # BUG: 2026-05-20 19:30:02 FIXME/TODO
-            self._sweep_start_times_ = dict(map(lambda k: (k,0), range(self._nSweeps_)))
+            self._sweep_start_times_ = {k:0 for k in range(len(self._nSweeps_))}
 
         # NOTE: 2024-07-19 13:43:00
         # All attributes below are calculated from what h been set up so far
@@ -1339,43 +1346,91 @@ class ABFProtocol(ElectrophysiologyProtocol):
         self._nDataPointsHolding_ = int(self._nDataPointsPerSweep_/64)
 
     def __hash__(self) -> int:
+        from core import prog
+        # swst = (dict, tuple(self._sweep_start_times_.items()))
+        # digp = (dict, tuple(self._epochsDigitalPatterns_.items()))
         return hash(
-            self._nADCChannels_,
-            self._nDACChannels_,
-            self._activeDACChannel_,
-            self._hasAltDacOutState_,
-            self._nTotalDigitalOutputs_,
-            self._nDigitalEnable_,
-            self._nSynchronizedDigitalOutputs_,
-            self._hasAltDigOutState_,
-            self._digTrainActiveHi_,
-            self._digHolding_,
-            self._digHoldingValue_,
-            self._digUseLastEpochHolding_,
-            self._acquisitionMode_,
-            self._nSweeps_,
-            self._nRuns_,
-            self._nTrials_,
-            self._nTotalDataPoints_,
-            self._nDataPointsPerSweep_,
-            self._epochsDigitalPatterns_,
-            self._samplingRate_,
-            self._sweepInterval_,
-            self._averaging_,
-            self._averageWeighting_,
-            self._protocolFile_,
-            self._sourceHash_,
-            self._sourceId_,
-            self._fileOrigin_,
-            self._inputs_,
-            self._outputs_,
-            self._sweep_start_times_,
-            self._name_,
-            self._sweepDuration_,
-            self._totalDuration_,
-            self._nAlternateDigitalOutputs_,
-            self._nDataPointsHolding_,
+            (self.__class__,
+                  tuple(prog.hashable_proxy(val) for val in (
+                      self._nADCChannels_,
+                      self._nDACChannels_,
+                      self._activeDACChannel_,
+                      self._hasAltDacOutState_,
+                      self._hasAltDigOutState_,
+                      self._nTotalDigitalOutputs_,
+                      self._nDigitalEnable_,
+                      self._nSynchronizedDigitalOutputs_,
+                      self._digTrainActiveHi_,
+                      self._digHolding_,
+                      self._digHoldingValue_,
+                      self._digUseLastEpochHolding_,
+                      self._acquisitionMode_,
+                      self._nSweeps_,
+                      self._nRuns_,
+                      self._nTrials_,
+                      self._nTotalDataPoints_,
+                      self._nDataPointsPerSweep_,
+                      self._epochsDigitalPatterns_,
+                      self._samplingRate_,
+                      self._sweepInterval_,
+                      self._averaging_,
+                      self._averageWeighting_,
+                      self._protocolFile_,
+                      self._sourceHash_,
+                      self._sourceId_,
+                      self._fileOrigin_,
+                      self._inputs_,
+                      self._outputs_,
+                      self._sweep_start_times_,
+                      self._name_,
+                      self._sweepDuration_,
+                      self._totalDuration_,
+                      self._nAlternateDigitalOutputs_,
+                      self._nDataPointsHolding_,)
+                  )
             )
+        )
+
+    def __membersForHash__(self) -> dict:
+        swst = (dict, tuple(self._sweep_start_times_.items()))
+        digp = (dict, tuple(self._epochsDigitalPatterns_.items()))
+        return {"_nADCChannels_": self._nADCChannels_,
+             "_nDACChannels_": self._nDACChannels_,
+             "_activeDACChannel_": self._activeDACChannel_,
+             "_hasAltDacOutState_": self._hasAltDacOutState_,
+             "_hasAltDigOutState_": self._hasAltDigOutState_,
+             "_nTotalDigitalOutputs_": self._nTotalDigitalOutputs_,
+             "_nDigitalEnable_": self._nDigitalEnable_,
+             "_nSynchronizedDigitalOutputs_": self._nSynchronizedDigitalOutputs_,
+             "_digTrainActiveHi_": self._digTrainActiveHi_,
+             "_digHolding_": self._digHolding_,
+             "_digHoldingValue_": self._digHoldingValue_,
+             "_digUseLastEpochHolding_": self._digUseLastEpochHolding_,
+             "_acquisitionMode_": self._acquisitionMode_,
+             "_nSweeps_": self._nSweeps_,
+             "_nRuns_": self._nRuns_,
+             "_nTrials_": self._nTrials_,
+             "_nTotalDataPoints_": self._nTotalDataPoints_,
+             "_nDataPointsPerSweep_": self._nDataPointsPerSweep_,
+             "_epochsDigitalPatterns_": digp,
+             "_samplingRate_": self._samplingRate_,
+             "_sweepInterval_": self._sweepInterval_,
+             "_averaging_": self._averaging_,
+             "_averageWeighting_": self._averageWeighting_,
+             "_protocolFile_": self._protocolFile_,
+             "_sourceHash_": self._sourceHash_,
+             "_sourceId_": self._sourceId_,
+             "_fileOrigin_": self._fileOrigin_,
+             "_inputs_": self._inputs_,
+             "_outputs_": self._outputs_,
+             "_sweep_start_times_": swst,
+             "_name_": self._name_,
+             "_sweepDuration_": self._sweepDuration_,
+             "_totalDuration_": self._totalDuration_,
+             "_nAlternateDigitalOutputs_": self._nAlternateDigitalOutputs_,
+             "_nDataPointsHolding_": self._nDataPointsHolding_,
+            }
+
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__} ({super().__repr__()}) with:"]
@@ -1446,7 +1501,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         return ret
 
-    def diff(self, other) -> dict:
+    def diff(self, other, acceptEquivalentUnits: bool = False) -> dict:
         if not isinstance(other, self.__class__):
             return {"Type":(self.__class__, other.__class__)}
 
@@ -1479,7 +1534,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return cached_entity
 
 
-        attrs = dict()
+        attrs = {}
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
                   "_hasAltDacOutState_", "_hasAltDigOutState_",
                   "_nTotalDigitalOutputs_", "_nSynchronizedDigitalOutputs_",
@@ -1530,8 +1585,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None, cache: dict = {}):
 
         if entity in cache:
             return cache[entity]
@@ -1539,7 +1593,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if attrs is None:
             attrs = h5io.attrs2dict(entity.attrs)
 
-        kargs = dict()
+        kargs = {}
 
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
                   "_hasAltDacOutState_", "_hasAltDigOutState_",
@@ -2015,8 +2069,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return np.array(list(map(self.getSweepTime, range(self.nSweeps)))) * pq.s
 
     def check_DAC_Epoch(self,
-                       dac:typing.Union[ABFOutputConfiguration, int, str],
-                       epoch:typing.Optional[typing.Union[ABFEpoch, int, str]]=None) -> tuple:
+                       dac: ABFOutputConfiguration | int | str,
+                       epoch: ABFEpoch | int | str | None = None) -> tuple:
         r"""
         Checks that:
 
@@ -2160,14 +2214,31 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return self.ClampMode.NoClamp
 
     def getSweepTime(self, sweep:int = 0) -> pq.Quantity:
-        if isinstance(self._sweep_start_times_, dict) and sweep in self._sweep_start_times_:
-            return self._sweep_start_times_[sweep]
+        r"""Return the start time of a sweep, relative to the trial's start.
+    Parameters:
+    ===========
 
+        :sweep: the index of the sweep with the condition that 0 <= sweep < nSweeps
+    """
+        if isinstance(self._sweep_start_times_, dict) and sweep in self._sweep_start_times_:
+            times = tuple(self._sweep_start_times_.values())
+
+            if len(times) > 1 and all(time == times[0] for time in times[1:]):
+                time0 = times[0] * pq.s
+                if self.sweepInterval == 0*pq.s:
+                    return sweep * self.sweepDuration + time0
+                else:
+                    return sweep * self.sweepInterval + time0
+
+            else:
+                return self._sweep_start_times_[sweep]
+
+        else:
         # NOTE: 2026-05-20 20:39:03
         # not sure about the next lines ...
-        if self.sweepInterval == 0*pq.s:
-            return sweep * self.sweepDuration
-        return sweep * self.sweepInterval
+            if self.sweepInterval == 0*pq.s:
+                return sweep * self.sweepDuration
+            return sweep * self.sweepInterval
 
 
     @property
@@ -5962,6 +6033,14 @@ class ABFInputConfiguration:
         # return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
         return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
 
+    def approxEq(self, other, atol=1e-05, rtol=1e-08):
+        if not isinstance(other, self.__class__):
+            return False
+
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+
+        return all(utilities.memberApproxEq(other, p[0]) for p in properties)
+
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
 
@@ -6304,8 +6383,10 @@ class ABFOutputConfiguration:
                 self._epochs_ = epochs
 
     def __hash__(self) -> int:
+        from core import prog
         return hash(
-                (
+            (self.__class__,
+                tuple(prog.hashable_proxy(val) for val in (
                     self._dacChannel_,
                     self._physicalChannelIndex_,
                     self._dacName_,
@@ -6316,7 +6397,9 @@ class ABFOutputConfiguration:
                     self._waveformEnabled_,
                     self._waveformSource_,
                     tuple(self._epochs_)
+                    )
                 )
+            )
             )
 
     def __repr__(self):

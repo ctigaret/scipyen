@@ -5031,3 +5031,18 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
     elif len(result) > 1:
         return result
 
+def groupTrialsByProtocol(*trials) -> dict:
+    result = {}
+    for k in range(len(trials)):
+        protocol = getProtocol(trials[k])
+        complies = len(trials[k].segments) == protocol.nSweeps
+        if len(result) == 0:
+            result[protocol] = {complies: [trials[k]]}
+        else:
+            keys = list(result)
+            visited = next(p for p in result if (next(utilities.approxEq(protocol, p))))
+            if visited:
+                result[visited][complies].append(trials[k])
+
+    return result
+

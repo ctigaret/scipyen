@@ -2078,5 +2078,13 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
         elif value is not None:
             raise TypeError(f"Expecting a python Quantity, a functor constructing a default Quantity, or None; instead, got {type(value).__name__}")
 
+def quantity_hash(x: pq.Quantity):
+    if isinstance(x, pq.UnitQuantity):
+        return hash(x)
+    if x.size == 1:
+        return hash((pq.Quantity, float(x.magnitude), x.dimensionality))
+    return hash((pq.Quantity, tuple(x.magnitude), x.dimensionality))
+
+
 # def _defaultQuantity_(magnitude, units) -> pq.Quantity:
 #     return magnitude * units

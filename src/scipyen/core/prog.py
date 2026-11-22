@@ -2458,6 +2458,37 @@ def is_predicate(x:typing.Any, n:int=1) -> bool:
 
     return ret
 
+def hashable_proxy(x):
+    from core import scipyen_quantities as scq
+
+    if isinstance(x, (str, int, bool, float, complex, bytes, )):
+        return x
+
+    elif isinstance(x, bytearray):
+        return bytes(x)
+
+    elif isinstance(x, tuple):
+        try:
+            hash(x)
+            return x
+        except:
+            return tuple(hashable_proxy(val) for val in x)
+
+    elif isinstance(x, dict):
+        return (dict, tuple((k, hashable_proxy(v)) for k,v in x.items()))
+
+    elif isinstance(x, pq.Quantity):
+        return scq.quantity_hash(x)
+
+    elif isinstance(x, (list, collections.deque)):
+        return tuple(hashable_proxy(v) for v in x)
+
+    elif is_hashable(x):
+        return x
+
+    else:
+        raise TypeError(f"Cannot create a hashable proxy for {type(x)}")
+
 def is_hashable(x) -> bool:
     r"""Returns True if x is hashable, i.e. hash(x) succeeds and returns an int"""
     ret = bool(getattr(x, "__hash__", None) is not None)
@@ -3862,4 +3893,3 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
             path = [(pathlib.Path(info.module_finder.path)/info.name).as_posix()]
             path = [p for p in path if not seen(p)]
             yield from walk_packages(path, info.name+".")
-

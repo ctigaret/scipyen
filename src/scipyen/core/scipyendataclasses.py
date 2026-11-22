@@ -30,7 +30,7 @@ import treelib # noqa
 import pathlib
 from copy import (deepcopy, copy,) # noqa
 import psygnal
-from psygnal import evented
+# from psygnal import evented
 
 #### END core python modules
 
@@ -2074,7 +2074,7 @@ class Schedule(ScipyenDataclass):
 
         self.episodes.insert(targetNdx, value) # now, value will be at targetNdx
         nFrames = [0] + list(itertools.accumulate(episode.nFrames for episode in self.episodes))
-        eFrames = sum(episode.nFrames for episode in self.episodes)
+        # eFrames = sum(episode.nFrames for episode in self.episodes)
         # print(f"\t episode frames: {[episode.nFrames for episode in self.episodes]}\n")
         # print(f"\t cumsum frames = {nFrames}\n")
         # print(f"\t total schedule frames = {eFrames}")
