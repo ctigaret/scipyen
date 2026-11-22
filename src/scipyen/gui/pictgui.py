@@ -168,8 +168,6 @@ Use with QThreadPool
 
         else:
             self.signals.signal_Result.emit(self.result)  # Return the result of the processing
-            #self.signals.signal_Result.emit(self.result)  # Return the result of the processing
-            # self.signals.signal_Finished.emit()  # Done
 
         finally:
             self.signals.signal_Finished.emit()  # Done

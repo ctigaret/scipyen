@@ -489,6 +489,14 @@ import neo
 from dataclasses import MISSING
 from collections import namedtuple
 from tribool import Tribool
+import h5py
+import pyabf
+# from pyabf.abf1.headerV1 import HeaderV1
+# from pyabf.abf2.headerV2 import HeaderV2
+# from pyabf.abf2.section import Section
+# from pyabf.abfReader import AbfReader
+# from pyabf.stimulus import (findStimulusWaveformFile,
+#                             stimulusWaveformFromFile)
 
 from core import scipyen_quantities as scq
 from core import datatypes, strutils, utilities
@@ -498,16 +506,8 @@ from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkTyp
 from core.prog import scipywarn
 from core.datazone import Interval
 from ephys.ephys_protocol import ElectrophysiologyProtocol
-import pyabf
-# from pyabf.abf1.headerV1 import HeaderV1
-# from pyabf.abf2.headerV2 import HeaderV2
-# from pyabf.abf2.section import Section
-# from pyabf.abfReader import AbfReader
-# from pyabf.stimulus import (findStimulusWaveformFile,
-#                             stimulusWaveformFromFile)
 
 from iolib import h5io
-import h5py
 
 # useful alias:
 ABF = pyabf.ABF

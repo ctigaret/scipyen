@@ -3678,10 +3678,10 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
                     overlaps, cursorOutsideBuffer, startpos, endpos = self._checkTextCursorInCommandBuffer_()
 
-                    if any(overlaps, cursorOutsideBuffer):
+                    if any((overlaps, cursorOutsideBuffer)):
                         self._keep_cursor_in_buffer()
 
-                    if self._control.readOnly():
+                    if self._control.isReadOnly():
                         self._control.setReadOnly(False)
 
                     if echoing:

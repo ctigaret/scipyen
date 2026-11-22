@@ -1186,29 +1186,41 @@ def approximatelyEqual(x, y, atol: float = 1e-05, rtol: float = 1e-08, equal_nan
 
     else:
         properties = inspect.getmembers_static(x, lambda p: isinstance(p, property))
-        yield all(next(memberApproximatelyEqual(x, y, p[0], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na)) for p in properties)
+
+        # yield from (next(memberApproximatelyEqual(x, y, p[0], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na)) for p in properties)
+        yield all(memberApproximatelyEqual(x, y, p[0], atol=atol, rtol=rtol, equal_nan=equal_nan, equal_na=equal_na) for p in properties)
 
 
 def memberApproximatelyEqual(x, y, attribute: str, atol: float = 1e-05, rtol: float = 1e-08, equal_nan:bool = True, equal_na: bool=True) -> bool:
     # print(f"utilities.memberApproximatelyEqual testing for {attribute}")
+    if type(x) != type(y):
+        return False
+
+    if not all(hasattr(v, attribute) for v in (x,y)):
+        return False
+
     x_value = getattr(x, attribute)
     y_value = getattr(y, attribute)
     ids = (id(x), id(y))
 
     if type(x_value) == type(y_value):
         if isinstance(x_value, str):
-            yield x_value == y_value
+            # yield x_value == y_value
+            return x_value == y_value
 
         elif isinstance(x_value, typing.Sequence):
             x_reduced = tuple(x_ for x_ in x_value if id(x_) not in ids)
             y_reduced = tuple(y_ for y_ in y_value if id(y_) not in ids)
-            yield from approximatelyEqual(x_reduced, y_reduced, atol, rtol, equal_nan=equal_nan, equal_na=equal_na)
+            # yield from approximatelyEqual(x_reduced, y_reduced, atol, rtol, equal_nan=equal_nan, equal_na=equal_na)
+            return all(approximatelyEqual(x_reduced, y_reduced, atol, rtol, equal_nan=equal_nan, equal_na=equal_na))
 
         else:
-            yield from approximatelyEqual(x_value, y_value, atol, rtol, equal_nan=equal_nan, equal_na=equal_na)
+            # yield from approximatelyEqual(x_value, y_value, atol, rtol, equal_nan=equal_nan, equal_na=equal_na)
+            return next(approximatelyEqual(x_value, y_value, atol, rtol, equal_nan=equal_nan, equal_na=equal_na))
 
     else:
-        yield False
+        # yield False
+        return False
 
 # @safewrapper
 def safe_identity_test(x:object, y:object, idcheck:bool=True,
