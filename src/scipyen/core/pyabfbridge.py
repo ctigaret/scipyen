@@ -6033,13 +6033,13 @@ class ABFInputConfiguration:
         # return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
         return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
 
-    def approxEq(self, other, atol=1e-05, rtol=1e-08):
+    def approximatelyEqual(self, other, atol=1e-05, rtol=1e-08):
         if not isinstance(other, self.__class__):
             return False
 
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
 
-        return all(utilities.memberApproxEq(other, p[0]) for p in properties)
+        return all(utilities.memberApproximatelyEqual(other, p[0]) for p in properties)
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex

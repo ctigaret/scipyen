@@ -76,7 +76,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
 # from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
 from core.datatypes import PODS
 
-# from ephys import ephys_protocol
+from ephys import (ephys_protocol, ephys_pathways)
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
@@ -358,6 +358,12 @@ class ObjectModel(QtGui.QStandardItemModel):
         else:
             return
 
+        # if objectNode.objectInfo.objKeyType == ephys_protocol.ElectrophysiologyProtocol:
+        #     display = f"{objectNode.objectInfo.objKeyType.__name__} <{objectNode.objectInfo.objKey.name}>"
+        # else:
+        #     display = objectNode.objectInfo.name
+        #
+        # objectItem.setData(display, QtCore.Qt.DisplayRole)
         objectItem.setData(qVariant(objectNode), ObjectDataRole)
         objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
@@ -463,9 +469,15 @@ class ObjectModel(QtGui.QStandardItemModel):
         #  • one must gain access to the rootNode up the hierarchy and build up
         # the access expression «on the fly»
 
-        objectItem.setData(qVariant(objectNode), ObjectDataRole) ## how about this !?
-        objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole) ## how about this !?
+        # if objectNode.objectInfo.objKeyType == ephys_protocol.ElectrophysiologyProtocol:
+        #     display = f"{objectNode.objectInfo.objKeyType.__name__} {objectNode.objectInfo.objKey.name}"
+        # else:
+        #     display = objectNode.objectInfo.name
+
+        objectItem.setData(qVariant(objectNode), ObjectDataRole)
+        objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
+        # objectItem.setData(display, QtCore.Qt.DisplayRole)
 
         objectItemTip = f"Key type: {objectNode.objectInfo.objKeyType.__name__} -> {objectNode.objectInfo.objTip} object"
         objectItem.setData(objectItemTip, QtCore.Qt.ToolTipRole)

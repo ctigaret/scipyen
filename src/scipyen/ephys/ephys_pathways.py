@@ -3797,6 +3797,15 @@ class PathwayTrials(dict):
         for pathway in self:
             pathway.pathwayScheduleEpisodeChanged.connect(self.onPathwayScheduleEpisodeChange)
 
+    def __contains__(self, obj: SynapticPathway | str) -> bool:
+        if isinstance(obj, SynapticPathway):
+            return obj in self.keys()
+
+        elif isinstance(obj, str):
+            return obj in (k.name for k in self)
+
+        return False
+
     def __getitem__(self, key: SynapticPathway | str) -> neo.Block:
         if isinstance(key, SynapticPathway):
             return super().__getitem__(key)

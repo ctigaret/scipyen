@@ -65,8 +65,6 @@ try:
 except: # noqa
     pass
 
-# from pyqtgraph import (DataTreeWidget, TableWidget, )
-
 import neo # noqa
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
@@ -161,10 +159,10 @@ NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,) + FUNCTION_TY
 @dataclasses.dataclass
 class ObjectInfo:
     name: str = "/"
-    r"""Symbol to which this object is bount (either in its parent, or in some namespace)"""
+    r"""Symbol to which this object is bound (either in its parent, or in some namespace)"""
 
     indirect: bool = False
-    r"""True if the object isinternally represented by a hierarchical structures such as a dict.
+    r"""True if the object is internally represented by a hierarchical structures such as a dict.
     This happens for obejcts that are themselves a 'flavor' of dict, a sequence (tuple, list, deque)
     a dataclass, and for introspectable objects.
 
@@ -182,7 +180,7 @@ class ObjectInfo:
 
 .. note::
 
-    ¹ by definition these are hashable objects; mot commonly, they are str or int
+    ¹ by definition these are hashable objects; most commonly, they are str or int
     but the language allows other types as well e.g. tuple, or any object type that
     can generate a unique hash value.
 
@@ -227,8 +225,6 @@ This is either:
 * None for object that forbid access to their contents
 * "attribute" for attribute style access (see above)
 * "index" for item or index style access
-
-This field is redundant, therefore flagged for culling.
 
 """
     # accessPath: tuple = dataclasses.field(default_factory = tuple)
@@ -370,8 +366,12 @@ class ObjectNode(Node):
         for child in self.objectInfo.children:
             # print(f"inspecting '{child}' of node '{node.tag}'")
             keyType = type(child)
-            if isinstance(child, ephys_pathways.SynapticPathway):
-                key = child.name
+            if isinstance(child, (ephys_pathways.SynapticPathway, ephys_protocol.ElectrophysiologyProtocol)):
+                key = f"{type(child).__name__} <{child.name}> *"
+                # key = child.name
+
+            # elif isinstance(child, ephys_protocol.ElectrophysiologyProtocol):
+            #     key = f"{type(child).__name__} <{child.name}>"
             else:
                 key = f"{child}"
 
@@ -862,7 +862,6 @@ def parseObject(obj: object,
         "objInfo": info,
         "memberAccess": memberAccess,
         "accessType": accessType,
-        # "objectAccessPath": objectAccessPath,
         "objTip": tip,
         "objType": objType,
         "choices": choices,
@@ -871,7 +870,6 @@ def parseObject(obj: object,
         "objId": objId,
         "objKey": objKey,
         "objKeyType": objKeyType
-        # "containerChild": ""
         }
 
     return ObjectInfo(**infoDict)
@@ -1356,10 +1354,7 @@ def _parseObject_(obj: taxonbridge.Taxon,  # noqa: F811
 @parseObject.register(types.MappingProxyType)
 @parseObject.register(UserDict)
 @parseObject.register(OrderedDict)
-def _parseObject_(obj: typing.Union[dict,              # noqa: F811,UP007
-                                    types.MappingProxyType,
-                                    UserDict,
-                                    OrderedDict],
+def _parseObject_(obj: dict | types.MappingProxyType | UserDict | OrderedDict,
                   objName: str, /,
                   introspect: bool = False,
                   predicate = None,
