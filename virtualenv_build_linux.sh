@@ -1396,8 +1396,8 @@ using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
-# with_pyside6=1 # this is now the default 2026-08-04 10:30:35
-build_pyside6=1
+with_pyside6=1 # this is now the default 2026-08-04 10:30:35
+build_pyside6=0
 # with_pyqt6=0
 # build_pyqt6=0
 # with_pyqt5=0
@@ -1451,7 +1451,7 @@ for i in "$@" ; do
         # ;;
         --build_pyside6)
         build_pyside6=1
-        # with_pyside6=1
+        with_pyside6=0
         # with_pyqt6=0
         # build_pyqt6=0
         # with_pyqt5=0
