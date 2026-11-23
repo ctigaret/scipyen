@@ -736,9 +736,13 @@ function dopyside6 ()
         else
             if [ -z ${uv_exec} ] ; then
                 pip install PySide6
+                pip install pyside6-utils
+                
             else
                 ${uv_exec} pip install PySide6
+                ${uv_exec} pip install pyside6-utils
             fi
+            
             if [[ $? -ne 0 ]] ; then
                 echo -e "\nCould not install PySide6 from PyPi. Goodbye!\n"
                 exit 1
@@ -895,6 +899,7 @@ function install_console_styles()
     if [ ! -r ${VIRTUAL_ENV}/.styles_done ] || [[ $reinstall_console_styles -gt 0 ]]; then
         # NOTE: install console color schemes
         cd $scipyendir/src/scipyen/gui/scipyen_console_styles
+        echo -e "\n\n=====================\n# Installing custom console styles\n=====================\n\n"
         if [ -x ${uv_exec} ] ; then
             pip install .
         else
