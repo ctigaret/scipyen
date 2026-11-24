@@ -653,9 +653,9 @@ class ProtocolTrials(dict):
         r"""Returns an instance of ProtocolTrials containing only protocols with compliant trials"""
         if len(self) == 0:
             return typing.Self()
-        
+
         return self.__class__({p: BlockCompliance({True: b[True]}) for p, b in self.items() if len(b[True])})
-        
+
     def getCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
         r"""Retrieves list of blocks that comply with the specified protocol
     """
@@ -5367,7 +5367,7 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
     elif len(result) > 1:
         return result
 
-@timefunc
+# @timefunc
 def groupTrialsByProtocol(*trials) -> ProtocolTrials:
     result = ProtocolTrials()
     if len(trials) == 1:

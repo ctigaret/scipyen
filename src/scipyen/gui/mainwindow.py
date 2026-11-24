@@ -10002,7 +10002,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         #     QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         # msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
 
-        ret = msgBox.exec()
+        # ret = msgBox.exec()
         if ret == QtWidgets.QMessageBox.No:
             return
 
