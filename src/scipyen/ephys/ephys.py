@@ -377,7 +377,7 @@ class BlockCompliance(dict):
             assert all(isinstance(k, bool) for k in self), "All keys must be booleans"
             assert all(isinstance(v, typing.List) for v in self.values()), "All values must be sequences"
             non_empty = [v for v in self.values() if len(v)]
-            assert all(all(isinstance(b, neo.Block) for b in v) for v in non-empty), "All non-empty values must contain neo.Block objects"
+            assert all(all(isinstance(b, neo.Block) for b in v) for v in non_empty), "All non-empty values must contain neo.Block objects"
 
     def __contains__(self, key: bool) -> bool:
         if not isinstance(key, bool):
@@ -510,12 +510,9 @@ class ProtocolTrials(dict):
 
         self._useApproxEqual_: bool = False
 
-
         if len(self):
             assert all(isinstance(k, ElectrophysiologyProtocol) for k in self), "ProtocolTrials accepts only ElectrophysiologyProtocol as keys"
-            assert all(isinstance(v, BlockCompliance)), "All values must be BlockCompliance dictionaries"
-
-        # self._key_cache_ = set()
+            assert all(isinstance(v, BlockCompliance) for v in self.values()), "All values must be BlockCompliance dictionaries"
 
         self._keyProperties_ = {}
 
@@ -652,7 +649,13 @@ class ProtocolTrials(dict):
         r"""List of protocols with compliant trials"""
         return [k for k in self if len(self[k][True])]
 
-
+    def discardNonCompliantTrials(self) -> typing.Self:
+        r"""Returns an instance of ProtocolTrials containing only protocols with compliant trials"""
+        if len(self) == 0:
+            return typing.Self()
+        
+        return self.__class__({p: BlockCompliance({True: b[True]}) for p, b in self.items() if len(b[True])})
+        
     def getCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
         r"""Retrieves list of blocks that comply with the specified protocol
     """
