@@ -188,6 +188,7 @@ from neo.core.objectlist import ObjectList as NeoObjectList
 import h5py
 import pandas as pd
 from tribool import Tribool
+from treelib import (Tree, Node)
 # import pyabf
 
 from scipy import optimize
@@ -465,7 +466,6 @@ class BlockCompliance(dict):
             raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
 
         self[False] = value
-
 
 class ProtocolTrials(dict):
     r"""Mapping of ElectrophysiologyProtocol to collection of trials (neo.Block objects).
