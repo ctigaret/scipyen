@@ -355,7 +355,11 @@ Aliased to ``DSM`` in this module.
 .. |nbsp| unicode:: 0xA0
    :trim:
 
-Applies a suitable function or functor on analog signal-like objects at a given "location" in the signal.
+Applies a suitable function or functor on analog signal-like objects at a given 
+"location" in the signal.
+        
+The "suitable" function or functor is a Python function that performs calculations
+on the signal, such as a measurement or the application of a digital filter.
 
 The ``DeferredSignalMeasure`` object is callable, taking as first argument a signal-like |nbsp|
     object, which will be passed at the *functor* or *function* encapsulated by |nbsp|
@@ -439,6 +443,8 @@ See ephys.signal_* family of functions for example of suitable functions.
         sequence of DeferredSignalMeasure objects, with the precondition that each
         of them returns a value in the signal's domain (hence can be used as *locator*
         objects), or a signal (possibly, a region of it).
+        
+    * None - special case where the computation is applied to the entire signal
 
 :name:
     Name of this DeferredSignalMeasure object

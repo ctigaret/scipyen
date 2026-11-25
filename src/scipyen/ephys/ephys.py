@@ -493,7 +493,7 @@ class ProtocolTrials(dict):
     My recomendation is to avoid collecting protocols in stock Python lists or dicts,
     and use this class (together with `ProtocolList`) instead.
 
-"""
+    """
     # import core.pyabfbridge as pab
     valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(BlockCompliance)
     protocolChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(ElectrophysiologyProtocol)

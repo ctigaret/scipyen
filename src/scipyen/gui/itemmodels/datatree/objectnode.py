@@ -368,10 +368,7 @@ class ObjectNode(Node):
             keyType = type(child)
             if isinstance(child, (ephys_pathways.SynapticPathway, ephys_protocol.ElectrophysiologyProtocol)):
                 key = f"{type(child).__name__} <{child.name}> *"
-                # key = child.name
 
-            # elif isinstance(child, ephys_protocol.ElectrophysiologyProtocol):
-            #     key = f"{type(child).__name__} <{child.name}>"
             else:
                 key = f"{child}"
 
@@ -380,16 +377,12 @@ class ObjectNode(Node):
                 if nodes == 0:
                     continue
                 subNode = nodes[0]
-                # if subNode.identifier in self._visited_:
-                #     continue
                 obj = self.data[subNode.identifier] # a Node
 
             else:
                 obj = accessor(self.data, child, None)
 
 
-            # print(f"\t -> got child '{key}' ({keyType.__name__}) ↦ {type(obj).__name__} object")
-            # visited = list(tree.filter_nodes(lambda n: n.data is obj))
             oInfo = parseObject(obj, key,
                                 introspect=introspect,
                                 predicate=predicate, includePrivate=includePrivate,

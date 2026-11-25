@@ -1042,7 +1042,14 @@ class ABFEpoch:
     def pulseFrequency(self) -> pq.Quantity:
         if float(self.pulsePeriod) == 0.:
             return 0*pq.Hz
-        return (1/self.pulsePeriod).rescale(pq.Hz)
+        try:
+            ret = (1/self.pulsePeriod).rescale(pq.Hz)
+        except:
+            traceback.print_exc()
+            print(f"{self.__class__.__name__}.pulseFrequency for pulsePeriod {self.pulsePeriod}")
+            ret = 0*pq.Hz
+            
+        return ret
 
     @property
     def trainRate(self) -> pq.Quantity:
