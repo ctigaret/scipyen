@@ -278,6 +278,7 @@ import core.signalprocessing as sigp
 from core import sysutils
 from core import tiwt # noqa: F401
 from core import xmlutils # noqa: F401
+from core.treedict import TreeDict
 
 from core.scipyen_config import (markConfigurable, confuse,  # noqa: F401
                                  saveWindowSettings, loadWindowSettings, )
@@ -313,7 +314,7 @@ from imaging.axiscalibration import (AxesCalibration, # noqa: F401
                                      AxisCalibrationData,
                                      ChannelCalibrationData,
                                      CalibrationData)
-from ephys import (ephys, membrane, ephys_pathways)  # noqa: F401
+from ephys import (ephys, membrane, ephys_pathways, ephys_mappings)  # noqa: F401
 from systems import *
 
 from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems)
@@ -9937,15 +9938,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @safewrapper
     def _slot_ext_krn_disconnected(self, cdict):
         # print("mainWindow: _slot_ext_krn_disconnected %s" % cdict)
-        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.removeForeignNamespace(cdict)
+        with qtutils.SignalBlocker(self.external_console.window):
+            self.workspaceModel.removeForeignNamespace(conndict)
+        # signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        # self.workspaceModel.removeForeignNamespace(cdict)
 
     @Slot(dict)
     @safewrapper
     def _slot_ext_krn_stop(self, conndict):
         print("mainWindow: _slot_ext_krn_stop %s" % conndict)
-        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.removeForeignNamespace(conndict)
+        with qtutils.SignalBlocker(self.external_console.window):
+            self.workspaceModel.removeForeignNamespace(conndict)
+            # signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
 
     @Slot(dict)
     @safewrapper
@@ -9990,26 +9994,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No),
                              defaultButton = QtWidgets.QMessageBox.No
         )
-#         msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
-#
-#         msgBox = QtWidgetsd.QMessageBox()
-
-        # msgBox.setWindowTitle(wintitle)
-        # msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-        # msgBox.setText(prompt)
-        # msgBox.setInformativeText(self.tr("This operation cannot be undone!"))
-        # msgBox.setStandardButtons(
-        #     QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        # msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
-
-        # ret = msgBox.exec()
         if ret == QtWidgets.QMessageBox.No:
             return
 
         for n in varNames:
             obj = self.workspace[n]
             if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                # print("%s.slot_deleteSelectedWorkspaceObjects %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
                 if isinstance(obj, mpl.figure.Figure):
                     # also removes obj.number from plt.get_fignums()
                     plt.close(obj)
@@ -10019,12 +10009,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
                 # does not remove its symbol for workspace - this has already been removed by delete action
                 self.deRegisterWindow(obj)
-                # super().deRegisterWindow(obj)
 
-            # self.removeWorkspaceSymbol(n)
             self.workspace.pop(n, None)
 
-        # self.workspaceModel.currentItem = None
         self.currentVarItem = None
 
         self.workspaceModel.update()
@@ -10032,12 +10019,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @Slot()
     def _slot_cm_AddPythonScriptToManager(self):
         fileSystemView = self._getFileSystemView()
-        # if self.fileSystemViewMode == "Tree":
-        #     fileSystemView = self.fileSystemTreeView
-        # elif self.fileSystemViewMode in ("Icon", "List"):
-        #     fileSystemView = self.fileSystemListView
-        # elif self.fileSystemViewMode == "Column":
-        #     fileSystemView = self.fileSystemColumnView
 
         if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
             return

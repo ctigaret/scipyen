@@ -133,10 +133,10 @@ from ephys.ephys_protocol import ElectrophysiologyProtocol
 # ### BEGIN forward class declarations
 class SynapticPathway: pass
 class PathwaysStimulationLayout: pass
-class PathwayTrials: pass
+# class PathwayTrials: pass
 class SynapticPathwayList: pass
 class RecordingSource: pass
-# class PathwayTrials: pass
+# # class PathwayTrials: pass
 
 # ### END   forward class declarations
 
@@ -2613,8 +2613,8 @@ class RecordingSource(ScipyenDataclass):
     def makeStimulusLayout(self, protocol: ElectrophysiologyProtocol, name: str) -> PathwaysStimulationLayout:
         return PathwaysStimulationLayout(self, protocol, name)
 
-    def makePathwayTrials(self) -> PathwayTrials:
-        return PathwayTrials({pathway: neo.Block(name=pathway.name) for pathway in self.pathways})
+    # def makePathwayTrials(self) -> PathwayTrials:
+    #     return PathwayTrials({pathway: neo.Block(name=pathway.name) for pathway in self.pathways})
 
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
@@ -3783,104 +3783,104 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
     return ret
 
 # # # # class PathwayTrials(psygnal.EventedDict): # NOTE: 2026-11-14 23:31:50 use this to EMIT signals when contents change
-class PathwayTrials(dict):
-    r"""Mapping of pathway name: str ↦ electrophysiology data: neo.Block
-    WARNING: To be phased out for deprecation in favour of PathwayTrialsTree
-    """
-    valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(typing.Self)
-    pathwayChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(SynapticPathway)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if len(self):
-            assert all(isinstance(k, SynapticPathway) for k in self), "PathwayTrials accepts only SynapticPathway objects as keys"
-            assert all(isinstance(v, neo.Block) for v in self.values()), "PathwayTrials accepts only neo.Block objects as values"
-
-        for pathway in self:
-            pathway.pathwayScheduleEpisodeChanged.connect(self.onPathwayScheduleEpisodeChange)
-
-    def __contains__(self, obj: SynapticPathway | str) -> bool:
-        if isinstance(obj, SynapticPathway):
-            return obj in self.keys()
-
-        elif isinstance(obj, str):
-            return obj in (k.name for k in self)
-
-        return False
-
-    def __getitem__(self, key: SynapticPathway | str) -> neo.Block:
-        if isinstance(key, SynapticPathway):
-            # BUG: 2026-11-25 09:25:56 FIXME
-            # if the value of a field in key (a SynapticPathway object) was changed
-            # this will raise KeyError (because membership ultimately relies on
-            # the key's hash value which will be different as a result)
-            #
-            # However, the id of the key SHOULD be the same, therefore:
-            # FIX for BUG: 2026-11-25 09:25:56
-            # 1. check if normal __getitem__ works
-            # if it doesn't then check 
-            try:
-                ret= super().__getitem__(key)
-            except KeyError:
-                keyId = id(key)
-                keyIds = [id(k) for k in self]
-                traceback.print_exc()
-                print(f"in {self.__class__.__name__}.__getitem__:\n keyId -> {keyId},\n keyIds: {keyIds}")
-
-        elif isinstance(key, str):
-            if key not in (p.name for p in self):
-                raise KeyError(f"No pathway named {name} found")
-
-            pathway = [p for p in self if p.name == key]
-
-            if len(pathway) > 1:
-                raise RuntimeError(f"Duplicate pathway name: {name}")
-
-            return super().__getitem__(pathway[0])
-
-        else:
-            raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway or str (SynapticPathway name)was expected")
-
-    def __setitem__(self, key: SynapticPathway, value: neo.Block):
-        # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
-        if not isinstance(key, SynapticPathway):
-            raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway was expected")
-
-        if not isinstance(value, neo.Block):
-            raise TypeError(f"Invalid value type {type(value).__name__} when a neo.Block was expected")
-
-        super().__setitem__(key, value)
-
-    def __hash__(self):
-        return hash(tuple(self.keys()), tuple(self.values()))
-
-    @property
-    def pathways(self):
-        yield from self
-
-    @property
-    def pathwayNames(self):
-        yield from (p.name for p in self)
-
-    def onPathwayScheduleEpisodeChange(self, pathway, schedule, episode,
-                                       episodeAttr, newVal, oldVal):
-        if pathway not in self:
-            scipywarn(f"{pathway.name} does not exist in this {self.__class__.__name__} object")
-            return
-
-        if len(self[pathway].segments) == 0:
-            scipywarn(f"No segments associated with {pathway.name}")
-            return
-
-        if episode.endFrame < len(self[pathway].segments) and episodeAttr == "name":
-            for segment in self[pathway].segments[episode.beginFrame:episode.endFrame+1]:
-                if oldVal in segment.name:
-                    segment.name = segment.name.replace(oldVal, newVal)
-
-            # self.valueChanged.emit(self)
-            self.pathwayChanged.emit(pathway)
-            
+# class PathwayTrials(dict):
+#     r"""Mapping of pathway name: str ↦ electrophysiology data: neo.Block
+#     WARNING: To be phased out for deprecation in favour of PathwayTrialsTree
+#     """
+#     valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(typing.Self)
+#     pathwayChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(SynapticPathway)
+#
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#
+#         if len(self):
+#             assert all(isinstance(k, SynapticPathway) for k in self), "PathwayTrials accepts only SynapticPathway objects as keys"
+#             assert all(isinstance(v, neo.Block) for v in self.values()), "PathwayTrials accepts only neo.Block objects as values"
+#
+#         for pathway in self:
+#             pathway.pathwayScheduleEpisodeChanged.connect(self.onPathwayScheduleEpisodeChange)
+#
+#     def __contains__(self, obj: SynapticPathway | str) -> bool:
+#         if isinstance(obj, SynapticPathway):
+#             return obj in self.keys()
+#
+#         elif isinstance(obj, str):
+#             return obj in (k.name for k in self)
+#
+#         return False
+#
+#     def __getitem__(self, key: SynapticPathway | str) -> neo.Block:
+#         if isinstance(key, SynapticPathway):
+#             # BUG: 2026-11-25 09:25:56 FIXME
+#             # if the value of a field in key (a SynapticPathway object) was changed
+#             # this will raise KeyError (because membership ultimately relies on
+#             # the key's hash value which will be different as a result)
+#             #
+#             # However, the id of the key SHOULD be the same, therefore:
+#             # FIX for BUG: 2026-11-25 09:25:56
+#             # 1. check if normal __getitem__ works
+#             # if it doesn't then check
+#             try:
+#                 ret= super().__getitem__(key)
+#             except KeyError:
+#                 keyId = id(key)
+#                 keyIds = [id(k) for k in self]
+#                 traceback.print_exc()
+#                 print(f"in {self.__class__.__name__}.__getitem__:\n keyId -> {keyId},\n keyIds: {keyIds}")
+#
+#         elif isinstance(key, str):
+#             if key not in (p.name for p in self):
+#                 raise KeyError(f"No pathway named {name} found")
+#
+#             pathway = [p for p in self if p.name == key]
+#
+#             if len(pathway) > 1:
+#                 raise RuntimeError(f"Duplicate pathway name: {name}")
+#
+#             return super().__getitem__(pathway[0])
+#
+#         else:
+#             raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway or str (SynapticPathway name)was expected")
+#
+#     def __setitem__(self, key: SynapticPathway, value: neo.Block):
+#         # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
+#         if not isinstance(key, SynapticPathway):
+#             raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway was expected")
+#
+#         if not isinstance(value, neo.Block):
+#             raise TypeError(f"Invalid value type {type(value).__name__} when a neo.Block was expected")
+#
+#         super().__setitem__(key, value)
+#
+#     def __hash__(self):
+#         return hash(tuple(self.keys()), tuple(self.values()))
+#
+#     @property
+#     def pathways(self):
+#         yield from self
+#
+#     @property
+#     def pathwayNames(self):
+#         yield from (p.name for p in self)
+#
+#     def onPathwayScheduleEpisodeChange(self, pathway, schedule, episode,
+#                                        episodeAttr, newVal, oldVal):
+#         if pathway not in self:
+#             scipywarn(f"{pathway.name} does not exist in this {self.__class__.__name__} object")
+#             return
+#
+#         if len(self[pathway].segments) == 0:
+#             scipywarn(f"No segments associated with {pathway.name}")
+#             return
+#
+#         if episode.endFrame < len(self[pathway].segments) and episodeAttr == "name":
+#             for segment in self[pathway].segments[episode.beginFrame:episode.endFrame+1]:
+#                 if oldVal in segment.name:
+#                     segment.name = segment.name.replace(oldVal, newVal)
+#
+#             # self.valueChanged.emit(self)
+#             self.pathwayChanged.emit(pathway)
+#
 
 
 def splitSweeps(block, pathwaySweepIndex, analogSignals, start, signalFilter = None):

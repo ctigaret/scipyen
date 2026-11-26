@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -366,336 +365,336 @@ class Analysis(BaseScipyenData): # TODO 2026-05-31 21:15:19
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
 
-class BlockCompliance(dict):
-    r"""Custom dictionary with bool keys ↦ list of neo.Block instances.
-    It follows that it can contain at most two entries, False and True, each
-    mapped to a possibly empty sequence of neo.Block objects.
-"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if len(self):
-            assert all(isinstance(k, bool) for k in self), "All keys must be booleans"
-            assert all(isinstance(v, typing.List) for v in self.values()), "All values must be sequences"
-            non_empty = [v for v in self.values() if len(v)]
-            assert all(all(isinstance(b, neo.Block) for b in v) for v in non_empty), "All non-empty values must contain neo.Block objects"
-
-    def __contains__(self, key: bool) -> bool:
-        if not isinstance(key, bool):
-            raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-
-        return key in self.keys()
-
-    def __getitem__(self, key: bool) -> typing.List:
-        if not isinstance(key, bool):
-            raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-
-        if key in self:
-            return super().__getitem__(key)
-
-        return []
-
-    def __setitem__(self, key: bool, value: typing.List[neo.Block]):
-        if not isinstance(key, bool):
-            raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-
-        if not isinstance(value, typing.List):
-            raise TypeError(f"Invalid value type ({type(value).__name__}) when a list was expected")
-
-        if len(value) and not all(isinstance(v, neo.Block) for v in value):
-            raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-
-        super().__setitem__(key, value)
-
-    def addCompliant(self, value: neo.Block | typing.List[neo.Block]):
-        data = self[True]
-
-        if isinstance(value, neo.Block):
-            data.append(value)
-            self[True] = data
-
-        elif isinstance(value, typing.List) and len(value):
-            if not all(isinstance(v, neo.Block) for v in value):
-                raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-            data.extend(value)
-            self[True] = data
-
-        else:
-            raise TypeError(f"Expecting a neo.Block or a list of neo.Block objects; instead, got {type(value).__name__}")
-
-    def addNonCompliant(self, value: neo.Block | typing.List[neo.Block]):
-        data = self[False]
-
-        if isinstance(value, neo.Block):
-            data.append(value)
-            self[False] = data
-
-        elif isinstance(value, typing.List) and len(value):
-            if not all(isinstance(v, neo.Block) for v in value):
-                raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-            data.extend(value)
-            self[False] = data
-
-    @property
-    def compliant(self) -> typing.List:
-        return self[True]
-
-    @compliant.setter
-    def compliant(self, value: neo.Block | typing.List[neo.Block]):
-        if isinstance(value, neo.Block):
-            value = [neo.Block]
-
-        if (not isinstance(value, typing.List)
-            or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
-            raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
-
-        self[True] = value
-
-
-    @property
-    def nonCompliant(self) -> typing.List:
-        return self[False]
-
-    @nonCompliant.setter
-    def nonCompliant(self, value: neo.Block | typing.List[neo.Block]):
-        if isinstance(value, neo.Block):
-            value = [neo.Block]
-
-        if (not isinstance(value, typing.List)
-            or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
-            raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
-
-        self[False] = value
-
-class ProtocolTrials(dict):
-    r"""Mapping of ElectrophysiologyProtocol to collection of trials (neo.Block objects).
-
-    Maps a key: ElectrophysiologyProtocol instance ↦ value: dict with bool keys,
-        where:
-        True ↦ list of compliant trials (i.e. trials that were recorded with the
-        protocol specified in the `key`, AND contain the same number of segments as the
-        number of sweeps configured in the protocol)
-
-        False ↦ list of non-compliant trials (trials wthat were also recorded
-        with the protocol specified in the key, but have less segments that the
-        number of sweeos in the protocol) — this can happen when the recording
-        was interrupted for some reason, resulting in fewer sweeps being saved on disk.
-
-    NOTE: Although an ElectrophysiologyProtocol is degined to be hashable, membership
-    test in collections is more complicated than simply checking each of its members
-    for equality. Notably, changes in the amplifier gain during a recording WILL
-    appear as if the protocol changed (even though it is only the scaling of the
-    physical dimensions that has changed). A workaround is to use the
-    utilities.approximatelyEqual(…) function, which tests for numerical "closeness"
-    and interconvertibility of physical dimensionality (i.e., units).
-
-    This approach is implemented by this class and its companion, `ephys_protocol.ProtocolList`.
-    My recomendation is to avoid collecting protocols in stock Python lists or dicts,
-    and use this class (together with `ProtocolList`) instead.
-
-    """
-    # import core.pyabfbridge as pab
-    valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(BlockCompliance)
-    protocolChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(ElectrophysiologyProtocol)
-
-
-    # protocolProps = inspect.getmembers_static(ElectrophysiologyProtocol, lambda p: isinstance(p, property))
-    # abfProtocolProps = inspect.getmembers_static(pab.ABFProtocol, lambda p: isinstance(p, property))
-
-    def _registerKeyProperties_(self, obj):
-        self._keyProperties_[type(obj)] = inspect.getmembers_static(type(obj), lambda p: isinstance(p, property))
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self._useApproxEqual_: bool = False
-
-        if len(self):
-            assert all(isinstance(k, ElectrophysiologyProtocol) for k in self), "ProtocolTrials accepts only ElectrophysiologyProtocol as keys"
-            assert all(isinstance(v, BlockCompliance) for v in self.values()), "All values must be BlockCompliance dictionaries"
-
-        self._keyProperties_ = {}
-
-    def __contains__(self, obj: ElectrophysiologyProtocol | str):
-        if isinstance(obj, ElectrophysiologyProtocol):
-            if self._useApproxEqual_:
-                if len(self._keyProperties_) == 0 or type(obj) not in self._keyProperties_:
-                    self._registerKeyProperties_(obj)
-
-                # NOTE: 2026-11-22 17:14:30
-                # this works, but it's too slow!
-                return any(all(utilities.memberApproximatelyEqual(obj, pobj, p[0]) for p in self._keyProperties_[type(obj)]) for pobj in self)
-                # return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
-                # if len(self._key_cache_) == 0:
-                #     return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
-                #
-                # return obj in self._key_cache_
-            else:
-                return any(obj == key for key in self)
-                # return super().__contains__(obj)
-
-        elif isinstance(obj, str):
-            return obj in (k.name for k in self)
-
-        return False
-
-    def __delitem__(self, key: ElectrophysiologyProtocol | str):
-        if isinstance(key, str):
-            key = self.getProtocol(key)
-
-        if key not in self:
-            raise KeyError(f"Key not found:\n{key}")
-
-        super().__delitem__(key)
-        # self._key_cache_.remove(key)
-
-
-    def __getitem__(self, key: ElectrophysiologyProtocol | str) -> BlockCompliance:
-        # print(f"{self.__class__.__name__}.__getitem__({type(key).__name__})")
-        found = ()
-        if isinstance(key, ElectrophysiologyProtocol) or ElectrophysiologyProtocol in inspect.getmro(type(key)):
-            if len(self._keyProperties_) == 0 or type(key) not in self._keyProperties_:
-                self._registerKeyProperties_(key)
-
-            if key not in self:
-                raise KeyError(f"Specified protocol is not a key of this object")
-
-            if self._useApproxEqual_:
-                props = self._keyProperties_[type(key)]
-                found = tuple(k for k, pobj in enumerate(self) if all(utilities.memberApproximatelyEqual(key, pobj, p[0]) for p in props))
-
-            else:
-                found = tuple(k for k, pobj in enumerate(self) if pobj == key)
-
-        elif isinstance(key, str):
-            if key not in self:
-                raise KeyError(f"No protocol named {name} found among the keys")
-
-            found = tuple(k for k,p in enumerate(self) if p.name == key)
-
-        else:
-            raise TypeError(f"Invalid key type ({type(key).__name__})")
-
-        if len(found)==1:
-            return tuple(self.values())[found[0]]
-
-        elif len(found) == 0:
-            raise KeyError("Key not found")
-
-        else:
-            raise KeyError("Ambiguous protocol key")
-
-
-    def __setitem__(self, key: ElectrophysiologyProtocol, value: BlockCompliance):
-        # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
-        if not isinstance(key, ElectrophysiologyProtocol):
-            raise TypeError(f"Invalid key type {type(key).__name__} when a ElectrophysiologyProtocol was expected")
-
-        if not isinstance(value, BlockCompliance):
-            raise TypeError(f"Invalid value type {type(value).__name__} when a BlockCompliance was expected")
-
-        # if key not in self:
-        #     self._key_cache_.add(key)
-
-        super().__setitem__(key, value)
-
-    def _hash__(self):
-        return hash(tuple(self.keys()), tuple(self.values()))
-
-    @property
-    def useApproximativeComparison(self) -> bool:
-        return self._useApproxEqual_
-
-    @useApproximativeComparison.setter
-    def useApproximativeComparison(self, val: bool):
-        self._useApproxEqual_ = val is True
-
-    @property
-    def protocols(self):
-        yield from self
-
-    @property
-    def protocolNames(self):
-        yield from (p.name for p in self)
-
-    def getProtocolKey(self, name: str):
-        if name not in self:
-            return KeyError(f"No protocol named {name} found among the keys")
-
-        try:
-            protocol = next(p for p in self if p.name == name)
-        except:
-            raise KeyError(f"Ambiguous protocol key")
-
-    def addCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if protocol not in self:
-            self[protocol] = BlockCompliance()
-        self[protocol].addCompliant(value)
-
-    def addNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if protocol not in self:
-            self[protocol] = BlockCompliance()
-        self[protocol].addNonCompliant(value)
-
-    @property
-    def notComplied(self) -> list:
-        r"""List of protocols without any compliant trial"""
-        return [k for k in self if len(self[k][True]) == 0]
-
-    @property
-    def complied(self) -> list:
-        r"""List of protocols with compliant trials"""
-        return [k for k in self if len(self[k][True])]
-
-    def discardNonCompliantTrials(self) -> typing.Self:
-        r"""Returns an instance of ProtocolTrials containing only protocols with compliant trials"""
-        if len(self) == 0:
-            return typing.Self()
-
-        return self.__class__({p: BlockCompliance({True: b[True]}) for p, b in self.items() if len(b[True])})
-
-    def getCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
-        r"""Retrieves list of blocks that comply with the specified protocol
-    """
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if key not in self:
-            raise ValueError("Specified protocol key not found")
-        return self[protocol].compliant
-
-    def getNonCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
-        r"""Retrieves list of blocks that do NOT comply with the specified protocol
-    """
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if key not in self:
-            raise ValueError("Specified protocol key not found")
-        return self[protocol].nonCompliant
-
-    def setCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if protocol not in self:
-            self[protocol] = BlockCompliance()
-        self[protocol].compliant = value
-
-    def setNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-        protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-        if protocol not in self:
-            self[protocol] = BlockCompliance()
-        self[protocol].nonCompliant = value
-
-    def add(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
-        if complies:
-            self.addCompliant(key, value)
-        else:
-            self.addNonCompliant(key, value)
-
-    def set(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
-        if complies:
-            self.setCompliant(key, value)
-        else:
-            self.setNonCompliant(key, value)
-
+# class BlockCompliance(dict):
+#     r"""Custom dictionary with bool keys ↦ list of neo.Block instances.
+#     It follows that it can contain at most two entries, False and True, each
+#     mapped to a possibly empty sequence of neo.Block objects.
+#     """
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#
+#         if len(self):
+#             assert all(isinstance(k, bool) for k in self), "All keys must be booleans"
+#             assert all(isinstance(v, typing.Sequence) for v in self.values()), "All values must be sequences"
+#             non_empty = [v for v in self.values() if len(v)]
+#             assert all(all(isinstance(b, neo.Block) for b in v) for v in non_empty), "All non-empty values must contain neo.Block objects"
+#
+#     def __contains__(self, key: bool) -> bool:
+#         if not isinstance(key, bool):
+#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
+#
+#         return key in self.keys()
+#
+#     def __getitem__(self, key: bool) -> typing.List:
+#         if not isinstance(key, bool):
+#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
+#
+#         if key in self:
+#             return super().__getitem__(key)
+#
+#         return []
+#
+#     def __setitem__(self, key: bool, value: typing.List[neo.Block]):
+#         if not isinstance(key, bool):
+#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
+#
+#         if not isinstance(value, typing.List):
+#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a list was expected")
+#
+#         if len(value) and not all(isinstance(v, neo.Block) for v in value):
+#             raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
+#
+#         super().__setitem__(key, value)
+#
+#     def addCompliant(self, value: neo.Block | typing.List[neo.Block]):
+#         data = self[True]
+#
+#         if isinstance(value, neo.Block):
+#             data.append(value)
+#             self[True] = data
+#
+#         elif isinstance(value, typing.List) and len(value):
+#             if not all(isinstance(v, neo.Block) for v in value):
+#                 raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
+#             data.extend(value)
+#             self[True] = data
+#
+#         else:
+#             raise TypeError(f"Expecting a neo.Block or a list of neo.Block objects; instead, got {type(value).__name__}")
+#
+#     def addNonCompliant(self, value: neo.Block | typing.List[neo.Block]):
+#         data = self[False]
+#
+#         if isinstance(value, neo.Block):
+#             data.append(value)
+#             self[False] = data
+#
+#         elif isinstance(value, typing.List) and len(value):
+#             if not all(isinstance(v, neo.Block) for v in value):
+#                 raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
+#             data.extend(value)
+#             self[False] = data
+#
+#     @property
+#     def compliant(self) -> typing.List:
+#         return self[True]
+#
+#     @compliant.setter
+#     def compliant(self, value: neo.Block | typing.List[neo.Block]):
+#         if isinstance(value, neo.Block):
+#             value = [neo.Block]
+#
+#         if (not isinstance(value, typing.List)
+#             or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
+#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
+#
+#         self[True] = value
+#
+#
+#     @property
+#     def nonCompliant(self) -> typing.List:
+#         return self[False]
+#
+#     @nonCompliant.setter
+#     def nonCompliant(self, value: neo.Block | typing.List[neo.Block]):
+#         if isinstance(value, neo.Block):
+#             value = [neo.Block]
+#
+#         if (not isinstance(value, typing.List)
+#             or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
+#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
+#
+#         self[False] = value
+#
+# class ProtocolTrials(dict):
+#     r"""Mapping of ElectrophysiologyProtocol to collection of trials (neo.Block objects).
+#
+#     Maps a key: ElectrophysiologyProtocol instance ↦ value: dict with bool keys,
+#         where:
+#         True ↦ list of compliant trials (i.e. trials that were recorded with the
+#         protocol specified in the `key`, AND contain the same number of segments as the
+#         number of sweeps configured in the protocol)
+#
+#         False ↦ list of non-compliant trials (trials wthat were also recorded
+#         with the protocol specified in the key, but have less segments that the
+#         number of sweeos in the protocol) — this can happen when the recording
+#         was interrupted for some reason, resulting in fewer sweeps being saved on disk.
+#
+#     NOTE: Although an ElectrophysiologyProtocol is degined to be hashable, membership
+#     test in collections is more complicated than simply checking each of its members
+#     for equality. Notably, changes in the amplifier gain during a recording WILL
+#     appear as if the protocol changed (even though it is only the scaling of the
+#     physical dimensions that has changed). A workaround is to use the
+#     utilities.approximatelyEqual(…) function, which tests for numerical "closeness"
+#     and interconvertibility of physical dimensionality (i.e., units).
+#
+#     This approach is implemented by this class and its companion, `ephys_protocol.ProtocolList`.
+#     My recomendation is to avoid collecting protocols in stock Python lists or dicts,
+#     and use this class (together with `ProtocolList`) instead.
+#
+#     """
+#     # import core.pyabfbridge as pab
+#     valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(BlockCompliance)
+#     protocolChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(ElectrophysiologyProtocol)
+#
+#
+#     # protocolProps = inspect.getmembers_static(ElectrophysiologyProtocol, lambda p: isinstance(p, property))
+#     # abfProtocolProps = inspect.getmembers_static(pab.ABFProtocol, lambda p: isinstance(p, property))
+#
+#     def _registerKeyProperties_(self, obj):
+#         self._keyProperties_[type(obj)] = inspect.getmembers_static(type(obj), lambda p: isinstance(p, property))
+#
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#
+#         self._useApproxEqual_: bool = False
+#
+#         if len(self):
+#             assert all(isinstance(k, ElectrophysiologyProtocol) for k in self), "ProtocolTrials accepts only ElectrophysiologyProtocol as keys"
+#             assert all(isinstance(v, BlockCompliance) for v in self.values()), "All values must be BlockCompliance dictionaries"
+#
+#         self._keyProperties_ = {}
+#
+#     def __contains__(self, obj: ElectrophysiologyProtocol | str):
+#         if isinstance(obj, ElectrophysiologyProtocol):
+#             if self._useApproxEqual_:
+#                 if len(self._keyProperties_) == 0 or type(obj) not in self._keyProperties_:
+#                     self._registerKeyProperties_(obj)
+#
+#                 # NOTE: 2026-11-22 17:14:30
+#                 # this works, but it's too slow!
+#                 return any(all(utilities.memberApproximatelyEqual(obj, pobj, p[0]) for p in self._keyProperties_[type(obj)]) for pobj in self)
+#                 # return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
+#                 # if len(self._key_cache_) == 0:
+#                 #     return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
+#                 #
+#                 # return obj in self._key_cache_
+#             else:
+#                 return any(obj == key for key in self)
+#                 # return super().__contains__(obj)
+#
+#         elif isinstance(obj, str):
+#             return obj in (k.name for k in self)
+#
+#         return False
+#
+#     def __delitem__(self, key: ElectrophysiologyProtocol | str):
+#         if isinstance(key, str):
+#             key = self.getProtocol(key)
+#
+#         if key not in self:
+#             raise KeyError(f"Key not found:\n{key}")
+#
+#         super().__delitem__(key)
+#         # self._key_cache_.remove(key)
+#
+#
+#     def __getitem__(self, key: ElectrophysiologyProtocol | str) -> BlockCompliance:
+#         # print(f"{self.__class__.__name__}.__getitem__({type(key).__name__})")
+#         found = ()
+#         if isinstance(key, ElectrophysiologyProtocol) or ElectrophysiologyProtocol in inspect.getmro(type(key)):
+#             if len(self._keyProperties_) == 0 or type(key) not in self._keyProperties_:
+#                 self._registerKeyProperties_(key)
+#
+#             if key not in self:
+#                 raise KeyError(f"Specified protocol is not a key of this object")
+#
+#             if self._useApproxEqual_:
+#                 props = self._keyProperties_[type(key)]
+#                 found = tuple(k for k, pobj in enumerate(self) if all(utilities.memberApproximatelyEqual(key, pobj, p[0]) for p in props))
+#
+#             else:
+#                 found = tuple(k for k, pobj in enumerate(self) if pobj == key)
+#
+#         elif isinstance(key, str):
+#             if key not in self:
+#                 raise KeyError(f"No protocol named {name} found among the keys")
+#
+#             found = tuple(k for k,p in enumerate(self) if p.name == key)
+#
+#         else:
+#             raise TypeError(f"Invalid key type ({type(key).__name__})")
+#
+#         if len(found)==1:
+#             return tuple(self.values())[found[0]]
+#
+#         elif len(found) == 0:
+#             raise KeyError("Key not found")
+#
+#         else:
+#             raise KeyError("Ambiguous protocol key")
+#
+#
+#     def __setitem__(self, key: ElectrophysiologyProtocol, value: BlockCompliance):
+#         # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
+#         if not isinstance(key, ElectrophysiologyProtocol):
+#             raise TypeError(f"Invalid key type {type(key).__name__} when a ElectrophysiologyProtocol was expected")
+#
+#         if not isinstance(value, BlockCompliance):
+#             raise TypeError(f"Invalid value type {type(value).__name__} when a BlockCompliance was expected")
+#
+#         # if key not in self:
+#         #     self._key_cache_.add(key)
+#
+#         super().__setitem__(key, value)
+#
+#     def _hash__(self):
+#         return hash(tuple(self.keys()), tuple(self.values()))
+#
+#     @property
+#     def useApproximativeComparison(self) -> bool:
+#         return self._useApproxEqual_
+#
+#     @useApproximativeComparison.setter
+#     def useApproximativeComparison(self, val: bool):
+#         self._useApproxEqual_ = val is True
+#
+#     @property
+#     def protocols(self):
+#         yield from self
+#
+#     @property
+#     def protocolNames(self):
+#         yield from (p.name for p in self)
+#
+#     def getProtocolKey(self, name: str):
+#         if name not in self:
+#             return KeyError(f"No protocol named {name} found among the keys")
+#
+#         try:
+#             protocol = next(p for p in self if p.name == name)
+#         except:
+#             raise KeyError(f"Ambiguous protocol key")
+#
+#     def addCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if protocol not in self:
+#             self[protocol] = BlockCompliance()
+#         self[protocol].addCompliant(value)
+#
+#     def addNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if protocol not in self:
+#             self[protocol] = BlockCompliance()
+#         self[protocol].addNonCompliant(value)
+#
+#     @property
+#     def notComplied(self) -> list:
+#         r"""List of protocols without any compliant trial"""
+#         return [k for k in self if len(self[k][True]) == 0]
+#
+#     @property
+#     def complied(self) -> list:
+#         r"""List of protocols with compliant trials"""
+#         return [k for k in self if len(self[k][True])]
+#
+#     def discardNonCompliantTrials(self) -> typing.Self:
+#         r"""Returns an instance of ProtocolTrials containing only protocols with compliant trials"""
+#         if len(self) == 0:
+#             return typing.Self()
+#
+#         return self.__class__({p: BlockCompliance({True: b[True]}) for p, b in self.items() if len(b[True])})
+#
+#     def getCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
+#         r"""Retrieves list of blocks that comply with the specified protocol
+#     """
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if key not in self:
+#             raise ValueError("Specified protocol key not found")
+#         return self[protocol].compliant
+#
+#     def getNonCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
+#         r"""Retrieves list of blocks that do NOT comply with the specified protocol
+#     """
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if key not in self:
+#             raise ValueError("Specified protocol key not found")
+#         return self[protocol].nonCompliant
+#
+#     def setCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if protocol not in self:
+#             self[protocol] = BlockCompliance()
+#         self[protocol].compliant = value
+#
+#     def setNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
+#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
+#         if protocol not in self:
+#             self[protocol] = BlockCompliance()
+#         self[protocol].nonCompliant = value
+#
+#     def add(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
+#         if complies:
+#             self.addCompliant(key, value)
+#         else:
+#             self.addNonCompliant(key, value)
+#
+#     def set(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
+#         if complies:
+#             self.setCompliant(key, value)
+#         else:
+#             self.setNonCompliant(key, value)
+#
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal],
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
@@ -5314,7 +5313,7 @@ def _construct_signal_from_fitted_curve_(fitCurve, fitResult, fitted_signal):
     return result
 
 def __do_fit__(sg, mdl, fT, fTadj, ch):
-    result = list()
+    result = []
     if len(fTadj) == 0:
         # defer this to below if adjustments are to be made
         initial, bounds = __get_initial_and_bounds__(fT)
@@ -5367,37 +5366,37 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
     elif len(result) > 1:
         return result
 
-# @timefunc
-def groupTrialsByProtocol(*trials) -> ProtocolTrials:
-    result = ProtocolTrials()
-    if len(trials) == 1:
-        if (
-            isinstance(trials[0], typing.Sequence)
-            and len(trials[0])>0
-            and all(isinstance(t, neo.Block) for t in trials[0])
-            ):
-            trials = trials[0]
-
-        elif not isinstance(trials[0], neo.Block):
-            raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
-
-
-    elif len(trials) == 0:
-        return result
-
-    elif len(trials) > 1:
-        if not all(isinstance(t, neo.Block) for t in trials):
-            raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
-
-    else:
-        raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
-
-
-    for trial in trials:
-        protocol = getProtocol(trial)
-        complies = len(trial.segments) == protocol.nSweeps
-        # print(f"{protocol.name} found: {protocol in result}")
-        result.add(protocol, trial, complies)
-
-    return result
+# # @timefunc
+# def groupTrialsByProtocol(*trials) -> ProtocolTrials:
+#     result = ProtocolTrials()
+#     if len(trials) == 1:
+#         if (
+#             isinstance(trials[0], typing.Sequence)
+#             and len(trials[0])>0
+#             and all(isinstance(t, neo.Block) for t in trials[0])
+#             ):
+#             trials = trials[0]
+#
+#         elif not isinstance(trials[0], neo.Block):
+#             raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
+#
+#
+#     elif len(trials) == 0:
+#         return result
+#
+#     elif len(trials) > 1:
+#         if not all(isinstance(t, neo.Block) for t in trials):
+#             raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
+#
+#     else:
+#         raise TypeError("Expecting a neo.Block object or a homogeneous sequence of neo.Block objects")
+#
+#
+#     for trial in trials:
+#         protocol = getProtocol(trial)
+#         complies = len(trial.segments) == protocol.nSweeps
+#         # print(f"{protocol.name} found: {protocol in result}")
+#         result.add(protocol, trial, complies)
+#
+#     return result
 
