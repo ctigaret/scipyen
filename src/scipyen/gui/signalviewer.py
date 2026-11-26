@@ -618,16 +618,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._new_data_ = True # needed to refresh the plotitems when new data has been set with the viewer
 
-        self._plot_names_ = dict() # maps item row position to name
+        self._plot_names_ = {} # maps item row position to name
 
         self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
         self._cursorWindowSizeY_ = self.defaultCursorWindowSizeY
 
         self._editCursorOnCreation_ = False
 
-        self._crosshairSignalCursors_ = dict() # a dict of SignalCursors mapping str name to cursor object
-        self._verticalSignalCursors_ = dict()
-        self._horizontalSignalCursors_ = dict()
+        self._crosshairSignalCursors_ = {} # a dict of SignalCursors mapping str name to cursor object
+        self._verticalSignalCursors_ = {}
+        self._horizontalSignalCursors_ = {}
         self._cursorHoverColor_ = self.defaultCursorHoverColor
 
         self._cursorLineStyle_ = self.defaultCursorLineStyle
@@ -722,7 +722,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._n_signal_axes_ = None
 
-        self._signal_axes_ = list()
+        self._signal_axes_ = []
 
         self._spiketrains_axis_ = None
         self._default_spiketrains_axis_name_ = "Spike trains"
@@ -730,16 +730,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._events_axis_ = None
         self._default_events_axis_name_ = "Events"
 
-        self._curve_overlays_ = dict()
+        self._curve_overlays_ = {}
 
-        self._target_overlays_ = dict()
+        self._target_overlays_ = {}
 
-        self._label_overlays_ = dict()
+        self._label_overlays_ = {}
 
-        self._legends_ = dict()
+        self._legends_ = {}
 
-        self._frame_analog_map_ = dict()
-        self._frame_irregs_map_ = dict()
+        self._frame_analog_map_ = {}
+        self._frame_irregs_map_ = {}
 
         # NOTE: 2023-05-15 13:49:42 meta-indexing array
         # made this a numpy record array (recarray) with shape (nframes, 1)
@@ -790,7 +790,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### BEGIN attributes controlling neo object representations
 
         #### BEGIN metadata for neo and datatypes objects
-        self.dataAnnotations = dict()
+        self.dataAnnotations = {}
         self.globalAnnotations = None
         self.currentFrameAnnotations = None
         self.currentSignalAnnotations = None
@@ -804,9 +804,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # axis;
         # maps frame index to a list of neo.Epochs
         # frames without epochs are absent from the map
-        self._cached_epochs_ = dict()
-        self._plotted_analogsignal_index = list() # which analog signals do we actually plot?
-        self._plotted_irregularsignal_index = list() # which irregular signals do we actually plot?
+        self._cached_epochs_ = {}
+        self._plotted_analogsignal_index = [] # which analog signals do we actually plot?
+        self._plotted_irregularsignal_index = [] # which irregular signals do we actually plot?
 
         #### END selective representation of neo objects components
 
@@ -845,11 +845,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # list of analog signal names selected from what is available in the current
         # frame, using the combobox for analog signals
         # this includes signals in numpy arrays
-        self.guiSelectedAnalogSignalEntries = list() # list of signal names
+        self.guiSelectedAnalogSignalEntries = [] # list of signal names
 
         # list of irregularly sampled signal names selected from what is available
         # in the current frame, using the combobox for irregularly sampled signals
-        self.guiSelectedIrregularSignalEntries = list()
+        self.guiSelectedIrregularSignalEntries = []
 
         self._plot_analogsignals_ = True
         self._plot_irregularsignals_ = True
@@ -3284,60 +3284,69 @@ anything else       anything else       ❌
         self._clear_labels_overlay_(axis)
 
 
-    def closeEvent(self, evt):
-        r"""Override ScipyenViewer.closeEvent.
-        Attempt to deal with situations where C/C++ objects are deleted before
-        their wrappers in pyqtgraph
-        """
-        # TODO/FIXME 2022-11-16 21:37:13
-        # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
-
-        # if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
-        if (
-            getattr(self, "_delete_on_close_", False)
-            or isinstance(self.appWindow, QtWidgets.QWidget)
-            or getattr(self.scipyenWindow, "autoRemoveViewers", False)
-            ):
-            if len(self._signal_axes_):
-                self._signal_axes_.clear()
-
-
-            self._legends_.clear()
-            self._frame_analog_map_.clear()
-            self._frame_irregs_map_.clear()
-            self._target_overlays_.clear()
-            self._label_overlays_.clear()
-            self._spiketrains_axis_ = None
-            self._events_axis_ = None
-            self._selected_plot_item_ = None
-            self._selected_plot_data_item_ = None
-
-            self._plot_names_.clear()
-            for plotItem in self.axes:
-                self.signalsLayout.removeItem(plotItem)
-                # print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
-                if qtutils.isQObjectAlive(plotItem):
-                    try:
-                        try:
-                            plotItem.vb.sigStateChanged.disconnect()
-                        except:
-                            pass
-
-                        try:
-                            plotItem.vb.sigResized.disconnect()
-                        except:
-                            pass
-
-                        plotItem.vb.close()
-                        plotItem.close()
-                        del plotItem
-
-                    except:
-                        continue
-
-
-        super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
-        evt.accept()
+    # def closeEvent(self, evt):
+    #     r"""Override ScipyenViewer.closeEvent.
+    #     Attempt to deal with situations where C/C++ objects are deleted before
+    #     their wrappers in pyqtgraph
+    #     """
+    #     # TODO/FIXME 2022-11-16 21:37:13
+    #     # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
+    #     #
+    #     # print(f"{self.__class__.__name__}.closeEvent:")
+    #     # print(f"\n\t-> _delete_on_close_ = {getattr(self, "_delete_on_close_", False)}")
+    #     # print(f"\n\t-> appWindow = {self.appWindow}")
+    #     # print(f"\n\t-> scipyenWindow.autoRemoveViewers = {getattr(self.scipyenWindow, "autoRemoveViewers", False)}")
+    #
+    #     # if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
+    #     # if (
+    #     #     getattr(self, "_delete_on_close_", True)
+    #     #     and not isinstance(self.appWindow, QtWidgets.QWidget)
+    #     #     and getattr(self.scipyenWindow, "autoRemoveViewers", True)
+    #     #     ):
+    #     #     print(f"\nclearing signal axes")
+    #     #     if len(self._signal_axes_):
+    #     #         self._signal_axes_.clear()
+    #     #
+    #     #
+    #     #     print(f"\nclearing legends, frame maps and overlays")
+    #     #     self._legends_.clear()
+    #     #     self._frame_analog_map_.clear()
+    #     #     self._frame_irregs_map_.clear()
+    #     #     self._target_overlays_.clear()
+    #     #     self._label_overlays_.clear()
+    #     #     print(f"\nremoving spike train axis")
+    #     #     self._spiketrains_axis_ = None
+    #     #     print(f"\nremoving events axis")
+    #     #     self._events_axis_ = None
+    #     #     self._selected_plot_item_ = None
+    #     #     self._selected_plot_data_item_ = None
+    #     #
+    #     #     self._plot_names_.clear()
+    #     #     for plotItem in self.axes:
+    #     #         print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
+    #     #         if qtutils.isQObjectAlive(plotItem):
+    #     #             self.signalsLayout.removeItem(plotItem)
+    #     #             try:
+    #     #                 try:
+    #     #                     plotItem.vb.sigStateChanged.disconnect()
+    #     #                 except:
+    #     #                     pass
+    #     #
+    #     #                 try:
+    #     #                     plotItem.vb.sigResized.disconnect()
+    #     #                 except:
+    #     #                     pass
+    #     #
+    #     #                 plotItem.vb.close()
+    #     #                 plotItem.close()
+    #     #                 del plotItem
+    #     #
+    #     #             except:
+    #     #                 continue
+    #
+    #
+    #     super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
+    #     evt.accept()
 
     def addCursors(self, /, *args, **kwargs) -> tuple:
         r"""Manually adds a set of cursors to the selected axes in the SignalViewer window.
@@ -7300,7 +7309,8 @@ Var-keyword parameters ("name=value" pairs):
             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
             self._meta_index.frame[:,0] = self.frameIndex
 
-        elif isinstance(y, (neo.core.Event, DataMark, TriggerEvent)): # plot an event independently of data
+        elif isinstance(y, (neo.core.Event, DataMark, TriggerEvent)):
+            # stand-alone plot of events
             x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
@@ -7311,7 +7321,8 @@ Var-keyword parameters ("name=value" pairs):
             self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
             self._meta_index.frame[:,0] = self.frameIndex
 
-        elif isinstance(y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
+        elif isinstance(y, (neo.core.Epoch, DataZone)):
+            # stand-alone plot of Epoch
             x = None
             self._cached_title = getattr(y, "name", None)
             self.dataAxis = 0 # data as column vectors
@@ -8008,8 +8019,8 @@ Var-keyword parameters ("name=value" pairs):
                 if isinstance(plotStyle, str):
                     self.plotStyle = plotStyle
 
-                elif isinstance(style, str):
-                    self.plotStyle = style
+                # elif isinstance(style, str):
+                #     self.plotStyle = style
 
                 self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
                 self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
@@ -8366,12 +8377,6 @@ Var-keyword parameters ("name=value" pairs):
         # TODO: use it in other viewers, too!
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
         worker.run()
-
-#         if not self.isVisible():
-#             self.setVisible(True)
-#
-#         if get_focus:
-#             self.activateWindow()
 
     def _ui_getViewParams(self, doc_title, frameAxis, signalChannelAxis,
                           frameIndex, signalIndex, signalChannelIndex,
@@ -9260,7 +9265,7 @@ Var-keyword parameters ("name=value" pairs):
     curves in distinct frames are similar, if not identical, even though they
     start at distinct values.
 
-    CAUTION: For best result ensure all axes (Plotitem objects) in the SignalViewer
+    CAUTION: For best result ensure all axes (PlotItem objects) in the SignalViewer
     are linked.
 
         """
@@ -9636,12 +9641,12 @@ Var-keyword parameters ("name=value" pairs):
 
         if len(events):
             self._plotEvents_(events, **kwargs)
-        else:
+        elif isinstance(self.eventsAxis, pg.PlotItem):
             self.eventsAxis.setVisible(False)
 
         if len(spiketrains):
             self._plot_data_(spiketrains, *args, **kwargs)
-        else:
+        elif isinstance(self.spikeTrainsAxis, pg.PlotItem):
             self.spikeTrainsAxis.setVisible(False)
 
         if self._plot_epochs_ and len(epochs):

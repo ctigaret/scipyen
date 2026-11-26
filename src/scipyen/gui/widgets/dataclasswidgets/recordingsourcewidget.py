@@ -119,14 +119,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self._configureUI_()
 
     def default(self) -> T:
-        # self._name_ = "source"
-        # self._adc_ = 0
-        # self._dac_ = 0
-        # self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
-        # self._auxin_ = ephys_pathways.AuxiliaryInputList()
-        # self._auxout_ = ephys_pathways.AuxiliaryOutputList()
-        # self._electrode_ = ephys.ElectrodeMode.Null
-        # self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
         self._reset_()
         return self._data_
 
@@ -170,17 +162,14 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.stimulusListTable.setValue(self._data_.syn)
         self.stimulusListTable.autoResizeColumns()
 
-        # self.stimulusListTable.sig_indexRowColChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_indexChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_dataChanged.connect(self._slot_stimulusListChanged)
-        # self.stimulusListTable.sig_indexesChanged.connect(self._slot_stimulusListIndexesChanged)
 
         self.synapticPathwaysTable.isAutoResizeColumns = True
         self.synapticPathwaysTable.setToolTip("Configured Synaptic Pathways")
         self.synapticPathwaysTable.setValue(self._data_.pathways)
         self.synapticPathwaysTable.autoResizeColumns()
 
-        # self.synapticPathwaysTable.sig_indexRowColChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
 
@@ -206,7 +195,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         if isinstance(val, int) and val >=0 and val < len(self._electrodeModeNames_):
             # CAUTION: 2026-10-27 15:00:38
             # when val is an int, it is the INDEX of the selected electrode mode name
-            # in the combo box, NOT the int value of a specific ElectrodeMode enum value!!!
+            # in the combo box, NOT the `int` value of a specific ElectrodeMode enum value!!!
             val = self._electrodeModeNames_[val]
 
         if isinstance(val, str) and val in self._electrodeModeNames_:
@@ -244,7 +233,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                                  syn = deepcopy(self._data_.syn),
                                  auxin = deepcopy(self._data_.auxin),
                                  auxout = deepcopy(self._data_.auxout),
-                                 electrodeMode = self._data_.electrodeMode,
+                                 electrodeMode = self.electrodeMode,
                                  pathways = deepcopy(self._data_.pathways))
 
         self.sig_valueChanged.emit(ret)
@@ -449,7 +438,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                                                  path0stim=path0stim,
                                                  path1stim=path1stim,
                                                  name=self._data_.name,
-                                                 electrodeMode = self._data_.electrodeMode)
+                                                 electrodeMode = self._electrode_,
+                                                 )
         self.setValue(result)
         self.sig_valueChanged.emit(self._data_)
 
@@ -460,18 +450,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
             return
 
         self._data_ = val
-        currentElectrodeModeNdx = self._electrodeModeNames_.index(self._data_.electrodeMode.name)
-
-        # else:
-        #     self._name_ = "source"
-        #     self._adc_ = 0
-        #     self._dac_ = 0
-        #     self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
-        #     self._auxin_ = ephys_pathways.AuxiliaryInputList()
-        #     self._auxout_ = ephys_pathways.AuxiliaryOutputList()
-        #     self._electrode_ = ephys.ElectrodeMode.Null
-        #     self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
-        #     self._make_value_()
+        currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
 
         with qtutils.SignalBlocker(
             (

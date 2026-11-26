@@ -3773,6 +3773,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         viewer_type = type(win)
 
+        # print(f"{self.__class__.__name__}.deRegisterWindow({viewer_type})")
+
         if viewer_type in self.viewers:
             if win in self.viewers[viewer_type]:
                 self.viewers[viewer_type].remove(win)
@@ -3784,15 +3786,19 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             if len(self.viewers[viewer_type]):
                 self.currentViewers[viewer_type] = self.viewers[viewer_type][-1]
 
+        # print("removing from workspace")
         self.removeFromWorkspace(win)
 
         # NOTE: 2026-05-19 18:10:09 see # NOTE: 2026-05-19 18:09:59
         # this fuction would still have held a ref to `win` after having been
         # `del`-ed in self.removeFromWorkspace -
-        if qtutils.isQObjectAlive(win):
-            win.deleteLater()
-            win = None
-            del win
+        # if qtutils.isQObjectAlive(win):
+        #     print("deleting later")
+        #     win.deleteLater()
+
+        # print("setting to None")
+        win = None
+        # del win
 
     def raiseWindow(self, obj: typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]):
         r"""Sets obj to be the current window and raises it.

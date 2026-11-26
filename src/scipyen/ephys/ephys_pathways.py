@@ -2579,6 +2579,8 @@ class RecordingSource(ScipyenDataclass):
             raise TypeError(f"Invalid electrode mode {electrodeMode}")
 
         if len(self.pathways) == 0:
+            # NOTE: 2026-11-26 08:48:26
+            # use the supplied electrodeMode ONLY when constructing new (default) pathways!
             self.pathways.name = self.name
             for ksyn, syn in enumerate(self.syn):
                 # synList = SynapticStimulusChannelList(syn, name = syn.name)
@@ -2589,9 +2591,6 @@ class RecordingSource(ScipyenDataclass):
                                         electrode = electrodeMode)
                 # print(f"\tcreated synaptic pathway {pathway}")
                 self.pathways.append(pathway)
-
-        # self.pathways.parent=self
-        # print(f"\tpathways = {self.pathways}")
 
         super().__post_init__() # ScipyenDataclass, for events handling
 
@@ -2605,8 +2604,8 @@ class RecordingSource(ScipyenDataclass):
                     self.syn,
                     self.auxin,
                     self.auxout,
-                    self.electrodeMode,
-                    self.pathways
+                    self.pathways,
+                    # self.electrodeMode,
                 )
             )
 
@@ -2653,6 +2652,10 @@ class RecordingSource(ScipyenDataclass):
                             track_order=track_order,
                             entity_cache=entity_cache)
 
+        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+                    compression=compression, chunks=chunks, track_order=track_order,
+                    entity_cache=entity_cache)
+
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
 
@@ -2669,15 +2672,15 @@ class RecordingSource(ScipyenDataclass):
         name = attrs["name"]
         adc  = attrs["adc"]
         dac  = attrs["dac"]
-        # electrodeMode = attrs["electrodeMode"]
 
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
-        # pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
+        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
 
         return cls(name=name, adc=adc, dac=dac, syn=syn,
-                   auxin=auxin, auxout=auxout, electrodeMode = electrodeMode)
+                   auxin=auxin, auxout=auxout, pathwys=pathways,
+                   electrodeMode = electrodeMode)
 
     @property
     def clamped(self) -> bool:

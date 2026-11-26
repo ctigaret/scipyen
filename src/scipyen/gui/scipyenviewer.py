@@ -845,7 +845,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # if/when it does exist
             self._deregister_menuBar_()
 
-
             if self.isTopLevelWindow:
                 if self._delete_on_close_ or getattr(self.scipyenWindow, "autoRemoveViewers", False):
                     if any([v is self for v in self.scipyenWindow.workspace.values()]):
