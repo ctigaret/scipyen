@@ -365,336 +365,6 @@ class Analysis(BaseScipyenData): # TODO 2026-05-31 21:15:19
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
 
-# class BlockCompliance(dict):
-#     r"""Custom dictionary with bool keys ↦ list of neo.Block instances.
-#     It follows that it can contain at most two entries, False and True, each
-#     mapped to a possibly empty sequence of neo.Block objects.
-#     """
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#
-#         if len(self):
-#             assert all(isinstance(k, bool) for k in self), "All keys must be booleans"
-#             assert all(isinstance(v, typing.Sequence) for v in self.values()), "All values must be sequences"
-#             non_empty = [v for v in self.values() if len(v)]
-#             assert all(all(isinstance(b, neo.Block) for b in v) for v in non_empty), "All non-empty values must contain neo.Block objects"
-#
-#     def __contains__(self, key: bool) -> bool:
-#         if not isinstance(key, bool):
-#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-#
-#         return key in self.keys()
-#
-#     def __getitem__(self, key: bool) -> typing.List:
-#         if not isinstance(key, bool):
-#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-#
-#         if key in self:
-#             return super().__getitem__(key)
-#
-#         return []
-#
-#     def __setitem__(self, key: bool, value: typing.List[neo.Block]):
-#         if not isinstance(key, bool):
-#             raise TypeError(f"Invalid key type ({type(key).__name__}) when a bool was expected")
-#
-#         if not isinstance(value, typing.List):
-#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a list was expected")
-#
-#         if len(value) and not all(isinstance(v, neo.Block) for v in value):
-#             raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-#
-#         super().__setitem__(key, value)
-#
-#     def addCompliant(self, value: neo.Block | typing.List[neo.Block]):
-#         data = self[True]
-#
-#         if isinstance(value, neo.Block):
-#             data.append(value)
-#             self[True] = data
-#
-#         elif isinstance(value, typing.List) and len(value):
-#             if not all(isinstance(v, neo.Block) for v in value):
-#                 raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-#             data.extend(value)
-#             self[True] = data
-#
-#         else:
-#             raise TypeError(f"Expecting a neo.Block or a list of neo.Block objects; instead, got {type(value).__name__}")
-#
-#     def addNonCompliant(self, value: neo.Block | typing.List[neo.Block]):
-#         data = self[False]
-#
-#         if isinstance(value, neo.Block):
-#             data.append(value)
-#             self[False] = data
-#
-#         elif isinstance(value, typing.List) and len(value):
-#             if not all(isinstance(v, neo.Block) for v in value):
-#                 raise TypeError("Invalid value element types; expecting a list of neo.Block objects")
-#             data.extend(value)
-#             self[False] = data
-#
-#     @property
-#     def compliant(self) -> typing.List:
-#         return self[True]
-#
-#     @compliant.setter
-#     def compliant(self, value: neo.Block | typing.List[neo.Block]):
-#         if isinstance(value, neo.Block):
-#             value = [neo.Block]
-#
-#         if (not isinstance(value, typing.List)
-#             or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
-#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
-#
-#         self[True] = value
-#
-#
-#     @property
-#     def nonCompliant(self) -> typing.List:
-#         return self[False]
-#
-#     @nonCompliant.setter
-#     def nonCompliant(self, value: neo.Block | typing.List[neo.Block]):
-#         if isinstance(value, neo.Block):
-#             value = [neo.Block]
-#
-#         if (not isinstance(value, typing.List)
-#             or (len(value) and not all(isinstance(v, neo.Block) for v in value))):
-#             raise TypeError(f"Invalid value type ({type(value).__name__}) when a neo.Block or a list of neo.Block objects was expected")
-#
-#         self[False] = value
-#
-# class ProtocolTrials(dict):
-#     r"""Mapping of ElectrophysiologyProtocol to collection of trials (neo.Block objects).
-#
-#     Maps a key: ElectrophysiologyProtocol instance ↦ value: dict with bool keys,
-#         where:
-#         True ↦ list of compliant trials (i.e. trials that were recorded with the
-#         protocol specified in the `key`, AND contain the same number of segments as the
-#         number of sweeps configured in the protocol)
-#
-#         False ↦ list of non-compliant trials (trials wthat were also recorded
-#         with the protocol specified in the key, but have less segments that the
-#         number of sweeos in the protocol) — this can happen when the recording
-#         was interrupted for some reason, resulting in fewer sweeps being saved on disk.
-#
-#     NOTE: Although an ElectrophysiologyProtocol is degined to be hashable, membership
-#     test in collections is more complicated than simply checking each of its members
-#     for equality. Notably, changes in the amplifier gain during a recording WILL
-#     appear as if the protocol changed (even though it is only the scaling of the
-#     physical dimensions that has changed). A workaround is to use the
-#     utilities.approximatelyEqual(…) function, which tests for numerical "closeness"
-#     and interconvertibility of physical dimensionality (i.e., units).
-#
-#     This approach is implemented by this class and its companion, `ephys_protocol.ProtocolList`.
-#     My recomendation is to avoid collecting protocols in stock Python lists or dicts,
-#     and use this class (together with `ProtocolList`) instead.
-#
-#     """
-#     # import core.pyabfbridge as pab
-#     valueChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(BlockCompliance)
-#     protocolChanged: typing.ClassVar[psygnal.Signal] = psygnal.Signal(ElectrophysiologyProtocol)
-#
-#
-#     # protocolProps = inspect.getmembers_static(ElectrophysiologyProtocol, lambda p: isinstance(p, property))
-#     # abfProtocolProps = inspect.getmembers_static(pab.ABFProtocol, lambda p: isinstance(p, property))
-#
-#     def _registerKeyProperties_(self, obj):
-#         self._keyProperties_[type(obj)] = inspect.getmembers_static(type(obj), lambda p: isinstance(p, property))
-#
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#
-#         self._useApproxEqual_: bool = False
-#
-#         if len(self):
-#             assert all(isinstance(k, ElectrophysiologyProtocol) for k in self), "ProtocolTrials accepts only ElectrophysiologyProtocol as keys"
-#             assert all(isinstance(v, BlockCompliance) for v in self.values()), "All values must be BlockCompliance dictionaries"
-#
-#         self._keyProperties_ = {}
-#
-#     def __contains__(self, obj: ElectrophysiologyProtocol | str):
-#         if isinstance(obj, ElectrophysiologyProtocol):
-#             if self._useApproxEqual_:
-#                 if len(self._keyProperties_) == 0 or type(obj) not in self._keyProperties_:
-#                     self._registerKeyProperties_(obj)
-#
-#                 # NOTE: 2026-11-22 17:14:30
-#                 # this works, but it's too slow!
-#                 return any(all(utilities.memberApproximatelyEqual(obj, pobj, p[0]) for p in self._keyProperties_[type(obj)]) for pobj in self)
-#                 # return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
-#                 # if len(self._key_cache_) == 0:
-#                 #     return any(next(utilities.approximatelyEqual(obj, p)) for p in self.keys())
-#                 #
-#                 # return obj in self._key_cache_
-#             else:
-#                 return any(obj == key for key in self)
-#                 # return super().__contains__(obj)
-#
-#         elif isinstance(obj, str):
-#             return obj in (k.name for k in self)
-#
-#         return False
-#
-#     def __delitem__(self, key: ElectrophysiologyProtocol | str):
-#         if isinstance(key, str):
-#             key = self.getProtocol(key)
-#
-#         if key not in self:
-#             raise KeyError(f"Key not found:\n{key}")
-#
-#         super().__delitem__(key)
-#         # self._key_cache_.remove(key)
-#
-#
-#     def __getitem__(self, key: ElectrophysiologyProtocol | str) -> BlockCompliance:
-#         # print(f"{self.__class__.__name__}.__getitem__({type(key).__name__})")
-#         found = ()
-#         if isinstance(key, ElectrophysiologyProtocol) or ElectrophysiologyProtocol in inspect.getmro(type(key)):
-#             if len(self._keyProperties_) == 0 or type(key) not in self._keyProperties_:
-#                 self._registerKeyProperties_(key)
-#
-#             if key not in self:
-#                 raise KeyError(f"Specified protocol is not a key of this object")
-#
-#             if self._useApproxEqual_:
-#                 props = self._keyProperties_[type(key)]
-#                 found = tuple(k for k, pobj in enumerate(self) if all(utilities.memberApproximatelyEqual(key, pobj, p[0]) for p in props))
-#
-#             else:
-#                 found = tuple(k for k, pobj in enumerate(self) if pobj == key)
-#
-#         elif isinstance(key, str):
-#             if key not in self:
-#                 raise KeyError(f"No protocol named {name} found among the keys")
-#
-#             found = tuple(k for k,p in enumerate(self) if p.name == key)
-#
-#         else:
-#             raise TypeError(f"Invalid key type ({type(key).__name__})")
-#
-#         if len(found)==1:
-#             return tuple(self.values())[found[0]]
-#
-#         elif len(found) == 0:
-#             raise KeyError("Key not found")
-#
-#         else:
-#             raise KeyError("Ambiguous protocol key")
-#
-#
-#     def __setitem__(self, key: ElectrophysiologyProtocol, value: BlockCompliance):
-#         # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
-#         if not isinstance(key, ElectrophysiologyProtocol):
-#             raise TypeError(f"Invalid key type {type(key).__name__} when a ElectrophysiologyProtocol was expected")
-#
-#         if not isinstance(value, BlockCompliance):
-#             raise TypeError(f"Invalid value type {type(value).__name__} when a BlockCompliance was expected")
-#
-#         # if key not in self:
-#         #     self._key_cache_.add(key)
-#
-#         super().__setitem__(key, value)
-#
-#     def _hash__(self):
-#         return hash(tuple(self.keys()), tuple(self.values()))
-#
-#     @property
-#     def useApproximativeComparison(self) -> bool:
-#         return self._useApproxEqual_
-#
-#     @useApproximativeComparison.setter
-#     def useApproximativeComparison(self, val: bool):
-#         self._useApproxEqual_ = val is True
-#
-#     @property
-#     def protocols(self):
-#         yield from self
-#
-#     @property
-#     def protocolNames(self):
-#         yield from (p.name for p in self)
-#
-#     def getProtocolKey(self, name: str):
-#         if name not in self:
-#             return KeyError(f"No protocol named {name} found among the keys")
-#
-#         try:
-#             protocol = next(p for p in self if p.name == name)
-#         except:
-#             raise KeyError(f"Ambiguous protocol key")
-#
-#     def addCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if protocol not in self:
-#             self[protocol] = BlockCompliance()
-#         self[protocol].addCompliant(value)
-#
-#     def addNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if protocol not in self:
-#             self[protocol] = BlockCompliance()
-#         self[protocol].addNonCompliant(value)
-#
-#     @property
-#     def notComplied(self) -> list:
-#         r"""List of protocols without any compliant trial"""
-#         return [k for k in self if len(self[k][True]) == 0]
-#
-#     @property
-#     def complied(self) -> list:
-#         r"""List of protocols with compliant trials"""
-#         return [k for k in self if len(self[k][True])]
-#
-#     def discardNonCompliantTrials(self) -> typing.Self:
-#         r"""Returns an instance of ProtocolTrials containing only protocols with compliant trials"""
-#         if len(self) == 0:
-#             return typing.Self()
-#
-#         return self.__class__({p: BlockCompliance({True: b[True]}) for p, b in self.items() if len(b[True])})
-#
-#     def getCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
-#         r"""Retrieves list of blocks that comply with the specified protocol
-#     """
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if key not in self:
-#             raise ValueError("Specified protocol key not found")
-#         return self[protocol].compliant
-#
-#     def getNonCompliant(self, key: ElectrophysiologyProtocol | str) -> list:
-#         r"""Retrieves list of blocks that do NOT comply with the specified protocol
-#     """
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if key not in self:
-#             raise ValueError("Specified protocol key not found")
-#         return self[protocol].nonCompliant
-#
-#     def setCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if protocol not in self:
-#             self[protocol] = BlockCompliance()
-#         self[protocol].compliant = value
-#
-#     def setNonCompliant(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block]):
-#         protocol = self.getProtocolKey(key) if isinstance(key, str) else key
-#         if protocol not in self:
-#             self[protocol] = BlockCompliance()
-#         self[protocol].nonCompliant = value
-#
-#     def add(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
-#         if complies:
-#             self.addCompliant(key, value)
-#         else:
-#             self.addNonCompliant(key, value)
-#
-#     def set(self, key: ElectrophysiologyProtocol | str, value: neo.Block | typing.List[neo.Block], complies:bool):
-#         if complies:
-#             self.setCompliant(key, value)
-#         else:
-#             self.setNonCompliant(key, value)
-#
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal],
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
@@ -799,8 +469,7 @@ def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, Da
 
     return signal, command
 
-def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal],
-                       **kwargs) -> tuple:
+def detectMembraneTest(command: neo.AnalogSignal | DataSignal, **kwargs) -> tuple:
     r"""Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
     The detection occurs in a command signal (a copy of the DAC command) where the boxcar is defined.
     Use this an alternative to parsing an ElectrophysiologyProtocol, in order to
@@ -870,11 +539,8 @@ def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal],
     return start, stop, test_amplitude
 
 
-def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
-                 start:int = 0,
-                 span:int=1,
-                 isISI:bool=False,
-                 useNan:bool=True):
+def isiFrequency(data: typing.Sequence | collections.abc.Iterable,
+                 start: int = 0, span: int = 1, isISI: bool = False, useNan: bool = True):
     r"""Calculates the reciprocal of an inter-event interval.
 
     This can be the time interval between any two events with indices "start" &
@@ -979,7 +645,7 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
 @singledispatch
 def mid_point(loc: object,
               outer: bool = True):
-    r"""Mid point across a location object.
+    r"""Mid point across a location object, within a signal's domain.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -1017,13 +683,9 @@ these objects encapsulate a single interval.
 @mid_point.register(tuple)
 @mid_point.register(list)
 @mid_point.register(collections.deque)
-def _mid_point_(loc: typing.Union[typing.Sequence[numbers.Number],
-                                      typing.Sequence[pq.Quantity],
-                                      typing.Sequence[typing.Sequence[numbers.Number]],
-                                      typing.Sequence[typing.Sequence[pq.Quantity]],
-                                      ],
+def _mid_point_(loc: typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity] | typing.Sequence[typing.Sequence[numbers.Number]] | typing.Sequence[typing.Sequence[pq.Quantity]],
                 outer: bool = True):
-    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc): # noqa
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
         assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         loc = (min(loc), max(loc))
         return loc[0] + (loc[1]-loc[0])/2
@@ -1033,8 +695,9 @@ def _mid_point_(loc: typing.Union[typing.Sequence[numbers.Number],
             t0, t1 = min(loc[0][0], loc[-1][-1]), max(loc[0][0], loc[-1][-1])
             return t0 + (t1-t0)/2
         else:
-            mp = lambda xx: xx[0] + (xx[1]-xx[0])/2 # noqa
-            return list(map(lambda l: mp(sorted(l)), loc))
+            mp = lambda xx: xx[0] + (xx[1]-xx[0])/2
+            return [mp(sorted(l)) for l in loc]
+            # return list(map(lambda l: mp(sorted(l)), loc))
 
     else:
         raise ValueError("'loc' must be a sequence of two scalars or a sequence of scalar pairs")
@@ -1042,9 +705,7 @@ def _mid_point_(loc: typing.Union[typing.Sequence[numbers.Number],
 @mid_point.register(neo.Epoch)
 @mid_point.register(DataZone)
 @mid_point.register(Interval)
-def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
-                outer: bool = True):
-
+def _mid_point_(loc: neo.Epoch | DataZone | Interval, outer: bool = True): # noqa: F811
     if outer:
         t0 = loc.t0.flatten()[0] if isinstance(loc, Interval) else loc.times.flatten()[0]
         dt = loc.t1.flatten()[-1] - t0 if isinstance(loc, Interval) else np.sum(loc.durations.flatten())
@@ -1052,20 +713,27 @@ def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
         return t0 + dt/2
 
     else:
-        intervals = list(map(lambda k: (
-                                        loc[k] if isinstance(loc, Interval)
-                                        else (loc[k].times, loc[k].times+loc[k].durations)
-                                        ),
-                             range(loc.size)
-                            )
-                        )
+        intervals = [
+            (
+                loc[k] if isinstance(loc, Interval)
+                else (loc[k].times, loc[k].times+loc[k].durations)
+            )
+            for k in range(loc.size)
+        ]
+        # intervals = list(map(lambda k: (
+        #                                 loc[k] if isinstance(loc, Interval)
+        #                                 else (loc[k].times, loc[k].times+loc[k].durations)
+        #                                 ),
+        #                      range(loc.size)
+        #                     )
+        #                 )
 
-        return list(map(lambda i: mid_point(i, True), intervals))
+        return [mid_point(i, True) for i in intervals]
+        # return list(map(lambda i: mid_point(i, True), intervals))
 
 @mid_point.register(DataCursor)
 @mid_point.register(SignalCursor)
-def _mid_point_(loc: typing.Union[DataCursor, SignalCursor], # noqa
-                _: bool = True):
+def _mid_point_(loc: DataCursor | SignalCursor, _: bool = True): # noqa: F811
     ret = loc.x if isinstance(loc, SignalCursor) else loc.coord
 
     if isinstance(ret, pq.Quantity):
@@ -1074,7 +742,7 @@ def _mid_point_(loc: typing.Union[DataCursor, SignalCursor], # noqa
     return ret
 
 @mid_point.register(pq.Quantity)
-def _mid_point_(loc: pq.Quantity, _:bool = True):
+def _mid_point_(loc: pq.Quantity, _:bool = True):# noqa: F811
     if loc.size == 1:
         return loc
 
@@ -1082,13 +750,8 @@ def _mid_point_(loc: pq.Quantity, _:bool = True):
 
 
 @singledispatch
-def get_location_boundary(loc: object, start: bool,
-                          outer: bool = True,
-                          ) -> typing.Union[
-                            numbers.Number, pq.Quantity,
-                            typing.Sequence[numbers.Number],
-                            typing.Sequence[pq.Quantity]
-                            ]:
+def get_location_boundary(loc: object, start: bool, outer: bool = True,
+                          ) -> numbers.Number | pq.Quantity | typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity]:
     r"""Returns the left or reight boundary of the location object.
 
 .. |nbsp| unicode:: 0xA0
@@ -1134,19 +797,12 @@ because these objects encapsulate only one sub-interval.
 @get_location_boundary.register(tuple)
 @get_location_boundary.register(list)
 @get_location_boundary.register(collections.deque)
-def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
-                                      typing.Sequence[pq.Quantity],
-                                      typing.Sequence[typing.Sequence[numbers.Number]],
-                                      typing.Sequence[typing.Sequence[pq.Quantity]],
-                                      ],
-                       start: bool,
-                       outer: bool = True
-                   ) -> typing.Union[numbers.Number, pq.Quantity,
-                                     typing.Sequence[numbers.Number],
-                                     typing.Sequence[pq.Quantity]]:
+def _get_location_boundary_(loc: typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity] | typing.Sequence[typing.Sequence[numbers.Number]] | typing.Sequence[typing.Sequence[pq.Quantity]],
+                       start: bool, outer: bool = True
+                   ) -> numbers.Number | pq.Quantity | typing.Sequence[numbers.Number] |typing.Sequence[pq.Quantity]:
 
     # print(f"get_location_boundary(loc = {loc})\n")
-    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc): # noqa
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
         assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         return loc[0] if start else loc[1]
 
@@ -1154,7 +810,8 @@ def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
         if outer:
             return loc[0][0] if start else loc[-1][-1]
         else:
-            return list(map(lambda l: l[0] if start else l[1], loc)) # noqa
+            return [l[0] if start else l[1] for l in loc]
+            # return list(map(lambda l: l[0] if start else l[1], loc)) # noqa
 
     else:
         raise ValueError("'loc' must be a sequence of two scalars or a sequence of scalar pairs")
@@ -1162,12 +819,9 @@ def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
 @get_location_boundary.register(neo.Epoch)
 @get_location_boundary.register(DataZone)
 @get_location_boundary.register(Interval)
-def _get_location_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
-                       start: bool,
-                       outer: bool = True
-                   ) -> typing.Union[numbers.Number, pq.Quantity,
-                                     typing.Sequence[numbers.Number],
-                                     typing.Sequence[pq.Quantity]]:
+def _get_location_boundary_(loc: neo.Epoch | DataZone | Interval,
+                       start: bool, outer: bool = True
+                   ) -> numbers.Number | pq.Quantity | typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity]:
     get_boundary = lambda i: (
         (
             i.t0.copy().flatten()[0] if isinstance(i, Interval)
@@ -1182,18 +836,17 @@ def _get_location_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
     if outer:
         return get_boundary(loc)
     else:
-        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                                key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
-        return list(map(get_boundary, intervals))
+        intervals = sorted([loc[k] for k in range(loc.size)],
+                            key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0)
+        return [get_boundary(i) for i in intervals]
+        # intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+        #                         key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+        # return list(map(get_boundary, intervals))
 
 @get_location_boundary.register(DataCursor)
 @get_location_boundary.register(SignalCursor)
-def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor], # noqa
-                       start: bool,
-                       _: bool = True
-                   ) -> typing.Union[numbers.Number, pq.Quantity,
-                                     typing.Sequence[numbers.Number],
-                                     typing.Sequence[pq.Quantity]]:
+def _get_location_boundary_(loc: DataCursor | SignalCursor, start: bool, _: bool = True
+                   ) -> numbers.Number, pq.Quantity | typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity]:
 
     if isinstance(loc, SignalCursor):
         coord = float(loc.x)
@@ -1447,19 +1100,14 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
 
 @signal_fit.register(DataCursor)
 @signal_fit.register(SignalCursor)
-def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor], # noqa
+def _signal_fit_(loc: DataCursor | SignalCursor,
                  model: types.FunctionType,
                  fitTable: pd.DataFrame,
-                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 signal: neo.AnalogSignal | DataSignal,
                  /,
-                 adjustFitTable: dict = dict(),
-                 channel: typing.Optional[int] = None,
-                 ) -> typing.Optional[
-                   typing.Union[
-                       tuple,
-                       typing.Sequence[tuple]
-                       ]
-                   ]:
+                 adjustFitTable: dict = {},
+                 channel: int | None = None,
+                 ) -> tuple | typing.Sequence[tuple]:
     if isinstance(loc, SignalCursor):
         coord = float(loc.x)
         span = float(loc.xwindow)
@@ -1481,10 +1129,9 @@ def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
 @singledispatch
 def signal_reduce(loc: object, func: typing.Callable,
-                  signal: typing.Union[neo.AnalogSignal, DataSignal], /,
-                  channel: typing.Optional[int] = None,
-                  ) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-                  # relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                  signal: neo.AnalogSignal | DataSignal, /,
+                  channel: int | None = None,
+                  ) -> pq.Quantity | typing.Sequence[pq.Quantity]:
     r""" Applies a reducing function to a signal, within the location's intervals.
 
 .. |nbsp| unicode:: 0xA0
@@ -4381,38 +4028,7 @@ def cursors_measure(func: typing.Callable,
 # # migrating to single dispatch paradigm (dispatches on the locator type, which
 # # can be a cursor, an epoch, an interval, or NOTE: 2024-02-09 08:50:35 a scalar
 # # time quantity (TODO))
-# @singledispatch
-# def reduce(locator, func:typing.Callable,
-#            signal:typing.Union[neo.AnalogSignal, DataSignal],
-#            channel:typing.Optional[int]=True,
-#            duration:bool=False,
-#            loatorIndex:typing.Optional[int] = None):
-#     r"""Single-dispatch version of *_reduce functions in this module.
-#
-# WARNING: this currently is just a springboard for the *_reduce functions already
-# defined in the module and delegates to them.
-#
-# In the future, these functions might be replaced entirely by this function.
-# """
-#     raise NotImplementedError(f"Function does not support {type(locator).__name__} locators")
-#
-# @reduce.register(SignalCursor)
-# def _(locator, func, signal, channel:int=None,
-#       duration:bool=False, locatorIndex:int=None):
-#     return cursor_reduce(func, signal, locator, channel=channel)
-#
-# @reduce.register(tuple)
-# def _(locator, func, signal, channel:int=None,
-#       duration=False, locatorIndex:int=None):
-#     return interval_reduce(func, signal, locator,channel=channel, duration=duration)
-#
-# @reduce.register(neo.Epoch)
-# @reduce.register(DataZone)
-# def _(locator, func, signal, channel=None,
-#       duration=False, locatorIndex:int=None):
-#     return epoch_reduce(func, signal, locator,
-#                         index=locatorIndex, channel=channel)
-# @singledispatch
+
 def amplitudeMeasure(*args, name:str = "amplitude",
                      channel:int = 0,
                      relative: bool = True) -> DeferredSignalMeasure:
