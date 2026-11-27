@@ -322,6 +322,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         self._readOnly_ = val is True
         for objectItem in self.objectItems():
             objectNode = objectItem.data(ObjectDataRole)
+            if objectNode is None:
+                return
             objectNode.objectInfo.readOnly = self._readOnly_
             self._updateRowForNode_(objectItem, objectNode)
 
@@ -358,12 +360,10 @@ class ObjectModel(QtGui.QStandardItemModel):
         else:
             return
 
-        # if objectNode.objectInfo.objKeyType == ephys_protocol.ElectrophysiologyProtocol:
-        #     display = f"{objectNode.objectInfo.objKeyType.__name__} <{objectNode.objectInfo.objKey.name}>"
-        # else:
-        #     display = objectNode.objectInfo.name
-        #
-        # objectItem.setData(display, QtCore.Qt.DisplayRole)
+        # WARNING 2026-11-27 08:46:40
+        # objectTypeItem and objectInfoValueItem WILL be None if item is an
+        # inline table item
+
         objectItem.setData(qVariant(objectNode), ObjectDataRole)
         objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
@@ -375,7 +375,10 @@ class ObjectModel(QtGui.QStandardItemModel):
 
             if self._inlineTables_:
                 dataItem = objectItem.child(0, 0)
+                if not dataItem:
+                    dataItem = QtGui.QStandardItem("")
                 dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
+                dataItem.setData(qVariant(objectNode), ObjectDataRole) # so that we can still open it in an external editor
                 objectItem.setData(qVariant(1), ObjectChildrenCountRole)
 
             else:
@@ -386,21 +389,22 @@ class ObjectModel(QtGui.QStandardItemModel):
             objectItem.setRowCount(nChildren)
             objectItem.setData(qVariant(nChildren), ObjectChildrenCountRole)
 
-        typeName = objectNode.objectInfo.objType.__name__
-        objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
-        objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
+        if all(itm is not None for itm in (objectTypeItem, objectInfoValueItem)):
+            typeName = objectNode.objectInfo.objType.__name__
+            objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
+            objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
 
-        if isinstance(objectNode.data, pathlib.Path):
-            if __has_PySide6__:
-                objectInfoValueItem.setData(objectNode.data, ObjectDataRole) # expects Node payload
-                objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
+            if isinstance(objectNode.data, pathlib.Path):
+                if __has_PySide6__:
+                    objectInfoValueItem.setData(objectNode.data, ObjectDataRole) # expects Node payload
+                    objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
 
+                else:
+                    objectInfoValueItem.setData(objectNode.data, QtCore.Qt.EditRole) # expects Node payload
             else:
-                objectInfoValueItem.setData(objectNode.data, QtCore.Qt.EditRole) # expects Node payload
-        else:
-            objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
-            objectInfoValueItem.setData(objectNode.objectInfo.choices, DataChoicesRole)
-            objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
+                objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
+                objectInfoValueItem.setData(objectNode.objectInfo.choices, DataChoicesRole)
+                objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
 
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
         readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -418,6 +422,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         indexes = []
 
         for itm in (objectItem, objectTypeItem, objectInfoValueItem):
+            if itm is None:
+                continue
             itm.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
             itm.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
             if itm.column() == 2:
@@ -489,6 +495,7 @@ class ObjectModel(QtGui.QStandardItemModel):
             if self._inlineTables_:
                 dataItem = QtGui.QStandardItem("")
                 dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
+                dataItem.setData(qVariant(objectNode), ObjectDataRole) # so that we can still open it in an external editor
                 flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                 dataItem.setFlags(flags)
                 dataItem.setRowCount(0)

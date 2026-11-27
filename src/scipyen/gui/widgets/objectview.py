@@ -741,10 +741,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             return
 
         model = self.sourceModel
-        if isinstance(item,parent(), QtGui.QStandardItem):
+        if isinstance(item.parent(), QtGui.QStandardItem):
             objData = item.parent().data(ObjectDataRole) # NOTE: 2026-09-26 23:54:52 this is an ObjectNode
         else:
-            objdata = item.data(ObjectDataRole)
+            objData = item.data(ObjectDataRole)
 
         hasEditorWidgetChild = item.data(StandaloneEditorWidgetRole)
         if hasEditorWidgetChild is True:
@@ -1043,17 +1043,17 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         super().mousePressEvent(evt)
         evt.setAccepted(True)
 
-    def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
-        # TODO: 2026-09-26 22:10:14 Finalize me !!!
-        if (evt.buttons() & QtCore.Qt.LeftButton
-            and isinstance(self._dragStartPosition_, QtCore.QPoint)
-            ):
-            items = self.selectedItems()
-            if (
-                len(items)
-                and
-                (evt.pos() - self._dragStartPosition_).manhattanLength() >=  QtWidgets.QApplication.startDragDistance()
-                ):
-                drag = QtGui.QDrag(self)
-                mimeData = QtCore.QMimeData()
+    # def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+    #     # TODO: 2026-09-26 22:10:14 Finalize me !!!
+    #     if (evt.buttons() & QtCore.Qt.LeftButton
+    #         and isinstance(self._dragStartPosition_, QtCore.QPoint)
+    #         ):
+    #         items = self.selectedItems()
+    #         if (
+    #             len(items)
+    #             and
+    #             (evt.pos() - self._dragStartPosition_).manhattanLength() >=  QtWidgets.QApplication.startDragDistance()
+    #             ):
+    #             drag = QtGui.QDrag(self)
+    #             mimeData = QtCore.QMimeData()
 

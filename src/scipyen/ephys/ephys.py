@@ -153,7 +153,7 @@ waveform_signal
 """
 
 #### BEGIN core python modules
-import os
+import os  # noqa: I001
 # import sys
 import collections
 import traceback
@@ -366,8 +366,8 @@ class Analysis(BaseScipyenData): # TODO 2026-05-31 21:15:19
         super().__init__(**kwargs)
 
 
-def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                    command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
+def detectClampMode(signal: neo.AnalogSignal | DataSignal,
+                    command: neo.AnalogSignal | DataSignal | pq.Quantity) -> ClampMode:
     r"""Infers the clamping mode from the units of signal and command"""
     vc_mode = scq.checkElectricalCurrentUnits(signal) and scq.checkElectricalPotentialUnits(command)
     ic_mode = scq.checkElectricalPotentialUnits(signal) and scq.checkElectricalCurrentUnits(command)
@@ -415,8 +415,8 @@ def validatePAxS(val:dict):
 
     return True
 
-def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, DataSignal],
-                   command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number]) -> tuple:
+def checkClampMode(clampMode:ClampMode, signal: neo.AnalogSignal | DataSignal,
+                   command: neo.AnalogSignal | DataSignal | pq.Quantity | numbers.Number) -> tuple:
     r"""Verifies that the clamping mode in clampMode is applicable to the signal & command.
     Returns the signal and the command, possibly with units modified as expected for the specified clamping mode"""
     if clampMode == ClampMode.VoltageClamp:
@@ -846,7 +846,7 @@ def _get_location_boundary_(loc: neo.Epoch | DataZone | Interval,
 @get_location_boundary.register(DataCursor)
 @get_location_boundary.register(SignalCursor)
 def _get_location_boundary_(loc: DataCursor | SignalCursor, start: bool, _: bool = True
-                   ) -> numbers.Number, pq.Quantity | typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity]:
+                   ) -> numbers.Number | pq.Quantity | typing.Sequence[numbers.Number] | typing.Sequence[pq.Quantity]:
 
     if isinstance(loc, SignalCursor):
         coord = float(loc.x)
@@ -868,19 +868,11 @@ def _get_location_boundary_(loc: DataCursor | SignalCursor, start: bool, _: bool
     return t0 if start else t1
 
 @singledispatch
-def signal_fit(loc:object,
-               model: typing.Callable,
-               fitTable: pd.DataFrame,
-               signal: typing.Union[neo.AnalogSignal, DataSignal],
+def signal_fit(loc:object, model: typing.Callable, fitTable: pd.DataFrame,
+               signal: neo.AnalogSignal | DataSignal,
                /,
-               adjustFitTable: dict = dict(),
-               channel: typing.Optional[int] = None,
-               ) -> typing.Optional[
-                   typing.Union[
-                       tuple,
-                       typing.Sequence[tuple]
-                       ]
-                   ]:
+               adjustFitTable: dict = {}, channel: int | None = None,
+               ) -> tuple | typing.Sequence[tuple]:
     r"""
 Parameters:
 -----------
@@ -962,7 +954,7 @@ Returns None in case of failure
 @signal_fit.register(tuple)
 @signal_fit.register(list)
 @signal_fit.register(collections.deque)
-def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
+def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],  # noqa: UP007
                                       typing.Sequence[pq.Quantity],
                                       DeferredSignalMeasure,
                                       typing.Sequence[typing.Sequence[numbers.Number]],
@@ -971,7 +963,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[types.FunctionType]],
                                       typing.Sequence[typing.Sequence[functools.partial]],
                                       typing.Sequence[
-                                                        typing.Union[
+                                                        typing.Union[  # noqa: UP007
                                                             numbers.Number,
                                                             pq.Quantity,
                                                             DeferredSignalMeasure,
@@ -982,16 +974,11 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       types.NoneType],
                  model: typing.Callable,
                  fitTable: pd.DataFrame,
-                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 signal: neo.AnalogSignal | DataSignal,
                  /,
-                 adjustFitTable: dict = dict(),
-                 channel: typing.Optional[int]=None,
-                 ) -> typing.Optional[
-                   typing.Union[
-                       tuple,
-                       typing.Sequence[tuple]
-                       ]
-                   ]:
+                 adjustFitTable: dict = {}, # noqa: B006
+                 channel: int | None =None,
+                 ) -> tuple | typing.Sequence[tuple]:
     if not models.isModelFunction(model):
         raise ValueError(f"The supplied {model} function is NOT a model function")
 
@@ -1008,7 +995,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         else:
             sg = loc()
-        if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+        if not isinstance(sg, (neo.AnalogSignal, DataSignal)):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
         return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
@@ -1022,7 +1009,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
             elif isinstance(loc[0], typing.Callable):
                 sg = loc[0]()
 
-            if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+            if not isinstance(sg, (neo.AnalogSignal, DataSignal)):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
             return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
@@ -1037,11 +1024,12 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
             raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
 
     elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for ll in loc_) for loc_ in loc):
-        result = list()
+        result = []
         for loc_ in loc:
             t0, t1 = loc_
             sg = __slice_signal__(t0, t1, signal, channel) # , relative)
             ret = __do_fit__(sg, model, fitTable, adjustFitTable, channel)
+            result.append(ret)
 
         return np.vstack(result)
 
@@ -1051,26 +1039,23 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
 @signal_fit.register(neo.Epoch)
 @signal_fit.register(DataZone)
 @signal_fit.register(Interval)
-def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
+def _signal_fit_(loc: neo.Epoch | DataZone, Interval,
                  model: typing.Callable,
                  fitTable: pd.DataFrame,
-                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 signal: neo.AnalogSignal | DataSignal,
                  /,
-                 adjustFitTable: dict = dict(),
-                 channel: typing.Optional[int] = None,
-                 ) -> typing.Optional[
-                   typing.Union[
-                       tuple,
-                       typing.Sequence[tuple]
-                       ]
-                   ]:
+                 adjustFitTable: dict = {}, # noqa: B006
+                 channel: int | None = None,
+                 ) -> tuple | typing.Sequence[tuple]:
     if loc.ndim > 0:
-        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                                key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+        intervals = sorted([loc[k] for k in range(loc.size)],
+                    key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0)
+        # intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+        #                         key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
     else:
         intervals = [loc]
 
-    result = list()
+    result = []
 
     for i in intervals:
         if isinstance(i, Interval):
