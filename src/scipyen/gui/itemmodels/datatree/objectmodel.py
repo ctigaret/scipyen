@@ -76,7 +76,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
 # from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
 from core.datatypes import PODS
 
-from ephys import (ephys_protocol, ephys_pathways)
+from ephys import (ephys_protocol, ephys_pathways)  # noqa: F401
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
@@ -483,7 +483,6 @@ class ObjectModel(QtGui.QStandardItemModel):
         objectItem.setData(qVariant(objectNode), ObjectDataRole)
         objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
-        # objectItem.setData(display, QtCore.Qt.DisplayRole)
 
         objectItemTip = f"Key type: {objectNode.objectInfo.objKeyType.__name__} -> {objectNode.objectInfo.objTip} object"
         objectItem.setData(objectItemTip, QtCore.Qt.ToolTipRole)
@@ -529,11 +528,11 @@ class ObjectModel(QtGui.QStandardItemModel):
         if isinstance(objectNode.data, pathlib.Path):
             if __has_PySide6__:
                 objectInfoValueItem.setData(objectNode.data, ObjectDataRole) # expects Node payload
-                # objectInfoValueItem.setData(obj, ObjectDataRole)
                 objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
+
             else:
                 objectInfoValueItem.setData(objectNode.data, QtCore.Qt.EditRole) # expects Node payload
-                # objectInfoValueItem.setData(obj, QtCore.Qt.EditRole)
+
         else:
             objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
 
@@ -552,7 +551,6 @@ class ObjectModel(QtGui.QStandardItemModel):
         readOnlyFont = QtGui.QFont(font)
         readOnlyFont.setItalic(True)
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-        # readOnlyBrush = palette.brush(QtGui.QPalette.Disabled, QtGui.QPalette.Text)
 
         for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
             item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
@@ -603,8 +601,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         self.clear()
 
-        # self._visited_.clear()
-        # self._hideRoot_ = hideRoot is True
         self._introspect_ = introspect is True
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate is True
@@ -641,8 +637,6 @@ class ObjectModel(QtGui.QStandardItemModel):
                                            objKeyType=type(self._rootTitle_))
 
         self._tree_.add_node(self._rootNode_)
-        # print(f"\n\t-> assign to self._modelData_")
-        # self._modelData_ = self._rootNode_.data
 
         self.beginResetModel()
         rowItems = self._makeRowForNode_(self._rootNode_)
@@ -669,7 +663,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
     @showCallables.setter
     def showCallables(self, val:bool):
-        # print(f"{self.__class__.__name__}.showCallables({val})")
         self._showCallables_ = val is True
 
     @property
@@ -703,40 +696,6 @@ class ObjectModel(QtGui.QStandardItemModel):
     @showValuesOnly.setter
     def showValuesOnly(self, val:bool):
         self._showValueAttributesOnly_ = val is True
-
-    # def _can_memoize_(self, obj) -> bool:
-    #     # if isinstance(obj, str) and strutils.is_path(obj):
-    #     #     return True
-    #
-    #     ret = (
-    #         not isinstance(obj, NOTMEMOIZED + PODS)
-    #         and not issubclass(type(obj), NOTMEMOIZED + PODS)
-    #         )
-    #
-    #     return ret
-    #
-    # def _is_memoized_(self, obj, objId, objDict) -> bool:
-    #     return (
-    #         self._can_memoize_(obj)
-    #         and objId in self._visited_
-    #         and objDict["objType"] == self._visited_[objId][-1]
-    #         )
-    #
-    # def _memoize_(self, obj, path, objDict):
-    #     objId = objDict["objId"]
-    #     realtype = objDict["objType"]
-    #     if objId not in self._visited_:
-    #         idx = len(self._visited_)
-    #         self._visited_[objId] = (idx, type(obj), path, realtype)
-
-    # def itemChildren(self: typing.Self,
-    #                  item: QtGui.QStandardItem) -> list:
-    #     if not item.hasChildren():
-    #         return []
-    #
-    #     return [item.child(k, 0) for k in range(item.rowCount())]
-        # return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
-
 
     def getDataObjectForLeaf(self, leaf: QtCore.QModelIndex | QtGui.QStandardItem,
                              byPath: bool = False) -> object:
